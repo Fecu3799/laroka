@@ -79,3 +79,12 @@ Capas obligatorias por módulo:
 - No ejecutar compilaciones ni validaciones intermedias
 - No hacer verificaciones despues de cada archivo
 - Implementar la tarea completa y reportar resultados al final
+
+## Estilo de respuesta
+
+- Responder directo, sin openers ("Claro!", "Excelente pregunta")
+- Sin cierres innecesarios ("Espero que ayude")
+- No reafirmar lo que el usuario dijo antes de responder
+- No tocar código fuera del scope de la tarea
+- No leer el mismo archivo dos veces en la misma sesión
+- Si algo es incierto, decir "no sé" en lugar de inventar
