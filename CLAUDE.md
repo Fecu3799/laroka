@@ -76,4 +76,6 @@ Capas obligatorias por módulo:
 - No hacer commits automáticos
 - No ejecutar git add ni git commit
 - El desarrollador gestiona todo el versionado
-- Una vez configurado CI, no realizar validaciones desde la terminal
+- No ejecutar compilaciones ni validaciones intermedias
+- No hacer verificaciones despues de cada archivo
+- Implementar la tarea completa y reportar resultados al final
