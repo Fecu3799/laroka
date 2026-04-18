@@ -23,6 +23,8 @@ import com.laroka.backend.catalog.mapper.ProductMapper;
 import com.laroka.backend.catalog.service.ProductService;
 import com.laroka.backend.shared.security.SecurityUtils;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 
 import lombok.RequiredArgsConstructor;
@@ -30,6 +32,7 @@ import lombok.RequiredArgsConstructor;
 @RestController
 @RequestMapping("/backoffice/products")
 @RequiredArgsConstructor
+@Tag(name = "Backoffice Products", description = "Manage products in the catalog")
 public class ProductController {
 
 	private final ProductService service;
@@ -37,11 +40,13 @@ public class ProductController {
 	private final SecurityUtils securityUtils;
 
 	@GetMapping("/{id}")
+	@Operation(summary = "Get product by ID", description = "Returns a specific product")
 	public ResponseEntity<ProductResponseDTO> findById(@PathVariable Integer id) {
 		return ResponseEntity.ok(mapper.toResponseDTO(service.findById(id)));
 	}
 
 	@GetMapping
+	@Operation(summary = "List products", description = "Returns all products, optionally filtered by branch, category, or pizzeria")
 	public ResponseEntity<List<ProductResponseDTO>> findAll(
 			@RequestParam(required = false) Integer branchId,
 			@RequestParam(required = false) Integer categoryId,
@@ -60,23 +65,27 @@ public class ProductController {
 	}
 
 	@PostMapping
+	@Operation(summary = "Create product", description = "Creates a new product")
 	public ResponseEntity<ProductResponseDTO> create(@RequestBody ProductRequestDTO dto) {
 		Product saved = service.create(mapper.toEntity(dto));
 		return ResponseEntity.status(HttpStatus.CREATED).body(mapper.toResponseDTO(saved));
 	}
 
 	@PutMapping("/{id}")
+	@Operation(summary = "Update product", description = "Updates an existing product")
 	public ResponseEntity<ProductResponseDTO> update(@PathVariable Integer id, @RequestBody ProductRequestDTO dto) {
 		return ResponseEntity.ok(mapper.toResponseDTO(service.update(id, mapper.toEntity(dto))));
 	}
 
 	@DeleteMapping("/{id}")
+	@Operation(summary = "Delete product", description = "Deletes a product")
 	public ResponseEntity<Void> delete(@PathVariable Integer id) {
 		service.delete(id);
 		return ResponseEntity.noContent().build();
 	}
 
 	@PatchMapping("/{id}/availability")
+	@Operation(summary = "Update product availability", description = "Updates the availability status of a product")
 	public ResponseEntity<ProductResponseDTO> updateAvailability(@PathVariable Integer id, @Valid @RequestBody AvailabilityUpdateDTO dto) {
 		Integer userBranchId = securityUtils.getAuthenticatedUserBranchId();
 		return ResponseEntity.ok(mapper.toResponseDTO(service.updateAvailability(id, dto.getAvailable(), userBranchId)));
