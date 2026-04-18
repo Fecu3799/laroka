@@ -46,6 +46,12 @@ Capas obligatorias por módulo:
 - Integraciones externas siempre via interfaz + Adapter
 - Errores manejados por GlobalExceptionHandler únicamente
 - Credenciales siempre por variables de entorno, nunca hardcodeadas
+- DTOs siempre separados: XxxRequestDTO para entrada, XxxResponseDTO para salida
+- RequestDTO: campos de entrada sin id ni timestamps
+- ResponseDTO: campos de salida incluyendo id y timestamps
+- El Mapper convierte DTO → Entidad en el Controller
+- El Service recibe y retorna Entidades, nunca DTOs
+- El Controller convierte Entidad → ResponseDTO antes de retornar
 
 ## Convenciones de código
 

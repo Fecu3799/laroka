@@ -9,4 +9,4 @@ CREATE TABLE pizzeria (
 );
 
 -- Insertar pizzería inicial
-INSERT INTO pizzeria (name) VALUES ('LaRoka Playa Unión');
+INSERT INTO pizzeria (name) VALUES ('LaRoka');
