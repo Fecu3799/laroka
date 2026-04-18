@@ -65,8 +65,8 @@ Capas obligatorias por módulo:
 
 ## Cómo trabajar con este repo
 
-- El informe técnico completo del proyecto está en docs/informe_tecnico.pdf
 - El backlog completo está en docs/BACKLOG.md
+- El informe completo del proyecto está en docs/informe_tecnico.txt
 - Cada módulo tiene su CONTEXT.md con reglas específicas
 - Al implementar una historia, referenciar su ID (ej: US-03-02)
 - Un prompt por capa, validar antes de continuar
