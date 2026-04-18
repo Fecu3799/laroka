@@ -16,6 +16,7 @@ import com.laroka.backend.catalog.repository.ProductRepository;
 import com.laroka.backend.pizzeria.entity.Pizzeria;
 import com.laroka.backend.pizzeria.exception.PizzeriaNotFoundException;
 import com.laroka.backend.pizzeria.repository.PizzeriaRepository;
+import com.laroka.backend.shared.exception.BusinessException;
 
 import lombok.RequiredArgsConstructor;
 
@@ -85,6 +86,15 @@ public class ProductService {
 
 	public void delete(Integer id) {
 		repository.delete(findById(id));
+	}
+
+	public Product updateAvailability(Integer id, Boolean available, Integer userBranchId) {
+		Product product = findById(id);
+		if (userBranchId != null && !product.getBranch().getId().equals(userBranchId)) {
+			throw new BusinessException("Product does not belong to user's branch");
+		}
+		product.setAvailable(available);
+		return repository.save(product);
 	}
 
 	private Category validateCategoryExists(Integer categoryId) {
