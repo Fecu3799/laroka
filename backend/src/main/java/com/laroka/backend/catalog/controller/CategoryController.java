@@ -14,6 +14,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import jakarta.validation.Valid;
+
 import com.laroka.backend.catalog.dto.CategoryRequestDTO;
 import com.laroka.backend.catalog.dto.CategoryResponseDTO;
 import com.laroka.backend.catalog.entity.Category;
@@ -50,14 +52,14 @@ public class CategoryController {
 
 	@PostMapping
 	@Operation(summary = "Create category", description = "Creates a new category")
-	public ResponseEntity<CategoryResponseDTO> create(@RequestBody CategoryRequestDTO dto) {
+	public ResponseEntity<CategoryResponseDTO> create(@Valid @RequestBody CategoryRequestDTO dto) {
 		Category saved = service.create(mapper.toEntity(dto));
 		return ResponseEntity.status(HttpStatus.CREATED).body(mapper.toResponseDTO(saved));
 	}
 
 	@PutMapping("/{id}")
 	@Operation(summary = "Update category", description = "Updates an existing category")
-	public ResponseEntity<CategoryResponseDTO> update(@PathVariable Integer id, @RequestBody CategoryRequestDTO dto) {
+	public ResponseEntity<CategoryResponseDTO> update(@PathVariable Integer id, @Valid @RequestBody CategoryRequestDTO dto) {
 		return ResponseEntity.ok(mapper.toResponseDTO(service.update(id, mapper.toEntity(dto))));
 	}
 

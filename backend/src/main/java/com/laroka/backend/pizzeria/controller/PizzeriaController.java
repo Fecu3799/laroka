@@ -13,6 +13,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import jakarta.validation.Valid;
+
 import com.laroka.backend.pizzeria.dto.PizzeriaRequestDTO;
 import com.laroka.backend.pizzeria.dto.PizzeriaResponseDTO;
 import com.laroka.backend.pizzeria.entity.Pizzeria;
@@ -46,14 +48,14 @@ public class PizzeriaController {
 
 	@PostMapping
 	@Operation(summary = "Create pizzeria", description = "Creates a new pizzeria")
-	public ResponseEntity<PizzeriaResponseDTO> create(@RequestBody PizzeriaRequestDTO dto) {
+	public ResponseEntity<PizzeriaResponseDTO> create(@Valid @RequestBody PizzeriaRequestDTO dto) {
 		Pizzeria saved = service.create(mapper.toEntity(dto));
 		return ResponseEntity.status(HttpStatus.CREATED).body(mapper.toResponseDTO(saved));
 	}
 
 	@PutMapping("/{id}")
 	@Operation(summary = "Update pizzeria", description = "Updates an existing pizzeria")
-	public ResponseEntity<PizzeriaResponseDTO> update(@PathVariable Integer id, @RequestBody PizzeriaRequestDTO dto) {
+	public ResponseEntity<PizzeriaResponseDTO> update(@PathVariable Integer id, @Valid @RequestBody PizzeriaRequestDTO dto) {
 		return ResponseEntity.ok(mapper.toResponseDTO(service.update(id, mapper.toEntity(dto))));
 	}
 

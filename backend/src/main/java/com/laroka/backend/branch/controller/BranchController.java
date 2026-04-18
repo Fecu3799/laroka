@@ -14,6 +14,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import jakarta.validation.Valid;
+
 import com.laroka.backend.branch.dto.BranchRequestDTO;
 import com.laroka.backend.branch.dto.BranchResponseDTO;
 import com.laroka.backend.branch.entity.Branch;
@@ -50,14 +52,14 @@ public class BranchController {
 
 	@PostMapping
 	@Operation(summary = "Create branch", description = "Creates a new branch")
-	public ResponseEntity<BranchResponseDTO> create(@RequestBody BranchRequestDTO dto) {
+	public ResponseEntity<BranchResponseDTO> create(@Valid @RequestBody BranchRequestDTO dto) {
 		Branch saved = service.create(mapper.toEntity(dto));
 		return ResponseEntity.status(HttpStatus.CREATED).body(mapper.toResponseDTO(saved));
 	}
 
 	@PutMapping("/{id}")
 	@Operation(summary = "Update branch", description = "Updates an existing branch")
-	public ResponseEntity<BranchResponseDTO> update(@PathVariable Integer id, @RequestBody BranchRequestDTO dto) {
+	public ResponseEntity<BranchResponseDTO> update(@PathVariable Integer id, @Valid @RequestBody BranchRequestDTO dto) {
 		return ResponseEntity.ok(mapper.toResponseDTO(service.update(id, mapper.toEntity(dto))));
 	}
 
