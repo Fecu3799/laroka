@@ -2,6 +2,9 @@ package com.laroka.backend.catalog.dto;
 
 import java.math.BigDecimal;
 
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -12,12 +15,25 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @Builder
 public class ProductRequestDTO {
+	@NotBlank(message = "Product name is required")
 	private String name;
+
 	private String description;
+
+	@NotNull(message = "Product price is required")
+	@DecimalMin(value = "0.01", message = "Product price must be greater than 0")
 	private BigDecimal price;
+
 	private String imageUrl;
+
 	private Boolean available;
+
+	@NotNull(message = "Category ID is required")
 	private Integer categoryId;
+
+	@NotNull(message = "Branch ID is required")
 	private Integer branchId;
+
+	@NotNull(message = "Pizzeria ID is required")
 	private Integer pizzeriaId;
 }

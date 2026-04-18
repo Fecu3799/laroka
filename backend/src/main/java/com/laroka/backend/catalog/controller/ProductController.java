@@ -66,14 +66,14 @@ public class ProductController {
 
 	@PostMapping
 	@Operation(summary = "Create product", description = "Creates a new product")
-	public ResponseEntity<ProductResponseDTO> create(@RequestBody ProductRequestDTO dto) {
+	public ResponseEntity<ProductResponseDTO> create(@Valid @RequestBody ProductRequestDTO dto) {
 		Product saved = service.create(mapper.toEntity(dto));
 		return ResponseEntity.status(HttpStatus.CREATED).body(mapper.toResponseDTO(saved));
 	}
 
 	@PutMapping("/{id}")
 	@Operation(summary = "Update product", description = "Updates an existing product")
-	public ResponseEntity<ProductResponseDTO> update(@PathVariable Integer id, @RequestBody ProductRequestDTO dto) {
+	public ResponseEntity<ProductResponseDTO> update(@PathVariable Integer id, @Valid @RequestBody ProductRequestDTO dto) {
 		return ResponseEntity.ok(mapper.toResponseDTO(service.update(id, mapper.toEntity(dto))));
 	}
 
