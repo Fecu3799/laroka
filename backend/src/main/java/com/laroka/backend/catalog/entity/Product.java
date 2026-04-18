@@ -19,6 +19,7 @@ import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
+import lombok.Builder.Default;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -46,6 +47,7 @@ public class Product {
 	@Column(name = "image_url")
 	private String imageUrl;
 
+	@Default
 	@Column(name = "available", nullable = false)
 	private Boolean available = true;
 
