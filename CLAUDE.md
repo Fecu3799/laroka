@@ -70,4 +70,10 @@ Capas obligatorias por módulo:
 - Cada módulo tiene su CONTEXT.md con reglas específicas
 - Al implementar una historia, referenciar su ID (ej: US-03-02)
 - Un prompt por capa, validar antes de continuar
-- No realizar acciones de versionado (git)
+
+## Reglas para ClaudeCode
+
+- No hacer commits automáticos
+- No ejecutar git add ni git commit
+- El desarrollador gestiona todo el versionado
+- Una vez configurado CI, no realizar validaciones desde la terminal
