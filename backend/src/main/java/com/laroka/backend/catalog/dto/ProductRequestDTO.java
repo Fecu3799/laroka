@@ -15,25 +15,22 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @Builder
 public class ProductRequestDTO {
-	@NotBlank(message = "Product name is required")
-	private String name;
+    @NotBlank(message = "Product name is required")
+    private String name;
 
-	private String description;
+    private String description;
 
-	@NotNull(message = "Product price is required")
-	@DecimalMin(value = "0.01", message = "Product price must be greater than 0")
-	private BigDecimal price;
+    @NotNull(message = "Product price is required")
+    @DecimalMin(value = "0.01", message = "Product price must be greater than 0")
+    private BigDecimal price;
 
-	private String imageUrl;
+    private String imageUrl;
 
-	private Boolean available;
+    private Boolean available;
 
-	@NotNull(message = "Category ID is required")
-	private Integer categoryId;
+    @NotNull(message = "Category ID is required")
+    private Integer categoryId;
 
-	@NotNull(message = "Branch ID is required")
-	private Integer branchId;
-
-	@NotNull(message = "Pizzeria ID is required")
-	private Integer pizzeriaId;
+    @NotNull(message = "Pizzeria ID is required")
+    private Integer pizzeriaId;
 }

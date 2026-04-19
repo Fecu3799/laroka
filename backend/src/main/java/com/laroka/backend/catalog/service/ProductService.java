@@ -4,13 +4,15 @@ import java.util.List;
 
 import org.springframework.stereotype.Service;
 
-import com.laroka.backend.branch.entity.Branch;
 import com.laroka.backend.branch.exception.BranchNotFoundException;
 import com.laroka.backend.branch.repository.BranchRepository;
+import com.laroka.backend.catalog.entity.BranchProduct;
 import com.laroka.backend.catalog.entity.Category;
 import com.laroka.backend.catalog.entity.Product;
+import com.laroka.backend.catalog.exception.BranchProductNotFoundException;
 import com.laroka.backend.catalog.exception.CategoryNotFoundException;
 import com.laroka.backend.catalog.exception.ProductNotFoundException;
+import com.laroka.backend.catalog.repository.BranchProductRepository;
 import com.laroka.backend.catalog.repository.CategoryRepository;
 import com.laroka.backend.catalog.repository.ProductRepository;
 import com.laroka.backend.pizzeria.entity.Pizzeria;
@@ -27,6 +29,7 @@ public class ProductService {
 	private final ProductRepository repository;
 	private final CategoryRepository categoryRepository;
 	private final BranchRepository branchRepository;
+	private final BranchProductRepository branchProductRepository;
 	private final PizzeriaRepository pizzeriaRepository;
 
 	public Product findById(Integer id) {
@@ -34,14 +37,9 @@ public class ProductService {
 			.orElseThrow(() -> new ProductNotFoundException(id));
 	}
 
-	public List<Product> findByBranch(Integer branchId) {
+	public List<BranchProduct> getMenuForBranch(Integer branchId) {
 		validateBranchExists(branchId);
-		return repository.findByBranchId(branchId);
-	}
-
-	public List<Product> findAvailableByBranch(Integer branchId) {
-		validateBranchExists(branchId);
-		return repository.findByBranchIdAndAvailableTrue(branchId);
+		return branchProductRepository.findByBranchIdAndAvailableTrue(branchId);
 	}
 
 	public List<Product> findByCategory(Integer categoryId) {
@@ -60,10 +58,8 @@ public class ProductService {
 
 	public Product create(Product product) {
 		Category category = validateCategoryExists(product.getCategory().getId());
-		Branch branch = validateBranchExists(product.getBranch().getId());
 		Pizzeria pizzeria = validatePizzeriaExists(product.getPizzeria().getId());
 		product.setCategory(category);
-		product.setBranch(branch);
 		product.setPizzeria(pizzeria);
 		return repository.save(product);
 	}
@@ -71,7 +67,6 @@ public class ProductService {
 	public Product update(Integer id, Product updates) {
 		Product product = findById(id);
 		Category category = validateCategoryExists(updates.getCategory().getId());
-		Branch branch = validateBranchExists(updates.getBranch().getId());
 		Pizzeria pizzeria = validatePizzeriaExists(updates.getPizzeria().getId());
 		product.setName(updates.getName());
 		product.setDescription(updates.getDescription());
@@ -79,7 +74,6 @@ public class ProductService {
 		product.setImageUrl(updates.getImageUrl());
 		product.setAvailable(updates.getAvailable());
 		product.setCategory(category);
-		product.setBranch(branch);
 		product.setPizzeria(pizzeria);
 		return repository.save(product);
 	}
@@ -88,13 +82,15 @@ public class ProductService {
 		repository.delete(findById(id));
 	}
 
-	public Product updateAvailability(Integer id, Boolean available, Integer userBranchId) {
-		Product product = findById(id);
-		if (userBranchId != null && !product.getBranch().getId().equals(userBranchId)) {
-			throw new BusinessException("Product does not belong to user's branch");
+	public Product updateAvailability(Integer productId, Boolean available, Integer branchId) {
+		if (branchId == null) {
+			throw new BusinessException("Branch ID is required to update product availability");
 		}
-		product.setAvailable(available);
-		return repository.save(product);
+		BranchProduct branchProduct = branchProductRepository.findByBranchIdAndProductId(branchId, productId)
+			.orElseThrow(() -> new BranchProductNotFoundException(branchId, productId));
+		branchProduct.setAvailable(available);
+		branchProductRepository.save(branchProduct);
+		return branchProduct.getProduct();
 	}
 
 	private Category validateCategoryExists(Integer categoryId) {
@@ -102,8 +98,8 @@ public class ProductService {
 			.orElseThrow(() -> new CategoryNotFoundException(categoryId));
 	}
 
-	private Branch validateBranchExists(Integer branchId) {
-		return branchRepository.findById(branchId)
+	private void validateBranchExists(Integer branchId) {
+		branchRepository.findById(branchId)
 			.orElseThrow(() -> new BranchNotFoundException(branchId));
 	}
 
