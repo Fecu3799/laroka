@@ -10,8 +10,15 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 
+import com.laroka.backend.auth.exception.InvalidCredentialsException;
+
 @ControllerAdvice
 public class GlobalExceptionHandler {
+
+	@ExceptionHandler(InvalidCredentialsException.class)
+	public ResponseEntity<Map<String, Object>> handleInvalidCredentials(InvalidCredentialsException ex) {
+		return buildResponse(HttpStatus.UNAUTHORIZED, ex.getMessage());
+	}
 
 	@ExceptionHandler(EntityNotFoundException.class)
 	public ResponseEntity<Map<String, Object>> handleEntityNotFound(EntityNotFoundException ex) {
