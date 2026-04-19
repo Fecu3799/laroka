@@ -153,6 +153,7 @@
 /* Branch button */
 .branch-btn {
   display: flex;
+  flex-direction: row-reverse;
   align-items: stretch;
   width: 100%;
   background: var(--bg-card);
@@ -206,12 +207,12 @@
   line-height: 1;
 }
 
-/* Label panel — absolute desde 35%, se superpone sobre el borde de la foto */
+/* Label panel — absolute desde 0 hasta right 35%, se superpone sobre el borde de la foto */
 .branch-label {
   position: absolute;
-  left: 35%;
+  left: 0;
   top: 0;
-  right: 0;
+  right: 35%;
   bottom: 0;
   display: flex;
   align-items: center;
@@ -219,10 +220,10 @@
   border-radius: 27px;
   border: 1px solid var(--accent);
   background:
-    linear-gradient(to right, rgba(0, 0, 0, 0.25) 0%, rgba(0, 0, 0, 0) 30%),
+    linear-gradient(to left, rgba(0, 0, 0, 0.25) 0%, rgba(0, 0, 0, 0) 30%),
     var(--bg-card);
   box-shadow:
-    inset 5px 0 10px rgba(0, 0, 0, 0.35),
+    inset -5px 0 10px rgba(0, 0, 0, 0.35),
     inset 0 2px 3px rgba(255, 255, 255, 0.06),
     inset 0 -4px 8px rgba(0, 0, 0, 0.45);
   transform: translateX(0);
@@ -230,9 +231,9 @@
   will-change: transform;
 }
 
-/* Switch: activado por JS con clase --sliding, inmediato */
+/* Switch: activado por JS con clase --sliding, desliza hacia la derecha */
 .branch-btn--sliding .branch-label {
-  transform: translateX(-53.85%);
+  transform: translateX(53.85%);
 }
 
 /* Branch name */

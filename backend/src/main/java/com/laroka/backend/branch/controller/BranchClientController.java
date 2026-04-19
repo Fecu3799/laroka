@@ -39,6 +39,6 @@ public class BranchClientController {
 	@GetMapping("/{id}/menu")
 	@Operation(summary = "Get branch menu", description = "Returns menu for a specific branch with available products grouped by category")
 	public ResponseEntity<List<MenuCategoryDTO>> getMenu(@PathVariable Integer id) {
-		return ResponseEntity.ok(menuMapper.toMenu(productService.findAvailableByBranch(id)));
+		return ResponseEntity.ok(menuMapper.toMenu(productService.getMenuForBranch(id)));
 	}
 }

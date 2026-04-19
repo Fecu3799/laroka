@@ -3,7 +3,6 @@ package com.laroka.backend.catalog.entity;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-import com.laroka.backend.branch.entity.Branch;
 import com.laroka.backend.pizzeria.entity.Pizzeria;
 
 import jakarta.persistence.Column;
@@ -47,6 +46,8 @@ public class Product {
 	@Column(name = "image_url")
 	private String imageUrl;
 
+	// TODO: disponibilidad operativa gestionada por BranchProduct.available; este campo
+	// puede usarse en el futuro para baja administrativa del catálogo maestro (US-EV-06)
 	@Default
 	@Column(name = "available", nullable = false)
 	private Boolean available = true;
@@ -54,10 +55,6 @@ public class Product {
 	@ManyToOne(fetch = FetchType.LAZY)
 	@JoinColumn(name = "category_id", nullable = false)
 	private Category category;
-
-	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "branch_id", nullable = false)
-	private Branch branch;
 
 	@ManyToOne(fetch = FetchType.LAZY)
 	@JoinColumn(name = "pizzeria_id", nullable = false)
