@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { usePreferredBranch } from '../hooks/usePreferredBranch'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080'
@@ -7,42 +7,51 @@ export function BranchSelector({ onSelect }) {
   const [branches, setBranches] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [selectedBranchId, setSelectedBranchId] = useState(null)
+  const [userSelectedBranchId, setUserSelectedBranchId] = useState(null)
   const { preferredBranchId, isLoaded, saveBranch } = usePreferredBranch()
+  const retryRef = useRef(null)
 
-  useEffect(() => {
-    fetchBranches()
+  const hasValidPreferred =
+    isLoaded &&
+    preferredBranchId != null &&
+    branches.some(b => b.id === preferredBranchId)
+  const selectedBranchId = userSelectedBranchId ?? (hasValidPreferred ? preferredBranchId : null)
+
+  const retry = useCallback(() => {
+    retryRef.current?.()
   }, [])
 
   useEffect(() => {
-    if (isLoaded && preferredBranchId && branches.length > 0) {
-      const exists = branches.some(b => b.id === preferredBranchId)
-      if (exists) {
-        setSelectedBranchId(preferredBranchId)
-        onSelect(preferredBranchId)
+    let cancelled = false
+    const load = async () => {
+      try {
+        const response = await fetch(`${API_BASE}/branches`)
+        if (!response.ok) throw new Error('Error fetching branches')
+        const data = await response.json()
+        if (!cancelled) {
+          setBranches(data)
+          setError(null)
+        }
+      } catch (err) {
+        if (!cancelled) setError(err.message || 'Error loading branches')
+      } finally {
+        if (!cancelled) setLoading(false)
       }
     }
-  }, [isLoaded, preferredBranchId, branches, onSelect])
+    retryRef.current = load
+    load()
+    return () => { cancelled = true }
+  }, [])
 
-  const fetchBranches = async () => {
-    try {
-      setLoading(true)
-      setError(null)
-      const response = await fetch(`${API_BASE}/branches`)
-      if (!response.ok) throw new Error('Error fetching branches')
-      const data = await response.json()
-      setBranches(data)
-    } catch (err) {
-      setError(err.message || 'Error loading branches')
-    } finally {
-      setLoading(false)
+  useEffect(() => {
+    if (selectedBranchId) {
+      onSelect(selectedBranchId)
     }
-  }
+  }, [selectedBranchId, onSelect])
 
   const handleSelectBranch = (branchId) => {
-    setSelectedBranchId(branchId)
+    setUserSelectedBranchId(branchId)
     saveBranch(branchId)
-    onSelect(branchId)
   }
 
   if (loading) {
@@ -53,7 +62,7 @@ export function BranchSelector({ onSelect }) {
     return (
       <div className="branch-selector error">
         <p>Error: {error}</p>
-        <button onClick={fetchBranches}>Retry</button>
+        <button onClick={retry}>Retry</button>
       </div>
     )
   }
