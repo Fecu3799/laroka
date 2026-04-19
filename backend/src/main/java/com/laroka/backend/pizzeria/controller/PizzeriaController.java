@@ -13,44 +13,54 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import jakarta.validation.Valid;
+
 import com.laroka.backend.pizzeria.dto.PizzeriaRequestDTO;
 import com.laroka.backend.pizzeria.dto.PizzeriaResponseDTO;
 import com.laroka.backend.pizzeria.entity.Pizzeria;
 import com.laroka.backend.pizzeria.mapper.PizzeriaMapper;
 import com.laroka.backend.pizzeria.service.PizzeriaService;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/pizzerias")
 @RequiredArgsConstructor
+@Tag(name = "Pizzerias", description = "Manage pizzeria information")
 public class PizzeriaController {
 
 	private final PizzeriaService service;
 	private final PizzeriaMapper mapper;
 
 	@GetMapping("/{id}")
+	@Operation(summary = "Get pizzeria by ID", description = "Returns a specific pizzeria")
 	public ResponseEntity<PizzeriaResponseDTO> findById(@PathVariable Integer id) {
 		return ResponseEntity.ok(mapper.toResponseDTO(service.findById(id)));
 	}
 
 	@GetMapping
+	@Operation(summary = "List all pizzerias", description = "Returns all pizzerias")
 	public ResponseEntity<List<PizzeriaResponseDTO>> findAll() {
 		return ResponseEntity.ok(service.findAll().stream().map(mapper::toResponseDTO).toList());
 	}
 
 	@PostMapping
-	public ResponseEntity<PizzeriaResponseDTO> create(@RequestBody PizzeriaRequestDTO dto) {
+	@Operation(summary = "Create pizzeria", description = "Creates a new pizzeria")
+	public ResponseEntity<PizzeriaResponseDTO> create(@Valid @RequestBody PizzeriaRequestDTO dto) {
 		Pizzeria saved = service.create(mapper.toEntity(dto));
 		return ResponseEntity.status(HttpStatus.CREATED).body(mapper.toResponseDTO(saved));
 	}
 
 	@PutMapping("/{id}")
-	public ResponseEntity<PizzeriaResponseDTO> update(@PathVariable Integer id, @RequestBody PizzeriaRequestDTO dto) {
+	@Operation(summary = "Update pizzeria", description = "Updates an existing pizzeria")
+	public ResponseEntity<PizzeriaResponseDTO> update(@PathVariable Integer id, @Valid @RequestBody PizzeriaRequestDTO dto) {
 		return ResponseEntity.ok(mapper.toResponseDTO(service.update(id, mapper.toEntity(dto))));
 	}
 
 	@DeleteMapping("/{id}")
+	@Operation(summary = "Delete pizzeria", description = "Deletes a pizzeria")
 	public ResponseEntity<Void> delete(@PathVariable Integer id) {
 		service.delete(id);
 		return ResponseEntity.noContent().build();
