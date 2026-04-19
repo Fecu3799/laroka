@@ -1,32 +1,29 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 
 const STORAGE_KEY = 'laroka_preferred_branch'
 
 export function usePreferredBranch() {
-  const [preferredBranchId, setPreferredBranchId] = useState(null)
-  const [isLoaded, setIsLoaded] = useState(false)
-
-  useEffect(() => {
+  const [state, setState] = useState(() => {
     const stored = localStorage.getItem(STORAGE_KEY)
-    if (stored) {
-      setPreferredBranchId(parseInt(stored))
+    return {
+      preferredBranchId: stored ? parseInt(stored) : null,
+      isLoaded: true
     }
-    setIsLoaded(true)
-  }, [])
+  })
 
   const saveBranch = (branchId) => {
     localStorage.setItem(STORAGE_KEY, branchId.toString())
-    setPreferredBranchId(branchId)
+    setState(prev => ({ ...prev, preferredBranchId: branchId }))
   }
 
   const clearBranch = () => {
     localStorage.removeItem(STORAGE_KEY)
-    setPreferredBranchId(null)
+    setState(prev => ({ ...prev, preferredBranchId: null }))
   }
 
   return {
-    preferredBranchId,
-    isLoaded,
+    preferredBranchId: state.preferredBranchId,
+    isLoaded: state.isLoaded,
     saveBranch,
     clearBranch
   }
