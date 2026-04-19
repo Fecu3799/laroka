@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { LaRokaLogo } from './LaRokaLogo'
-import heroPizzaImg from '../assets/hero-pizza.jpg'
+import heroPizzaImg from '../assets/hero-pizza.webp'
 import playaImg from '../assets/cities/playa.webp'
 import madrynImg from '../assets/cities/madryn.webp'
 import rawsonImg from '../assets/cities/rawson.webp'
