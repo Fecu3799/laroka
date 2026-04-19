@@ -18,9 +18,9 @@
   justify-content: center;
   background: linear-gradient(
     180deg,
-    #000000 0%,
-    #000000 45%,
-    var(--green-dark) 100%
+    var(--bg-primary) 0%,
+    var(--bg-primary) 45%,
+    var(--bg-secondary) 100%
   );
 }
 
@@ -65,7 +65,7 @@
   height: 100vh;
   height: 100dvh;
   overflow: hidden;
-  background: var(--green-dark);
+  background: var(--bg-secondary);
 }
 
 /* Hero zone — top 55% */
@@ -74,7 +74,7 @@
   height: 55%;
   flex-shrink: 0;
   overflow: hidden;
-  background-color: #1a3d1a;
+  background-color: var(--bg-secondary);
   background-size: cover;
   background-position: center;
 }
@@ -88,6 +88,14 @@
     rgba(0, 0, 0, 0.05) 50%,
     rgba(9, 94, 47, 0.96) 100%
   );
+  [data-theme="light"] & {
+    background: linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0.08) 0%,
+      rgba(0, 0, 0, 0.02) 50%,
+      rgba(212, 232, 217, 0.96) 100%
+    );
+  }
 }
 
 .branch-hero-logo {
@@ -101,7 +109,7 @@
 /* Panel zone — bottom 45% */
 .branch-panel {
   flex: 1;
-  background: var(--green-dark);
+  background: var(--bg-secondary);
   padding: 22px 18px 28px;
   display: flex;
   flex-direction: column;
@@ -113,7 +121,7 @@
   font-family: 'Oswald', sans-serif;
   font-size: 0.9rem;
   font-weight: 400;
-  color: rgba(255, 255, 255, 0.75);
+  color: color-mix(in srgb, var(--text-primary) 75%, transparent);
   text-align: center;
   margin-bottom: 18px;
   line-height: 1.4;
@@ -147,8 +155,8 @@
   display: flex;
   align-items: stretch;
   width: 100%;
-  background: var(--green-mid);
-  border: 1px solid var(--gold);
+  background: var(--bg-card);
+  border: 1px solid var(--accent);
   border-radius: 50px;
   cursor: pointer;
   overflow: hidden;
@@ -194,7 +202,7 @@
   font-family: 'Oswald', sans-serif;
   font-size: 1.2rem;
   font-weight: 700;
-  color: #ffffff;
+  color: var(--text-primary);
   line-height: 1;
 }
 
@@ -209,10 +217,10 @@
   align-items: center;
   justify-content: center;
   border-radius: 27px;
-  border: 1px solid var(--gold);
+  border: 1px solid var(--accent);
   background:
     linear-gradient(to right, rgba(0, 0, 0, 0.25) 0%, rgba(0, 0, 0, 0) 30%),
-    var(--green-mid);
+    var(--bg-card);
   box-shadow:
     inset 5px 0 10px rgba(0, 0, 0, 0.35),
     inset 0 2px 3px rgba(255, 255, 255, 0.06),
@@ -232,7 +240,7 @@
   font-family: 'Oswald', sans-serif;
   font-size: 1.05rem;
   font-weight: 700;
-  color: var(--white);
+  color: var(--text-primary);
   letter-spacing: 0.4px;
   text-align: center;
 }
@@ -247,8 +255,8 @@
 .branch-spinner {
   width: 30px;
   height: 30px;
-  border: 3px solid rgba(254, 205, 24, 0.25);
-  border-top-color: var(--gold);
+  border: 3px solid color-mix(in srgb, var(--accent) 25%, transparent);
+  border-top-color: var(--accent);
   border-radius: 50%;
   animation: spin 0.75s linear infinite;
 }
@@ -262,7 +270,7 @@
 /* Error state */
 .branch-error {
   text-align: center;
-  color: rgba(255, 255, 255, 0.65);
+  color: color-mix(in srgb, var(--text-primary) 65%, transparent);
   padding: 8px 0;
 }
 
@@ -273,8 +281,8 @@
 }
 
 .branch-retry-btn {
-  background: var(--gold);
-  color: var(--black);
+  background: var(--accent);
+  color: var(--bg-primary);
   border: none;
   padding: 11px 28px;
   border-radius: 50px;
@@ -296,12 +304,12 @@
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  background: var(--black);
-  color: var(--white);
+  background: var(--bg-primary);
+  color: var(--text-primary);
 }
 
 .app-header {
-  background: var(--green-dark);
+  background: var(--bg-secondary);
   padding: 1rem 1.25rem;
   display: flex;
   justify-content: space-between;
@@ -312,14 +320,14 @@
   font-family: 'Oswald', sans-serif;
   font-size: 1.5rem;
   font-weight: 700;
-  color: var(--gold);
+  color: var(--accent);
   margin: 0;
 }
 
 .change-branch-btn {
   background: transparent;
-  color: rgba(255, 255, 255, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: color-mix(in srgb, var(--text-primary) 60%, transparent);
+  border: 1px solid color-mix(in srgb, var(--text-primary) 25%, transparent);
   padding: 0.45rem 1rem;
   border-radius: 50px;
   font-family: 'Oswald', sans-serif;
@@ -330,8 +338,8 @@
 }
 
 .change-branch-btn:active {
-  border-color: rgba(255, 255, 255, 0.5);
-  color: var(--white);
+  border-color: color-mix(in srgb, var(--text-primary) 50%, transparent);
+  color: var(--text-primary);
 }
 
 .app-main {

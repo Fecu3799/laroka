@@ -2,12 +2,14 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 import { SplashScreen } from './components/SplashScreen'
 import { BranchSelection } from './components/BranchSelection'
 import { usePreferredBranch } from './hooks/usePreferredBranch'
+import { useTheme } from './hooks/useTheme'
 import './App.css'
 
 const SCREEN_EXIT_DURATION = 320
 
 function App() {
   const { preferredBranchId, saveBranch, clearBranch } = usePreferredBranch()
+  const { theme } = useTheme()
   const [screen, setScreen] = useState('splash')
   const [selectedBranchId, setSelectedBranchId] = useState(preferredBranchId)
   const [exiting, setExiting] = useState(false)
