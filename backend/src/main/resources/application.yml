@@ -32,3 +32,13 @@ spring:
     endpoint:
       health:
         show-details: never
+
+springdoc:
+  api-docs:
+    enabled: ${SWAGGER_ENABLED:true}
+  swagger-ui:
+    enabled: ${SWAGGER_ENABLED:true}
+    path: /swagger-ui.html
+
+swagger:
+  enabled: ${SWAGGER_ENABLED:true}

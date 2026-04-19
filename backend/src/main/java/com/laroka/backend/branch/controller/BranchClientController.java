@@ -15,11 +15,14 @@ import com.laroka.backend.catalog.dto.MenuCategoryDTO;
 import com.laroka.backend.catalog.mapper.MenuMapper;
 import com.laroka.backend.catalog.service.ProductService;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/branches")
 @RequiredArgsConstructor
+@Tag(name = "Branches", description = "Public API for branch information and menus")
 public class BranchClientController {
 
 	private final BranchService branchService;
@@ -28,11 +31,13 @@ public class BranchClientController {
 	private final MenuMapper menuMapper;
 
 	@GetMapping
+	@Operation(summary = "Get all active branches", description = "Returns a list of all active branches with basic information")
 	public ResponseEntity<List<BranchPublicDTO>> findAll() {
 		return ResponseEntity.ok(branchService.findAll().stream().map(branchMapper::toPublicDTO).toList());
 	}
 
 	@GetMapping("/{id}/menu")
+	@Operation(summary = "Get branch menu", description = "Returns menu for a specific branch with available products grouped by category")
 	public ResponseEntity<List<MenuCategoryDTO>> getMenu(@PathVariable Integer id) {
 		return ResponseEntity.ok(menuMapper.toMenu(productService.findAvailableByBranch(id)));
 	}
