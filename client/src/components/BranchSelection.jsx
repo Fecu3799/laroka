@@ -7,8 +7,6 @@ import rawsonImg from '../assets/cities/rawson.webp'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080'
 
-const FALLBACK_COLORS = ['#0F954B', '#095E2F', '#65A369']
-
 function getCityImage(name) {
   const n = name.toLowerCase()
   if (n.includes('playa')) return { src: playaImg, style: { transform: 'scale(1.5)', transformOrigin: 'center' } }
@@ -19,6 +17,9 @@ function getCityImage(name) {
 
 function CityThumb({ index, name }) {
   const result = getCityImage(name)
+  const colorVars = ['--bg-card', '--bg-secondary', '--border']
+  const colorVar = colorVars[index % colorVars.length]
+
   if (result) {
     return (
       <div className="branch-city-thumb">
@@ -28,10 +29,7 @@ function CityThumb({ index, name }) {
   }
   return (
     <div className="branch-city-thumb">
-      <div
-        className="branch-city-circle"
-        style={{ background: FALLBACK_COLORS[index % FALLBACK_COLORS.length] }}
-      >
+      <div className="branch-city-circle" style={{ background: `var(${colorVar})` }}>
         <span className="branch-city-initial" aria-hidden="true">{name[0]}</span>
       </div>
     </div>
