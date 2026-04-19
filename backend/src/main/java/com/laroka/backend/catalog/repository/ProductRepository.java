@@ -9,13 +9,7 @@ import com.laroka.backend.catalog.entity.Product;
 
 @Repository
 public interface ProductRepository extends JpaRepository<Product, Integer> {
-	List<Product> findByBranchId(Integer branchId);
-
-	List<Product> findByCategoryId(Integer categoryId);
-
-	List<Product> findByPizzeriaId(Integer pizzeriaId);
-
-	List<Product> findByBranchIdAndAvailableTrue(Integer branchId);
-
-	List<Product> findByPizzeriaIdAndAvailableTrue(Integer pizzeriaId);
+    List<Product> findByCategoryId(Integer categoryId);
+    List<Product> findByPizzeriaId(Integer pizzeriaId);
+    List<Product> findByPizzeriaIdAndAvailableTrue(Integer pizzeriaId);
 }

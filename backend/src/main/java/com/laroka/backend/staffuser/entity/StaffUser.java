@@ -1,12 +1,13 @@
-package com.laroka.backend.catalog.entity;
+package com.laroka.backend.staffuser.entity;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-import com.laroka.backend.pizzeria.entity.Pizzeria;
+import com.laroka.backend.branch.entity.Branch;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -18,17 +19,16 @@ import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Builder.Default;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "product")
+@Table(name = "staff_user")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Product {
+public class StaffUser {
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -37,28 +37,19 @@ public class Product {
 	@Column(name = "name", nullable = false)
 	private String name;
 
-	@Column(name = "description")
-	private String description;
+	@Column(name = "email", nullable = false, unique = true)
+	private String email;
 
-	@Column(name = "price", nullable = false, precision = 10, scale = 2)
-	private BigDecimal price;
+	@Column(name = "password_hash", nullable = false)
+	private String passwordHash;
 
-	@Column(name = "image_url")
-	private String imageUrl;
-
-	// TODO: disponibilidad operativa gestionada por BranchProduct.available; este campo
-	// puede usarse en el futuro para baja administrativa del catálogo maestro (US-EV-06)
-	@Default
-	@Column(name = "available", nullable = false)
-	private Boolean available = true;
+	@Enumerated(EnumType.STRING)
+	@Column(name = "role", nullable = false)
+	private UserRole role;
 
 	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "category_id", nullable = false)
-	private Category category;
-
-	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "pizzeria_id", nullable = false)
-	private Pizzeria pizzeria;
+	@JoinColumn(name = "branch_id", nullable = false)
+	private Branch branch;
 
 	@Column(name = "created_at", nullable = false, updatable = false)
 	private LocalDateTime createdAt;
@@ -70,9 +61,6 @@ public class Product {
 	protected void onCreate() {
 		createdAt = LocalDateTime.now();
 		updatedAt = LocalDateTime.now();
-		if (available == null) {
-			available = true;
-		}
 	}
 
 	@PreUpdate

@@ -1,5 +1,6 @@
 package com.laroka.backend.catalog.mapper;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -7,17 +8,18 @@ import org.springframework.stereotype.Component;
 
 import com.laroka.backend.catalog.dto.MenuCategoryDTO;
 import com.laroka.backend.catalog.dto.MenuProductDTO;
+import com.laroka.backend.catalog.entity.BranchProduct;
 import com.laroka.backend.catalog.entity.Product;
 
 @Component
 public class MenuMapper {
 
-	public List<MenuCategoryDTO> toMenu(List<Product> products) {
-		return products.stream()
-			.collect(Collectors.groupingBy(p -> p.getCategory().getId()))
+	public List<MenuCategoryDTO> toMenu(List<BranchProduct> branchProducts) {
+		return branchProducts.stream()
+			.collect(Collectors.groupingBy(bp -> bp.getProduct().getCategory().getId()))
 			.entrySet().stream()
 			.map(entry -> {
-				var category = entry.getValue().get(0).getCategory();
+				var category = entry.getValue().get(0).getProduct().getCategory();
 				return MenuCategoryDTO.builder()
 					.categoryId(category.getId())
 					.categoryName(category.getName())
@@ -29,12 +31,16 @@ public class MenuMapper {
 			.toList();
 	}
 
-	private MenuProductDTO toMenuProductDTO(Product product) {
+	private MenuProductDTO toMenuProductDTO(BranchProduct branchProduct) {
+		Product product = branchProduct.getProduct();
+		BigDecimal effectivePrice = branchProduct.getPriceOverride() != null
+			? branchProduct.getPriceOverride()
+			: product.getPrice();
 		return MenuProductDTO.builder()
 			.id(product.getId())
 			.name(product.getName())
 			.description(product.getDescription())
-			.price(product.getPrice())
+			.price(effectivePrice)
 			.imageUrl(product.getImageUrl())
 			.build();
 	}

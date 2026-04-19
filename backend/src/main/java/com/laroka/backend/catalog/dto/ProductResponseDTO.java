@@ -13,15 +13,14 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @Builder
 public class ProductResponseDTO {
-	private Integer id;
-	private String name;
-	private String description;
-	private BigDecimal price;
-	private String imageUrl;
-	private Boolean available;
-	private Integer categoryId;
-	private Integer branchId;
-	private Integer pizzeriaId;
-	private LocalDateTime createdAt;
-	private LocalDateTime updatedAt;
+    private Integer id;
+    private String name;
+    private String description;
+    private BigDecimal price;
+    private String imageUrl;
+    private Boolean available;
+    private Integer categoryId;
+    private Integer pizzeriaId;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 }
