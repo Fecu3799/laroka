@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { LaRokaLogo } from './LaRokaLogo'
 import heroPizzaImg from '../assets/hero-pizza.jpg'
-import playaImg from '../assets/cities/playa.png'
-import madrynImg from '../assets/cities/madryn.png'
-import rawsonImg from '../assets/cities/rawson.jpg'
+import playaImg from '../assets/cities/playa.webp'
+import madrynImg from '../assets/cities/madryn.webp'
+import rawsonImg from '../assets/cities/rawson.webp'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080'
 
@@ -38,13 +38,27 @@ function CityThumb({ index, name }) {
   )
 }
 
+const SLIDE_DURATION = 450
+
 export function BranchSelection({ onSelect }) {
   const [branches, setBranches] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [slidingId, setSlidingId] = useState(null)
   const retryRef = useRef(null)
+  const slideTimerRef = useRef(null)
 
   const retry = useCallback(() => retryRef.current?.(), [])
+
+  const handleBranchClick = useCallback((branchId) => {
+    if (slidingId) return
+    setSlidingId(branchId)
+    slideTimerRef.current = setTimeout(() => {
+      onSelect(branchId)
+    }, SLIDE_DURATION)
+  }, [slidingId, onSelect])
+
+  useEffect(() => () => clearTimeout(slideTimerRef.current), [])
 
   useEffect(() => {
     let cancelled = false
@@ -97,12 +111,14 @@ export function BranchSelection({ onSelect }) {
             {branches.map((branch, index) => (
               <li key={branch.id}>
                 <button
-                  className="branch-btn"
-                  onClick={() => onSelect(branch.id)}
+                  className={`branch-btn${slidingId === branch.id ? ' branch-btn--sliding' : ''}`}
+                  onClick={() => handleBranchClick(branch.id)}
                   aria-label={`Seleccionar sucursal ${branch.name}`}
                 >
                   <CityThumb index={index} name={branch.name} />
-                  <span className="branch-btn-name">{branch.name}</span>
+                  <div className="branch-label">
+                    <span className="branch-btn-name">{branch.name}</span>
+                  </div>
                 </button>
               </li>
             ))}

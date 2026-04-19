@@ -11,7 +11,7 @@
 /* ===== SPLASH SCREEN ===== */
 
 .splash-screen {
-  position: fixed;
+  position: absolute;
   inset: 0;
   display: flex;
   align-items: center;
@@ -145,28 +145,26 @@
 /* Branch button */
 .branch-btn {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   width: 100%;
   background: var(--green-mid);
-  border: 2px solid var(--gold);
+  border: 1px solid var(--gold);
   border-radius: 50px;
   cursor: pointer;
   overflow: hidden;
-  text-align: left;
   height: 54px;
   padding: 0;
-  transition: transform 0.14s ease, filter 0.14s ease;
+  position: relative;
+  transition: filter 0.14s ease;
 }
 
 .branch-btn:active {
-  transform: scale(0.97);
-  filter: brightness(0.9);
+  filter: brightness(0.88);
 }
 
-/* City thumbnail — left side of button */
+/* City thumbnail — 43% para tapar el fondo visible bajo la curva del label */
 .branch-city-thumb {
-  width: 35%;
-  height: 100%;
+  width: 43%;
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -200,15 +198,43 @@
   line-height: 1;
 }
 
+/* Label panel — absolute desde 35%, se superpone sobre el borde de la foto */
+.branch-label {
+  position: absolute;
+  left: 35%;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 27px;
+  border: 1px solid var(--gold);
+  background:
+    linear-gradient(to right, rgba(0, 0, 0, 0.25) 0%, rgba(0, 0, 0, 0) 30%),
+    var(--green-mid);
+  box-shadow:
+    inset 5px 0 10px rgba(0, 0, 0, 0.35),
+    inset 0 2px 3px rgba(255, 255, 255, 0.06),
+    inset 0 -4px 8px rgba(0, 0, 0, 0.45);
+  transform: translateX(0);
+  transition: transform 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+}
+
+/* Switch: activado por JS con clase --sliding, inmediato */
+.branch-btn--sliding .branch-label {
+  transform: translateX(-53.85%);
+}
+
 /* Branch name */
 .branch-btn-name {
   font-family: 'Oswald', sans-serif;
   font-size: 1.05rem;
   font-weight: 700;
   color: var(--white);
-  padding: 0 20px;
-  flex: 1;
   letter-spacing: 0.4px;
+  text-align: center;
 }
 
 /* Loading state */
@@ -312,4 +338,30 @@
   flex: 1;
   padding: 2rem 1.25rem;
   font-family: 'Oswald', sans-serif;
+}
+
+/* ===== SCREEN TRANSITIONS ===== */
+
+.screen {
+  width: 100%;
+  height: 100%;
+}
+
+.screen--exit {
+  animation: screen-exit 0.32s cubic-bezier(0.4, 0, 1, 1) forwards;
+  pointer-events: none;
+}
+
+.screen--enter {
+  animation: screen-enter 0.36s cubic-bezier(0, 0, 0.2, 1) both;
+}
+
+@keyframes screen-exit {
+  from { transform: translateX(0);    opacity: 1; }
+  to   { transform: translateX(-22%); opacity: 0; }
+}
+
+@keyframes screen-enter {
+  from { transform: translateX(35%); opacity: 0; }
+  to   { transform: translateX(0);   opacity: 1; }
 }

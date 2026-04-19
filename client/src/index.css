@@ -13,6 +13,32 @@ body,
   height: 100%;
 }
 
+@media (min-width: 500px) {
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background:
+      radial-gradient(ellipse at 15% 85%, rgba(9, 94, 47, 0.45) 0%, transparent 55%),
+      radial-gradient(ellipse at 85% 15%, rgba(15, 149, 75, 0.18) 0%, transparent 50%),
+      #000000;
+  }
+
+  #root {
+    width: 430px;
+    max-height: 932px;
+    height: 100dvh;
+    border-radius: 44px;
+    overflow: hidden;
+    position: relative;
+    flex-shrink: 0;
+    box-shadow:
+      0 0 0 1px rgba(101, 163, 105, 0.3),
+      0 30px 80px rgba(0, 0, 0, 0.95),
+      0 0 120px rgba(9, 94, 47, 0.2);
+  }
+}
+
 html {
   font-size: 16px;
   -webkit-text-size-adjust: 100%;
