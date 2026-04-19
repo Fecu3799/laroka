@@ -73,6 +73,7 @@ Capas obligatorias por módulo:
 
 - El backlog completo está en docs/BACKLOG.md
 - El informe completo del proyecto está en docs/informe_tecnico.txt
+- Cargar skills desde la raiz del repo (.claude/skills)
 - Cada módulo tiene su CONTEXT.md con reglas específicas
 - Al implementar una historia, referenciar su ID (ej: US-03-02)
 - Un prompt por capa, validar antes de continuar
@@ -85,6 +86,11 @@ Capas obligatorias por módulo:
 - No ejecutar compilaciones ni validaciones intermedias
 - No hacer verificaciones despues de cada archivo
 - Implementar la tarea completa y reportar resultados al final
+
+## Deudas técnicas activas
+
+- Leer docs/DEUDA_TECNICA.md al inicio de cada sesión
+- **DT-01**: Spring Security deshabilitado (todos los endpoints son públicos). Al trabajar en Sprint 2, alertar que DT-01 debe resolverse antes de continuar (US-02-03).
 
 ## Estilo de respuesta
 
