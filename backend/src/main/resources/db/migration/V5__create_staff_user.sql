@@ -21,14 +21,14 @@ INSERT INTO staff_user (name, email, password_hash, role, branch_id) VALUES
     (
         'Administrador LaRoka',
         'admin@laroka.com',
-        '$2a$10$4A1l7kHzvUvbGNH5x0FIQeJ/1J7Fmy7wZvvjHlMY6PFPmDqm8sC9q',
+        '$2a$10$V.TZKF75cSqUd71u52O9Be38/4C0awMPymY8eNypi.JKJfPZYeM1u',
         'ADMIN',
         1
     ),
     (
         'Personal Playa Unión',
         'staff@laroka.com',
-        '$2a$10$VkZK4pJ8mNHsLqK1vXxCVeJ.h.P8zU3W5qR9tD2eB3C4kL7m9pS2C',
+        '$2a$10$vwQtlM/JVmqXN3EBbCFQvuuMcZYxGW5ZqvC1m5UAVLcK5Br6iMbDW',
         'STAFF',
         1
     );
