@@ -9,7 +9,7 @@ const SCREEN_EXIT_DURATION = 320
 
 function App() {
   const { preferredBranchId, saveBranch, clearBranch } = usePreferredBranch()
-  const { theme } = useTheme()
+  useTheme()
   const [screen, setScreen] = useState('splash')
   const [selectedBranchId, setSelectedBranchId] = useState(preferredBranchId)
   const [exiting, setExiting] = useState(false)
