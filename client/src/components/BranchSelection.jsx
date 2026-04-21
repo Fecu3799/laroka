@@ -36,6 +36,24 @@ function CityThumb({ index, name }) {
   )
 }
 
+async function prefetchMenuImages(branchId) {
+  try {
+    const res = await fetch(`${API_BASE}/branches/${branchId}/menu`)
+    if (!res.ok) return
+    const categories = await res.json()
+    categories.forEach(cat => {
+      cat.products?.forEach(product => {
+        if (product.imageUrl) {
+          const img = new Image()
+          img.src = product.imageUrl
+        }
+      })
+    })
+  } catch {
+    // best-effort
+  }
+}
+
 const SLIDE_DURATION = 450
 
 export function BranchSelection({ onSelect }) {
@@ -48,11 +66,12 @@ export function BranchSelection({ onSelect }) {
 
   const retry = useCallback(() => retryRef.current?.(), [])
 
-  const handleBranchClick = useCallback((branchId) => {
+  const handleBranchClick = useCallback((branchId, branchName) => {
     if (slidingId) return
     setSlidingId(branchId)
+    prefetchMenuImages(branchId)
     slideTimerRef.current = setTimeout(() => {
-      onSelect(branchId)
+      onSelect(branchId, branchName)
     }, SLIDE_DURATION)
   }, [slidingId, onSelect])
 
@@ -110,7 +129,7 @@ export function BranchSelection({ onSelect }) {
               <li key={branch.id}>
                 <button
                   className={`branch-btn${slidingId === branch.id ? ' branch-btn--sliding' : ''}`}
-                  onClick={() => handleBranchClick(branch.id)}
+                  onClick={() => handleBranchClick(branch.id, branch.name)}
                   aria-label={`Seleccionar sucursal ${branch.name}`}
                 >
                   <CityThumb index={index} name={branch.name} />
