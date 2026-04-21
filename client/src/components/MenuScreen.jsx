@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion as Motion, AnimatePresence } from 'framer-motion'
 import { LaRokaLogo } from './LaRokaLogo'
 import { BottomNav } from './BottomNav'
 import { BranchDropdown } from './BranchDropdown'
@@ -83,7 +83,7 @@ function ComingSoon() {
   )
 }
 
-export function MenuScreen({ branchId, branchName, onChangeBranch, onSwitchBranch }) {
+export function MenuScreen({ branchId, branchName, onSwitchBranch }) {
   const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -94,7 +94,6 @@ export function MenuScreen({ branchId, branchName, onChangeBranch, onSwitchBranc
   const [activeTab, setActiveTab] = useState('menu')
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [branches, setBranches] = useState([])
-  const [branchesLoading, setBranchesLoading] = useState(false)
   const retryRef = useRef(null)
   const prevCategoryIndexRef = useRef(0)
 
@@ -150,7 +149,6 @@ export function MenuScreen({ branchId, branchName, onChangeBranch, onSwitchBranc
     if (!drawerOpen) return
     let cancelled = false
     const load = async () => {
-      setBranchesLoading(true)
       try {
         const res = await fetch(`${API_BASE}/branches`)
         if (!res.ok) throw new Error('Error')
@@ -158,8 +156,6 @@ export function MenuScreen({ branchId, branchName, onChangeBranch, onSwitchBranc
         if (!cancelled) setBranches(data)
       } catch {
         if (!cancelled) setBranches([])
-      } finally {
-        if (!cancelled) setBranchesLoading(false)
       }
     }
     load()
@@ -259,7 +255,7 @@ export function MenuScreen({ branchId, branchName, onChangeBranch, onSwitchBranc
           </div>
         ) : (
           <AnimatePresence mode="wait">
-            <motion.ul
+            <Motion.ul
               key={activeCategory}
               className="menu-list"
               role="list"
@@ -283,7 +279,7 @@ export function MenuScreen({ branchId, branchName, onChangeBranch, onSwitchBranc
               {currentProducts.map(product => (
                 <ProductCard key={product.id} product={product} />
               ))}
-            </motion.ul>
+            </Motion.ul>
           </AnimatePresence>
         )}
       </main>
