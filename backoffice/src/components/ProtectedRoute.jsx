@@ -1,11 +1,18 @@
 import { Navigate } from 'react-router-dom'
 
-export default function ProtectedRoute({ children }) {
-  // TODO: In Sprint 2-F, replace this with actual JWT token validation
-  // Check if token exists in localStorage and is valid
-  const isAuthenticated = localStorage.getItem('laroka_token')
+function isTokenValid(token) {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    return typeof payload.exp === 'number' && payload.exp * 1000 > Date.now()
+  } catch {
+    return false
+  }
+}
 
-  if (!isAuthenticated) {
+export default function ProtectedRoute({ children }) {
+  const token = localStorage.getItem('laroka_token')
+
+  if (!token || !isTokenValid(token)) {
     return <Navigate to="/login" replace />
   }
 

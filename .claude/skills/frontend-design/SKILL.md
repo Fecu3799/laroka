@@ -59,6 +59,7 @@ When working on the LaRoka project, ALWAYS follow these rules:
 ### Color Palette (exact values, no variations)
 
 - Negro: #000000
+- Verde muy oscuro: #0a1e0f
 - Verde oscuro: #095E2F
 - Verde medio: #0F954B
 - Verde claro: #65A369
