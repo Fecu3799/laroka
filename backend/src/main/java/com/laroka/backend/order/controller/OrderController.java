@@ -1,10 +1,7 @@
 package com.laroka.backend.order.controller;
 
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -23,6 +20,7 @@ import com.laroka.backend.order.entity.Order;
 import com.laroka.backend.order.entity.OrderItem;
 import com.laroka.backend.order.entity.OrderStatusHistory;
 import com.laroka.backend.order.mapper.OrderMapper;
+import com.laroka.backend.order.service.OrderCreationResult;
 import com.laroka.backend.order.service.OrderService;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -36,12 +34,6 @@ import lombok.RequiredArgsConstructor;
 @Tag(name = "Orders", description = "Public API for order creation and tracking")
 public class OrderController {
 
-    private static final long IDEMPOTENCY_TTL_MINUTES = 5;
-
-    private record IdempotencyEntry(CreateOrderResponseDTO response, Instant timestamp) {}
-
-    private final ConcurrentHashMap<String, IdempotencyEntry> idempotencyStore = new ConcurrentHashMap<>();
-
     private final OrderService orderService;
     private final OrderMapper orderMapper;
 
@@ -51,27 +43,12 @@ public class OrderController {
             @Valid @RequestBody CreateOrderRequestDTO dto,
             @RequestHeader(value = "X-Idempotency-Key", required = false) String idempotencyKey) {
 
-        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
-            IdempotencyEntry existing = idempotencyStore.get(idempotencyKey);
-            if (existing != null) {
-                Instant cutoff = Instant.now().minus(IDEMPOTENCY_TTL_MINUTES, ChronoUnit.MINUTES);
-                if (existing.timestamp().isAfter(cutoff)) {
-                    return ResponseEntity.ok(existing.response());
-                }
-                idempotencyStore.remove(idempotencyKey);
-            }
-        }
-
         Order order = orderMapper.toEntity(dto);
         List<OrderItem> items = orderMapper.toItems(dto);
-        Order saved = orderService.createOrder(order, items, dto.getPaymentMethod());
-        CreateOrderResponseDTO response = orderMapper.toResponseDTO(saved);
+        OrderCreationResult result = orderService.createOrder(order, items, dto.getPaymentMethod(), idempotencyKey);
 
-        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
-            idempotencyStore.put(idempotencyKey, new IdempotencyEntry(response, Instant.now()));
-        }
-
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        HttpStatus status = result.fromCache() ? HttpStatus.OK : HttpStatus.CREATED;
+        return ResponseEntity.status(status).body(orderMapper.toResponseDTO(result.order()));
     }
 
     @GetMapping("/{id}/status")

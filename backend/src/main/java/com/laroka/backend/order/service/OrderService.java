@@ -39,9 +39,42 @@ public class OrderService {
     private final BranchRepository branchRepository;
     private final ProductRepository productRepository;
     private final BranchProductRepository branchProductRepository;
+    private final IdempotencyStore idempotencyStore;
 
     @Transactional
-    public Order createOrder(Order order, List<OrderItem> items, PaymentMethod paymentMethod) {
+    public OrderCreationResult createOrder(Order order, List<OrderItem> items,
+                                           PaymentMethod paymentMethod, String idempotencyKey) {
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            return idempotencyStore.get(idempotencyKey)
+                    .map(cached -> new OrderCreationResult(cached, true))
+                    .orElseGet(() -> doCreateOrder(order, items, paymentMethod, idempotencyKey));
+        }
+        return doCreateOrder(order, items, paymentMethod, null);
+    }
+
+    @Transactional
+    public Order transitionStatus(UUID orderId, OrderStatus newStatus) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new OrderNotFoundException(orderId));
+        return doTransition(order, newStatus);
+    }
+
+    @Transactional(readOnly = true)
+    public Order findById(UUID id) {
+        return orderRepository.findByIdWithBranch(id)
+                .orElseThrow(() -> new OrderNotFoundException(id));
+    }
+
+    @Transactional(readOnly = true)
+    public List<OrderStatusHistory> getHistory(UUID orderId) {
+        if (!orderRepository.existsById(orderId)) {
+            throw new OrderNotFoundException(orderId);
+        }
+        return historyRepository.findByOrderIdOrderByChangedAtAsc(orderId);
+    }
+
+    private OrderCreationResult doCreateOrder(Order order, List<OrderItem> items,
+                                              PaymentMethod paymentMethod, String idempotencyKey) {
         if (items == null || items.isEmpty()) {
             throw new BusinessException("El pedido debe contener al menos un ítem");
         }
@@ -100,28 +133,13 @@ public class OrderService {
             saved = doTransition(saved, OrderStatus.RECEIVED);
         }
 
-        return orderRepository.findByIdWithDetails(saved.getId()).orElseThrow();
-    }
+        Order result = orderRepository.findByIdWithDetails(saved.getId()).orElseThrow();
 
-    @Transactional
-    public Order transitionStatus(UUID orderId, OrderStatus newStatus) {
-        Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new OrderNotFoundException(orderId));
-        return doTransition(order, newStatus);
-    }
-
-    @Transactional(readOnly = true)
-    public Order findById(UUID id) {
-        return orderRepository.findByIdWithBranch(id)
-                .orElseThrow(() -> new OrderNotFoundException(id));
-    }
-
-    @Transactional(readOnly = true)
-    public List<OrderStatusHistory> getHistory(UUID orderId) {
-        if (!orderRepository.existsById(orderId)) {
-            throw new OrderNotFoundException(orderId);
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            idempotencyStore.put(idempotencyKey, result);
         }
-        return historyRepository.findByOrderIdOrderByChangedAtAsc(orderId);
+
+        return new OrderCreationResult(result, false);
     }
 
     private Order doTransition(Order order, OrderStatus newStatus) {
