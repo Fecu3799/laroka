@@ -1,5 +1,6 @@
 :root,
 [data-theme="dark"] {
+  --sidebar-width: 130px;
   --bg-primary: #000000;
   --bg-secondary: #095E2F;
   --bg-card: #0F954B;
