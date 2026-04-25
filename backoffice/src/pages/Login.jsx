@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import useAuth from '../hooks/useAuth'
+import { login as loginService } from '../services/authService'
 import './Login.css'
-
-const API_URL = import.meta.env.VITE_API_URL ?? ''
 
 export default function Login() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  const { isAuthenticated } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -16,11 +17,10 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false)
 
   useEffect(() => {
-    const token = localStorage.getItem('laroka_token')
-    if (token && isTokenValid(token)) {
+    if (isAuthenticated) {
       navigate('/orders', { replace: true })
     }
-  }, [navigate])
+  }, [isAuthenticated, navigate])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -28,11 +28,7 @@ export default function Login() {
     setError('')
 
     try {
-      const res = await fetch(`${API_URL}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      })
+      const res = await loginService(email, password)
 
       if (res.status === 401) {
         setError('Credenciales incorrectas. Verificá los datos')
@@ -62,8 +58,8 @@ export default function Login() {
         <div className="login-card" role="main">
           <div className="login-icon-wrap" aria-hidden="true">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" fill="#FECD18" />
-              <path d="M4 21c0-4 3.582-7 8-7s8 3 8 7" stroke="#FECD18" strokeWidth="1.8" strokeLinecap="round" />
+              <path d="M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" fill="var(--color-accent)" />
+              <path d="M4 21c0-4 3.582-7 8-7s8 3 8 7" stroke="var(--color-accent)" strokeWidth="1.8" strokeLinecap="round" />
             </svg>
           </div>
 
@@ -161,13 +157,4 @@ export default function Login() {
       </div>
     </div>
   )
-}
-
-function isTokenValid(token) {
-  try {
-    const payload = JSON.parse(atob(token.split('.')[1]))
-    return typeof payload.exp === 'number' && payload.exp * 1000 > Date.now()
-  } catch {
-    return false
-  }
 }

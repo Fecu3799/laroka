@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import logo from '../assets/logo.png'
+import useAuth from '../hooks/useAuth'
+import { logout } from '../services/authService'
 import './Layout.css'
 
 const NAV = [
@@ -50,10 +52,11 @@ const NAV = [
 
 export default function Layout() {
   const navigate = useNavigate()
+  const { branchName, pizzeriaName } = useAuth()
   const [time, setTime] = useState(new Date())
 
   function handleLogout() {
-    localStorage.removeItem('laroka_token')
+    logout()
     navigate('/login', { replace: true })
   }
 
@@ -95,7 +98,7 @@ export default function Layout() {
         <div className="layout-sidebar-branch" aria-label="Sucursal activa">
           <div className="layout-branch-info">
             <span className="layout-branch-label">SUCURSAL</span>
-            <span className="layout-branch-name">Puerto Madryn</span>
+            <span className="layout-branch-name">{branchName ?? '—'}</span>
           </div>
         </div>
 
@@ -122,7 +125,7 @@ export default function Layout() {
               </svg>
             </span>
             <span className="layout-header-title">PANEL DE CONTROL</span>
-            <span className="layout-header-pizzeria">La Roka Pizzeria</span>
+            <span className="layout-header-pizzeria">{pizzeriaName ?? '—'}</span>
           </div>
           <div className="layout-header-right">
             <span className="layout-header-theme">Verde oscuro</span>
