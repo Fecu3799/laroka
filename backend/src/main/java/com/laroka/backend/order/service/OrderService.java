@@ -1,6 +1,7 @@
 package com.laroka.backend.order.service;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -15,11 +16,16 @@ import com.laroka.backend.catalog.entity.Product;
 import com.laroka.backend.catalog.exception.ProductNotFoundException;
 import com.laroka.backend.catalog.repository.BranchProductRepository;
 import com.laroka.backend.catalog.repository.ProductRepository;
+import com.laroka.backend.order.domain.OrderStateMachine;
 import com.laroka.backend.order.entity.Order;
 import com.laroka.backend.order.entity.OrderItem;
 import com.laroka.backend.order.entity.OrderStatus;
+import com.laroka.backend.order.entity.OrderStatusHistory;
 import com.laroka.backend.order.entity.OrderType;
+import com.laroka.backend.order.entity.PaymentMethod;
+import com.laroka.backend.order.exception.OrderNotFoundException;
 import com.laroka.backend.order.repository.OrderRepository;
+import com.laroka.backend.order.repository.OrderStatusHistoryRepository;
 import com.laroka.backend.shared.exception.BusinessException;
 
 import lombok.RequiredArgsConstructor;
@@ -29,12 +35,13 @@ import lombok.RequiredArgsConstructor;
 public class OrderService {
 
     private final OrderRepository orderRepository;
+    private final OrderStatusHistoryRepository historyRepository;
     private final BranchRepository branchRepository;
     private final ProductRepository productRepository;
     private final BranchProductRepository branchProductRepository;
 
     @Transactional
-    public Order createOrder(Order order, List<OrderItem> items) {
+    public Order createOrder(Order order, List<OrderItem> items, PaymentMethod paymentMethod) {
         if (items == null || items.isEmpty()) {
             throw new BusinessException("El pedido debe contener al menos un ítem");
         }
@@ -86,6 +93,45 @@ public class OrderService {
         }
         order.setItems(resolvedItems);
 
-        return orderRepository.save(order);
+        Order saved = orderRepository.save(order);
+        recordHistory(saved, null, OrderStatus.PENDING_PAYMENT);
+
+        if (paymentMethod == PaymentMethod.CASH) {
+            saved = doTransition(saved, OrderStatus.RECEIVED);
+        }
+
+        return saved;
+    }
+
+    @Transactional
+    public Order transitionStatus(UUID orderId, OrderStatus newStatus) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new OrderNotFoundException(orderId));
+        return doTransition(order, newStatus);
+    }
+
+    private Order doTransition(Order order, OrderStatus newStatus) {
+        List<OrderStatus> validNext = OrderStateMachine.getNextValidStatuses(order);
+        if (!validNext.contains(newStatus)) {
+            throw new BusinessException(
+                    "Transición de estado inválida: " + order.getStatus() + " → " + newStatus
+                    + " para pedido de tipo " + order.getOrderType());
+        }
+
+        OrderStatus previous = order.getStatus();
+        order.setStatus(newStatus);
+        Order saved = orderRepository.save(order);
+        recordHistory(saved, previous, newStatus);
+        return saved;
+    }
+
+    private void recordHistory(Order order, OrderStatus fromStatus, OrderStatus toStatus) {
+        historyRepository.save(OrderStatusHistory.builder()
+                .id(UUID.randomUUID())
+                .order(order)
+                .fromStatus(fromStatus)
+                .toStatus(toStatus)
+                .changedAt(LocalDateTime.now())
+                .build());
     }
 }
