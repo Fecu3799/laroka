@@ -100,7 +100,7 @@ public class OrderService {
             saved = doTransition(saved, OrderStatus.RECEIVED);
         }
 
-        return saved;
+        return orderRepository.findByIdWithDetails(saved.getId()).orElseThrow();
     }
 
     @Transactional
@@ -108,6 +108,20 @@ public class OrderService {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new OrderNotFoundException(orderId));
         return doTransition(order, newStatus);
+    }
+
+    @Transactional(readOnly = true)
+    public Order findById(UUID id) {
+        return orderRepository.findByIdWithBranch(id)
+                .orElseThrow(() -> new OrderNotFoundException(id));
+    }
+
+    @Transactional(readOnly = true)
+    public List<OrderStatusHistory> getHistory(UUID orderId) {
+        if (!orderRepository.existsById(orderId)) {
+            throw new OrderNotFoundException(orderId);
+        }
+        return historyRepository.findByOrderIdOrderByChangedAtAsc(orderId);
     }
 
     private Order doTransition(Order order, OrderStatus newStatus) {

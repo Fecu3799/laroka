@@ -1,8 +1,6 @@
 package com.laroka.backend.order.dto;
 
-import java.math.BigDecimal;
 import java.util.List;
-import java.util.UUID;
 
 import com.laroka.backend.order.entity.OrderStatus;
 import com.laroka.backend.order.entity.OrderType;
@@ -16,12 +14,10 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class CreateOrderResponseDTO {
+public class OrderStatusResponseDTO {
 
-    private UUID orderId;
     private OrderStatus status;
-    private BigDecimal totalAmount;
     private OrderType orderType;
     private String branchName;
-    private List<OrderItemResponseDTO> items;
+    private List<OrderStatusHistoryDTO> history;
 }
