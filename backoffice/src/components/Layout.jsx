@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Outlet, NavLink } from 'react-router-dom'
+import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import logo from '../assets/logo.png'
 import './Layout.css'
 
@@ -49,7 +49,13 @@ const NAV = [
 ]
 
 export default function Layout() {
+  const navigate = useNavigate()
   const [time, setTime] = useState(new Date())
+
+  function handleLogout() {
+    localStorage.removeItem('laroka_token')
+    navigate('/login', { replace: true })
+  }
 
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000)
@@ -92,6 +98,15 @@ export default function Layout() {
             <span className="layout-branch-name">Puerto Madryn</span>
           </div>
         </div>
+
+        <button className="layout-logout-btn" onClick={handleLogout} aria-label="Cerrar sesión">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            <polyline points="16 17 21 12 16 7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            <line x1="21" y1="12" x2="9" y2="12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+          </svg>
+          <span>SALIR</span>
+        </button>
       </aside>
 
       {/* ── Right: header + content ───────────────────────────── */}

@@ -12,8 +12,12 @@ function isTokenValid(token) {
 export default function ProtectedRoute({ children }) {
   const token = localStorage.getItem('laroka_token')
 
-  if (!token || !isTokenValid(token)) {
+  if (!token) {
     return <Navigate to="/login" replace />
+  }
+
+  if (!isTokenValid(token)) {
+    return <Navigate to="/login?reason=expired" replace />
   }
 
   return children

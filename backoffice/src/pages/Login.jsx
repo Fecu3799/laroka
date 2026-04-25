@@ -1,15 +1,18 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import './Login.css'
 
 const API_URL = import.meta.env.VITE_API_URL ?? ''
 
 export default function Login() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const [error, setError] = useState(
+    searchParams.get('reason') === 'expired' ? 'Sesión expirada. Ingresá nuevamente.' : ''
+  )
   const [showPassword, setShowPassword] = useState(false)
 
   useEffect(() => {
