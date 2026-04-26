@@ -24,7 +24,7 @@ public class AuthController {
 	private final AuthService authService;
 
 	@PostMapping("/login")
-	@Operation(summary = "Login", description = "Authenticates a staff user and returns a JWT token")
+	@Operation(summary = "Login", description = "Authenticates a staff user and returns JWT token")
 	public ResponseEntity<LoginResponseDTO> login(@Valid @RequestBody LoginRequestDTO dto) {
 		String token = authService.login(dto.getEmail(), dto.getPassword());
 		return ResponseEntity.ok(LoginResponseDTO.builder().token(token).build());
