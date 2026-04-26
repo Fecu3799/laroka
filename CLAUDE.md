@@ -69,6 +69,51 @@ Capas obligatorias por módulo:
 - Todo cambio de estado registrado con timestamp (RN-12)
 - Estados terminales no reversibles (RN-13)
 
+## Convenciones Frontend — Backoffice
+
+### Estructura de carpetas obligatoria
+src/
+├── assets/
+├── components/   # Componentes reutilizables (Layout, ProtectedRoute, etc)
+├── hooks/        # Hooks reutilizables — un archivo por hook
+├── pages/        # Una carpeta o archivo por página
+├── services/     # Llamadas a la API — un archivo por módulo
+└── index.css     # Variables CSS globales — única fuente de verdad
+
+### Hooks
+- Toda lógica reutilizable que use estado o efectos va en un hook en src/hooks/
+- Nunca implementar lógica de negocio inline en un componente si se va a usar 
+  en más de un lugar
+- Hooks existentes obligatorios:
+  - useAuth.js — única fuente de verdad para leer y decodificar el JWT. 
+    Ningún componente lee laroka_token directamente ni decodifica el payload 
+    por su cuenta. Siempre importar useAuth.
+
+### Variables CSS
+- --sidebar-width definido en index.css es la única fuente de verdad para el 
+  ancho del sidebar. Nunca hardcodear ese valor en otro archivo.
+- Todos los colores de la paleta definidos como variables en index.css. 
+  Nunca hardcodear hex en componentes.
+- Variables de paleta obligatorias:
+  --color-bg: #030d04
+  --color-accent: #f5c518
+  --color-green-primary: #00c853
+  --color-sidebar-bg: #030d04
+
+### Servicios
+- Toda llamada a la API va en src/services/ — nunca fetch/axios inline en 
+  un componente o hook
+- Un archivo por módulo: authService.js, ordersService.js, etc.
+- El token se obtiene desde useAuth, no desde localStorage directamente
+
+### Reglas generales
+- Nunca hardcodear strings de negocio ("LaRoka", "Puerto Madryn") en 
+  componentes — siempre vienen del JWT vía useAuth o de la API
+- Nunca usar ddl-auto=create o update (aplica al backend)
+- Todo cambio de esquema de base de datos va en una migración Flyway versionada
+- Antes de crear un componente nuevo verificar si ya existe uno reutilizable 
+  en components/ que cubra el caso
+
 ## Cómo trabajar con este repo
 
 - El backlog completo está en docs/BACKLOG.md

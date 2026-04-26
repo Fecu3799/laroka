@@ -20,7 +20,7 @@
 .layout-sidebar {
   width: var(--sidebar-width);
   height: 100vh;
-  background-color: #070d08;
+  background-color: var(--color-sidebar-bg);
   border-right: 1px solid rgba(101, 163, 105, 0.08);
   display: flex;
   flex-direction: column;
@@ -78,7 +78,7 @@
 .layout-nav-item--active {
   color: #ffffff;
   background-color: rgba(254, 205, 24, 0.07);
-  border-left-color: #f5c518;
+  border-left-color: var(--color-accent);
 }
 
 .layout-nav-item--active:hover {
@@ -140,7 +140,7 @@
   font-family: 'Inter', sans-serif;
   font-size: 11px;
   font-weight: 700;
-  color: #f5c518;
+  color: var(--color-accent);
   text-align: center;
   line-height: 1.3;
 }
@@ -204,7 +204,7 @@
 .layout-header-icon {
   display: flex;
   align-items: center;
-  color: #FECD18;
+  color: var(--color-accent);
   flex-shrink: 0;
 }
 
@@ -212,7 +212,7 @@
   font-family: 'Barlow Condensed', sans-serif;
   font-size: 1.15rem;
   font-weight: 700;
-  color: #FECD18;
+  color: var(--color-accent);
   letter-spacing: 0.05em;
   line-height: 1;
 }

@@ -1,24 +1,11 @@
 import { Navigate } from 'react-router-dom'
-
-function isTokenValid(token) {
-  try {
-    const payload = JSON.parse(atob(token.split('.')[1]))
-    return typeof payload.exp === 'number' && payload.exp * 1000 > Date.now()
-  } catch {
-    return false
-  }
-}
+import useAuth from '../hooks/useAuth'
 
 export default function ProtectedRoute({ children }) {
-  const token = localStorage.getItem('laroka_token')
+  const { isAuthenticated, isExpired } = useAuth()
 
-  if (!token) {
-    return <Navigate to="/login" replace />
-  }
-
-  if (!isTokenValid(token)) {
-    return <Navigate to="/login?reason=expired" replace />
-  }
+  if (isExpired) return <Navigate to="/login?reason=expired" replace />
+  if (!isAuthenticated) return <Navigate to="/login" replace />
 
   return children
 }
