@@ -38,7 +38,7 @@ function SizeIcon() {
   )
 }
 
-export function ProductDetailScreen({ product, onBack }) {
+export function ProductDetailScreen({ product, onBack, onAddToCart }) {
   const [qty, setQty] = useState(1)
   const [added, setAdded] = useState(false)
 
@@ -46,9 +46,10 @@ export function ProductDetailScreen({ product, onBack }) {
   const decrement = useCallback(() => setQty(q => Math.max(1, q - 1)), [])
 
   const handleAdd = useCallback(() => {
+    onAddToCart?.(product, qty)
     setAdded(true)
     setTimeout(() => setAdded(false), 1800)
-  }, [])
+  }, [onAddToCart, product, qty])
 
   const totalPrice = product.price * qty
 

@@ -4,6 +4,8 @@ import { LaRokaLogo } from './LaRokaLogo'
 import { BottomNav } from './BottomNav'
 import { BranchDropdown } from './BranchDropdown'
 import { ProductDetailScreen } from './ProductDetailScreen'
+import { CartScreen } from './CartScreen'
+import { useCart } from '../hooks/useCart'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080'
 
@@ -58,7 +60,7 @@ function ProductImage({ src, alt }) {
   )
 }
 
-function ProductCard({ product, onSelect }) {
+function ProductCard({ product, onSelect, onAdd }) {
   return (
     <li
       className="product-card"
@@ -78,7 +80,7 @@ function ProductCard({ product, onSelect }) {
       <button
         className="product-add-btn"
         aria-label={`Agregar ${product.name}`}
-        onClick={e => e.stopPropagation()}
+        onClick={e => { e.stopPropagation(); onAdd(product) }}
       >
         <AddIcon />
       </button>
@@ -108,6 +110,7 @@ export function MenuScreen({ branchId, branchName, onSwitchBranch }) {
   const [selectedProduct, setSelectedProduct] = useState(null)
   const retryRef = useRef(null)
   const prevCategoryIndexRef = useRef(0)
+  const { items, addItem, removeItem, updateQty, clearCart, count } = useCart()
 
   const handleSelectProduct = useCallback((product) => {
     const cat = categories.find(c => c.products.some(p => p.id === product.id))
@@ -117,6 +120,10 @@ export function MenuScreen({ branchId, branchName, onSwitchBranch }) {
   const handleCloseDetail = useCallback(() => {
     setSelectedProduct(null)
   }, [])
+
+  const handleAddToCart = useCallback((product, qty) => {
+    addItem(product, qty)
+  }, [addItem])
 
   useEffect(() => {
     let cancelled = false
@@ -165,6 +172,7 @@ export function MenuScreen({ branchId, branchName, onSwitchBranch }) {
   }
 
   const isMenuTab = activeTab === 'menu'
+  const isProfileTab = activeTab === 'profile'
 
   useEffect(() => {
     if (!drawerOpen) return
@@ -253,8 +261,17 @@ export function MenuScreen({ branchId, branchName, onSwitchBranch }) {
         )}
       </div>
 
-      <main className="menu-main">
-        {!isMenuTab ? (
+      <main className={`menu-main${activeTab === 'cart' ? ' menu-main--cart' : ''}`}>
+        {activeTab === 'cart' ? (
+          <CartScreen
+            items={items}
+            onBack={() => setActiveTab('menu')}
+            onRemove={removeItem}
+            onUpdateQty={updateQty}
+            onClear={clearCart}
+            onAddExtra={addItem}
+          />
+        ) : isProfileTab ? (
           <ComingSoon />
         ) : loading ? (
           <div className="menu-loading" role="status" aria-label="Cargando menú">
@@ -298,14 +315,19 @@ export function MenuScreen({ branchId, branchName, onSwitchBranch }) {
               }}
             >
               {currentProducts.map(product => (
-                <ProductCard key={product.id} product={product} onSelect={handleSelectProduct} />
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  onSelect={handleSelectProduct}
+                  onAdd={p => addItem(p, 1)}
+                />
               ))}
             </Motion.ul>
           </AnimatePresence>
         )}
       </main>
 
-      <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
+      <BottomNav activeTab={activeTab} onTabChange={setActiveTab} cartCount={count} />
 
       <AnimatePresence>
         {selectedProduct && (
@@ -320,6 +342,7 @@ export function MenuScreen({ branchId, branchName, onSwitchBranch }) {
             <ProductDetailScreen
               product={selectedProduct}
               onBack={handleCloseDetail}
+              onAddToCart={handleAddToCart}
             />
           </Motion.div>
         )}
