@@ -8,28 +8,6 @@
   --error: #ef4444;
 }
 
-/* ===== SPLASH SCREEN ===== */
-
-.splash-screen {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--bg-primary);
-}
-
-@keyframes splash-in {
-  from {
-    opacity: 0;
-    transform: translateY(18px) scale(0.94);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
 /* ===== LOGO COMPONENT ===== */
 
 .laroka-logo {
@@ -37,12 +15,6 @@
   user-select: none;
   max-width: 100%;
   height: auto;
-}
-
-/* SplashScreen: centrado, tamaño principal */
-.splash-logo {
-  width: 230px;
-  animation: splash-in 0.65s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
 /* BranchSelection: centrado en el hero */
