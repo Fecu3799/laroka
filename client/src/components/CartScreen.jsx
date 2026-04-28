@@ -4,13 +4,6 @@ function formatPrice(price) {
   return `$${Number(price).toLocaleString('es-AR')}`
 }
 
-const EXTRAS = [
-  { id: 'extra-coca', name: 'Coca-Cola', description: '1.5 L, fría.', price: 2500, imageUrl: null },
-  { id: 'extra-sprite', name: 'Sprite', description: '1.5 L, fría.', price: 2200, imageUrl: null },
-  { id: 'extra-agua', name: 'Agua', description: '500 ml, sin gas.', price: 1500, imageUrl: null },
-  { id: 'extra-fanta', name: 'Fanta', description: '1.5 L, fría.', price: 2200, imageUrl: null },
-  { id: 'extra-7up', name: '7 Up', description: '1.5 L, fría.', price: 2200, imageUrl: null },
-]
 
 function TrashIcon({ size = 14 }) {
   return (
@@ -139,7 +132,7 @@ function ExtraCard({ extra, cartQty, onAdd }) {
   )
 }
 
-export function CartScreen({ items, onBack, onRemove, onUpdateQty, onClear, onAddExtra }) {
+export function CartScreen({ items, extras = [], onBack, onRemove, onUpdateQty, onClear, onAddExtra }) {
   const [confirmClear, setConfirmClear] = useState(false)
 
   const total = items.reduce((sum, i) => sum + i.price * i.qty, 0)
@@ -207,7 +200,7 @@ export function CartScreen({ items, onBack, onRemove, onUpdateQty, onClear, onAd
           <div className="cart-extras-separator" />
           <h3 className="cart-extras-title">¿Se te antoja algo extra?</h3>
           <div className="cart-extras-scroll">
-            {EXTRAS.map(extra => (
+            {extras.map(extra => (
               <ExtraCard
                 key={extra.id}
                 extra={extra}

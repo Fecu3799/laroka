@@ -161,6 +161,11 @@ export function MenuScreen({ branchId, branchName, onSwitchBranch }) {
     return cat.products.filter(p => p.name.toLowerCase().includes(q))
   }, [categories, activeCategory, searchQuery])
 
+  const drinks = useMemo(
+    () => categories.find(c => c.categoryId === 3)?.products ?? [],
+    [categories]
+  )
+
   const handleCategoryChange = (categoryId) => {
     const newIndex = categories.findIndex(c => c.categoryId === categoryId)
     if (newIndex !== activeCategoryIndex) {
@@ -265,6 +270,7 @@ export function MenuScreen({ branchId, branchName, onSwitchBranch }) {
         {activeTab === 'cart' ? (
           <CartScreen
             items={items}
+            extras={drinks}
             onBack={() => setActiveTab('menu')}
             onRemove={removeItem}
             onUpdateQty={updateQty}
