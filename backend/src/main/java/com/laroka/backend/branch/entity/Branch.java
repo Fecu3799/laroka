@@ -1,5 +1,6 @@
 package com.laroka.backend.branch.entity;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 import com.laroka.backend.pizzeria.entity.Pizzeria;
@@ -37,6 +38,12 @@ public class Branch {
 
 	@Column(name = "address", nullable = false)
 	private String address;
+
+	@Column(name = "delivery_fee", nullable = false, precision = 10, scale = 2)
+	private BigDecimal deliveryFee;
+
+	@Column(name = "service_fee", nullable = false, precision = 10, scale = 2)
+	private BigDecimal serviceFee;
 
 	@ManyToOne(fetch = FetchType.LAZY)
 	@JoinColumn(name = "pizzeria_id", nullable = false)

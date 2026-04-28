@@ -88,7 +88,7 @@ public class OrderService {
         }
 
         List<OrderItem> resolvedItems = new ArrayList<>();
-        BigDecimal total = BigDecimal.ZERO;
+        BigDecimal subtotal = BigDecimal.ZERO;
 
         for (OrderItem item : items) {
             Product product = productRepository.findById(item.getProduct().getId())
@@ -99,27 +99,36 @@ public class OrderService {
                     .map(bp -> bp.getPriceOverride() != null ? bp.getPriceOverride() : product.getPrice())
                     .orElse(product.getPrice());
 
-            BigDecimal subtotal = unitPrice.multiply(BigDecimal.valueOf(item.getQuantity()));
-            total = total.add(subtotal);
+            BigDecimal lineSubtotal = unitPrice.multiply(BigDecimal.valueOf(item.getQuantity()));
+            subtotal = subtotal.add(lineSubtotal);
 
             resolvedItems.add(OrderItem.builder()
                     .id(UUID.randomUUID())
                     .product(product)
                     .quantity(item.getQuantity())
                     .unitPrice(unitPrice)
-                    .subtotal(subtotal)
+                    .subtotal(lineSubtotal)
                     .build());
         }
 
-        if (total.compareTo(BigDecimal.ZERO) <= 0) {
+        if (subtotal.compareTo(BigDecimal.ZERO) <= 0) {
             throw new BusinessException("El total del pedido debe ser mayor a cero");
         }
+
+        BigDecimal deliveryFee = order.getOrderType() == OrderType.DELIVERY
+                ? branch.getDeliveryFee()
+                : BigDecimal.ZERO;
+        BigDecimal serviceFee = branch.getServiceFee();
+        BigDecimal totalAmount = subtotal.add(deliveryFee).add(serviceFee);
 
         order.setId(UUID.randomUUID());
         order.setBranch(branch);
         order.setPizzeria(branch.getPizzeria());
         order.setStatus(OrderStatus.PENDING_PAYMENT);
-        order.setTotalAmount(total);
+        order.setSubtotal(subtotal);
+        order.setDeliveryFee(deliveryFee);
+        order.setServiceFee(serviceFee);
+        order.setTotalAmount(totalAmount);
 
         for (OrderItem item : resolvedItems) {
             item.setOrder(order);

@@ -20,6 +20,9 @@ public class CreateOrderResponseDTO {
 
     private UUID orderId;
     private OrderStatus status;
+    private BigDecimal subtotal;
+    private BigDecimal deliveryFee;
+    private BigDecimal serviceFee;
     private BigDecimal totalAmount;
     private OrderType orderType;
     private String branchName;
