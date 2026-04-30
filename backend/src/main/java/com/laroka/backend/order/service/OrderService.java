@@ -6,6 +6,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import com.laroka.backend.payment.entity.Payment;
+import com.laroka.backend.payment.entity.PaymentStatus;
+import com.laroka.backend.payment.repository.PaymentRepository;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,6 +44,7 @@ public class OrderService {
     private final ProductRepository productRepository;
     private final BranchProductRepository branchProductRepository;
     private final IdempotencyStore idempotencyStore;
+    private final PaymentRepository paymentRepository;
 
     @Transactional
     public OrderCreationResult createOrder(Order order, List<OrderItem> items,
@@ -140,6 +145,13 @@ public class OrderService {
 
         if (paymentMethod == PaymentMethod.CASH) {
             saved = doTransition(saved, OrderStatus.RECEIVED);
+            paymentRepository.save(Payment.builder()
+                    .id(UUID.randomUUID())
+                    .order(saved)
+                    .status(PaymentStatus.APPROVED)
+                    .method(PaymentMethod.CASH)
+                    .paidAt(LocalDateTime.now())
+                    .build());
         }
 
         Order result = orderRepository.findByIdWithDetails(saved.getId()).orElseThrow();
