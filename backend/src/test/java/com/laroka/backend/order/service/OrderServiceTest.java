@@ -58,7 +58,11 @@ class OrderServiceTest {
     }
 
     private Branch branch(Pizzeria pizzeria) {
-        return Branch.builder().id(1).name("Playa Unión").address("Av. Roca 123").pizzeria(pizzeria).build();
+        return Branch.builder()
+                .id(1).name("Playa Unión").address("Av. Roca 123").pizzeria(pizzeria)
+                .deliveryFee(new BigDecimal("500.00"))
+                .serviceFee(new BigDecimal("200.00"))
+                .build();
     }
 
     private Product product(BigDecimal price) {
@@ -123,7 +127,9 @@ class OrderServiceTest {
 
         ArgumentCaptor<Order> captor = ArgumentCaptor.forClass(Order.class);
         verify(orderRepository).save(captor.capture());
-        assertThat(captor.getValue().getTotalAmount()).isEqualByComparingTo("5600.00");
+        assertThat(captor.getValue().getSubtotal()).isEqualByComparingTo("5600.00");
+        assertThat(captor.getValue().getDeliveryFee()).isEqualByComparingTo("0");
+        assertThat(captor.getValue().getTotalAmount()).isEqualByComparingTo("5800.00");
     }
 
     @Test
@@ -148,7 +154,42 @@ class OrderServiceTest {
 
         ArgumentCaptor<Order> captor = ArgumentCaptor.forClass(Order.class);
         verify(orderRepository).save(captor.capture());
-        assertThat(captor.getValue().getTotalAmount()).isEqualByComparingTo("3100.00");
+        assertThat(captor.getValue().getSubtotal()).isEqualByComparingTo("3100.00");
+        assertThat(captor.getValue().getDeliveryFee()).isEqualByComparingTo("0");
+        assertThat(captor.getValue().getTotalAmount()).isEqualByComparingTo("3300.00");
+    }
+
+    @Test
+    void createOrder_delivery_appliesDeliveryFee() {
+        Pizzeria p = pizzeria();
+        Branch branch = branch(p);
+        Product product = product(new BigDecimal("2800.00"));
+        stubBaseCreation(branch, product);
+
+        service.createOrder(deliveryOrder(branch), List.of(itemFor(1, 1)), PaymentMethod.MERCADOPAGO, "key-d1");
+
+        ArgumentCaptor<Order> captor = ArgumentCaptor.forClass(Order.class);
+        verify(orderRepository).save(captor.capture());
+        Order saved = captor.getValue();
+        assertThat(saved.getSubtotal()).isEqualByComparingTo("2800.00");
+        assertThat(saved.getDeliveryFee()).isEqualByComparingTo("500.00");
+        assertThat(saved.getServiceFee()).isEqualByComparingTo("200.00");
+        assertThat(saved.getTotalAmount()).isEqualByComparingTo("3500.00");
+    }
+
+    @Test
+    void createOrder_takeaway_hasZeroDeliveryFee() {
+        Pizzeria p = pizzeria();
+        Branch branch = branch(p);
+        Product product = product(new BigDecimal("2800.00"));
+        stubBaseCreation(branch, product);
+
+        service.createOrder(takeawayOrder(branch), List.of(itemFor(1, 1)), PaymentMethod.MERCADOPAGO, "key-t1");
+
+        ArgumentCaptor<Order> captor = ArgumentCaptor.forClass(Order.class);
+        verify(orderRepository).save(captor.capture());
+        assertThat(captor.getValue().getDeliveryFee()).isEqualByComparingTo("0");
+        assertThat(captor.getValue().getTotalAmount()).isEqualByComparingTo("3000.00");
     }
 
     // --- createOrder: validaciones ---

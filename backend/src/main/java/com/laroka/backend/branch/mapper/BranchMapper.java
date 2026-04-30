@@ -40,6 +40,8 @@ public class BranchMapper {
 			.id(branch.getId())
 			.name(branch.getName())
 			.address(branch.getAddress())
+			.deliveryFee(branch.getDeliveryFee())
+			.serviceFee(branch.getServiceFee())
 			.build();
 	}
 

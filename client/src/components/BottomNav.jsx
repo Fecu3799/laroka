@@ -34,7 +34,7 @@ const TABS = [
   { id: 'profile', label: 'Profile', Icon: ProfileIcon },
 ]
 
-export function BottomNav({ activeTab, onTabChange }) {
+export function BottomNav({ activeTab, onTabChange, cartCount = 0 }) {
   return (
     <nav className="bottom-nav" aria-label="Navegación principal">
       {TABS.map(({ id, label, Icon }) => (
@@ -45,7 +45,18 @@ export function BottomNav({ activeTab, onTabChange }) {
           aria-label={label}
           aria-current={activeTab === id ? 'page' : undefined}
         >
-          <Icon />
+          {id === 'cart' ? (
+            <div className="bottom-nav-cart-wrapper">
+              <Icon />
+              {cartCount > 0 && (
+                <span className="bottom-nav-badge">
+                  {cartCount > 99 ? '99+' : cartCount}
+                </span>
+              )}
+            </div>
+          ) : (
+            <Icon />
+          )}
           <span className="bottom-nav-label">{label}</span>
         </button>
       ))}

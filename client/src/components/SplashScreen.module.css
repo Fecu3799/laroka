@@ -1,0 +1,43 @@
+.wrapper {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-primary);
+  opacity: 1;
+  transition: opacity 300ms ease;
+}
+
+.fading {
+  opacity: 0;
+}
+
+.logoComposite {
+  position: relative;
+  width: 230px;
+  aspect-ratio: 4053 / 1245;
+}
+
+.logoText {
+  display: block;
+  width: 100%;
+  height: auto;
+  user-select: none;
+}
+
+.logoPizza {
+  position: absolute;
+  width: 39px;
+  top: 26px;
+  right: 7px;
+  transform-origin: center;
+  animation: spin 1.2s linear infinite;
+  user-select: none;
+  pointer-events: none;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}

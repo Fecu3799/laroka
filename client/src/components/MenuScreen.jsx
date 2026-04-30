@@ -1,8 +1,11 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { motion as Motion, AnimatePresence } from 'framer-motion'
 import { LaRokaLogo } from './LaRokaLogo'
 import { BottomNav } from './BottomNav'
 import { BranchDropdown } from './BranchDropdown'
+import { ProductDetailScreen } from './ProductDetailScreen'
+import { CartScreen } from './CartScreen'
+import { useCart } from '../hooks/useCart'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080'
 
@@ -57,9 +60,15 @@ function ProductImage({ src, alt }) {
   )
 }
 
-function ProductCard({ product }) {
+function ProductCard({ product, onSelect, onAdd }) {
   return (
-    <li className="product-card">
+    <li
+      className="product-card"
+      onClick={() => onSelect(product)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={e => e.key === 'Enter' && onSelect(product)}
+    >
       <ProductImage src={product.imageUrl} alt={product.name} />
       <div className="product-info">
         <h3 className="product-name">{product.name}</h3>
@@ -68,7 +77,11 @@ function ProductCard({ product }) {
         )}
         <span className="product-price">{formatPrice(product.price)}</span>
       </div>
-      <button className="product-add-btn" aria-label={`Agregar ${product.name}`}>
+      <button
+        className="product-add-btn"
+        aria-label={`Agregar ${product.name}`}
+        onClick={e => { e.stopPropagation(); onAdd(product) }}
+      >
         <AddIcon />
       </button>
     </li>
@@ -94,8 +107,23 @@ export function MenuScreen({ branchId, branchName, onSwitchBranch }) {
   const [activeTab, setActiveTab] = useState('menu')
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [branches, setBranches] = useState([])
+  const [selectedProduct, setSelectedProduct] = useState(null)
   const retryRef = useRef(null)
   const prevCategoryIndexRef = useRef(0)
+  const { items, addItem, removeItem, updateQty, clearCart, count } = useCart()
+
+  const handleSelectProduct = useCallback((product) => {
+    const cat = categories.find(c => c.products.some(p => p.id === product.id))
+    setSelectedProduct({ ...product, categoryName: cat?.categoryName || '' })
+  }, [categories])
+
+  const handleCloseDetail = useCallback(() => {
+    setSelectedProduct(null)
+  }, [])
+
+  const handleAddToCart = useCallback((product, qty) => {
+    addItem(product, qty)
+  }, [addItem])
 
   useEffect(() => {
     let cancelled = false
@@ -133,6 +161,11 @@ export function MenuScreen({ branchId, branchName, onSwitchBranch }) {
     return cat.products.filter(p => p.name.toLowerCase().includes(q))
   }, [categories, activeCategory, searchQuery])
 
+  const drinks = useMemo(
+    () => categories.find(c => c.categoryId === 3)?.products ?? [],
+    [categories]
+  )
+
   const handleCategoryChange = (categoryId) => {
     const newIndex = categories.findIndex(c => c.categoryId === categoryId)
     if (newIndex !== activeCategoryIndex) {
@@ -144,6 +177,7 @@ export function MenuScreen({ branchId, branchName, onSwitchBranch }) {
   }
 
   const isMenuTab = activeTab === 'menu'
+  const isProfileTab = activeTab === 'profile'
 
   useEffect(() => {
     if (!drawerOpen) return
@@ -232,8 +266,18 @@ export function MenuScreen({ branchId, branchName, onSwitchBranch }) {
         )}
       </div>
 
-      <main className="menu-main">
-        {!isMenuTab ? (
+      <main className={`menu-main${activeTab === 'cart' ? ' menu-main--cart' : ''}`}>
+        {activeTab === 'cart' ? (
+          <CartScreen
+            items={items}
+            extras={drinks}
+            onBack={() => setActiveTab('menu')}
+            onRemove={removeItem}
+            onUpdateQty={updateQty}
+            onClear={clearCart}
+            onAddExtra={addItem}
+          />
+        ) : isProfileTab ? (
           <ComingSoon />
         ) : loading ? (
           <div className="menu-loading" role="status" aria-label="Cargando menú">
@@ -277,14 +321,38 @@ export function MenuScreen({ branchId, branchName, onSwitchBranch }) {
               }}
             >
               {currentProducts.map(product => (
-                <ProductCard key={product.id} product={product} />
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  onSelect={handleSelectProduct}
+                  onAdd={p => addItem(p, 1)}
+                />
               ))}
             </Motion.ul>
           </AnimatePresence>
         )}
       </main>
 
-      <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
+      <BottomNav activeTab={activeTab} onTabChange={setActiveTab} cartCount={count} />
+
+      <AnimatePresence>
+        {selectedProduct && (
+          <Motion.div
+            key="product-detail"
+            className="detail-screen-wrapper"
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
+            transition={{ type: 'tween', duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
+          >
+            <ProductDetailScreen
+              product={selectedProduct}
+              onBack={handleCloseDetail}
+              onAddToCart={handleAddToCart}
+            />
+          </Motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

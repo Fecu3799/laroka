@@ -42,6 +42,9 @@ public class OrderMapper {
         return CreateOrderResponseDTO.builder()
                 .orderId(order.getId())
                 .status(order.getStatus())
+                .subtotal(order.getSubtotal())
+                .deliveryFee(order.getDeliveryFee())
+                .serviceFee(order.getServiceFee())
                 .totalAmount(order.getTotalAmount())
                 .orderType(order.getOrderType())
                 .branchName(order.getBranch().getName())
@@ -54,6 +57,10 @@ public class OrderMapper {
                 .status(order.getStatus())
                 .orderType(order.getOrderType())
                 .branchName(order.getBranch().getName())
+                .subtotal(order.getSubtotal())
+                .deliveryFee(order.getDeliveryFee())
+                .serviceFee(order.getServiceFee())
+                .totalAmount(order.getTotalAmount())
                 .history(history.stream().map(this::toHistoryDTO).toList())
                 .build();
     }
