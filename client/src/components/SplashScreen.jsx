@@ -10,7 +10,10 @@ const FADE_DURATION_MS = 300
 export function SplashScreen({ onComplete }) {
   const [fading, setFading] = useState(false)
   const onCompleteRef = useRef(onComplete)
-  onCompleteRef.current = onComplete
+
+  useEffect(() => {
+    onCompleteRef.current = onComplete
+  }, [onComplete])
 
   useEffect(() => {
     let cancelled = false
