@@ -195,6 +195,57 @@ Disponible en `http://localhost:5174`.
  
 ---
  
+## Desarrollo local — webhooks
+
+Para recibir webhooks de MercadoPago en local se necesita exponer el backend con ngrok.
+
+### 1. Instalar ngrok
+
+```bash
+brew install ngrok
+```
+
+O descargar desde https://ngrok.com/download e instalar manualmente.
+
+### 2. Autenticar ngrok (una sola vez)
+
+```bash
+ngrok config add-authtoken <tu-authtoken>
+```
+
+### 3. Exponer el backend
+
+Con el backend corriendo en el puerto 8080:
+
+```bash
+ngrok http 8080
+```
+
+ngrok muestra una URL pública del tipo `https://xxxx-xxxx.ngrok-free.app`.
+
+### 4. Configurar la URL en MercadoPago sandbox
+
+1. Ingresar al [panel de desarrolladores de MercadoPago](https://www.mercadopago.com.ar/developers/panel/app).
+2. Seleccionar la aplicación de sandbox.
+3. En **Webhooks → Configurar notificaciones**, ingresar la URL:
+   ```
+   https://xxxx-xxxx.ngrok-free.app/payments/webhook
+   ```
+4. Seleccionar el evento **Pagos**.
+5. Copiar el **secreto de firma** generado por MP y agregarlo al entorno:
+   ```env
+   MERCADOPAGO_WEBHOOK_SECRET=<secreto-copiado>
+   ```
+
+### 5. Testear en local sin credenciales MP
+
+Si `MERCADOPAGO_KEY` está vacío, el adapter opera en modo dev:
+- `POST /payments/initiate` retorna una URL de sandbox simulada.
+- `POST /payments/webhook` con `{"type":"payment","data":{"id":"<orderId>"}}` activa el pedido directamente (el `id` se trata como `orderId`).
+- La validación de firma se omite cuando `MERCADOPAGO_WEBHOOK_SECRET` está vacío.
+
+---
+
 ## Comandos útiles
  
 ```bash

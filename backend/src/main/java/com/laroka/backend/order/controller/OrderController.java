@@ -22,6 +22,8 @@ import com.laroka.backend.order.entity.OrderStatusHistory;
 import com.laroka.backend.order.mapper.OrderMapper;
 import com.laroka.backend.order.service.OrderCreationResult;
 import com.laroka.backend.order.service.OrderService;
+import com.laroka.backend.payment.entity.Payment;
+import com.laroka.backend.payment.service.PaymentService;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -36,6 +38,7 @@ public class OrderController {
 
     private final OrderService orderService;
     private final OrderMapper orderMapper;
+    private final PaymentService paymentService;
 
     @PostMapping
     @Operation(summary = "Create order", description = "Creates a new order for a branch. Send X-Idempotency-Key to avoid duplicate orders on retry.")
@@ -52,10 +55,11 @@ public class OrderController {
     }
 
     @GetMapping("/{id}/status")
-    @Operation(summary = "Get order status", description = "Returns the current status and full state history of an order.")
+    @Operation(summary = "Get order status", description = "Returns the current status, payment status, and full state history of an order.")
     public ResponseEntity<OrderStatusResponseDTO> getOrderStatus(@PathVariable UUID id) {
         Order order = orderService.findById(id);
         List<OrderStatusHistory> history = orderService.getHistory(id);
-        return ResponseEntity.ok(orderMapper.toStatusResponseDTO(order, history));
+        Payment payment = paymentService.findOptionalByOrderId(id).orElse(null);
+        return ResponseEntity.ok(orderMapper.toStatusResponseDTO(order, history, payment));
     }
 }

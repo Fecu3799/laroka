@@ -16,6 +16,7 @@ import com.laroka.backend.shared.exception.BusinessException;
 public class MercadoPagoAdapter implements PaymentGateway {
 
     private static final String MP_PREFERENCES_URL = "https://api.mercadopago.com/checkout/preferences";
+    private static final String MP_PAYMENTS_URL = "https://api.mercadopago.com/v1/payments/";
 
     private final String accessToken;
     private final RestClient restClient;
@@ -63,8 +64,38 @@ public class MercadoPagoAdapter implements PaymentGateway {
         }
     }
 
+    @Override
+    public PaymentInfo fetchPayment(String paymentId) {
+        // Dev fallback: treat paymentId as orderId and return approved
+        if (accessToken == null || accessToken.isBlank()) {
+            return new PaymentInfo("approved", paymentId);
+        }
+
+        try {
+            MpPaymentResponse response = restClient.get()
+                    .uri(MP_PAYMENTS_URL + paymentId)
+                    .header("Authorization", "Bearer " + accessToken)
+                    .retrieve()
+                    .body(MpPaymentResponse.class);
+
+            if (response == null) {
+                throw new BusinessException("MercadoPago no devolvió datos del pago");
+            }
+            return new PaymentInfo(response.status(), response.externalReference());
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new BusinessException("Error al consultar el pago en MercadoPago: " + e.getMessage());
+        }
+    }
+
     private record MpPreferenceResponse(
             @JsonProperty("id") String id,
             @JsonProperty("init_point") String initPoint
+    ) {}
+
+    private record MpPaymentResponse(
+            @JsonProperty("status") String status,
+            @JsonProperty("external_reference") String externalReference
     ) {}
 }

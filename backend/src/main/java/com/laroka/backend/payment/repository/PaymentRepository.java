@@ -13,5 +13,6 @@ import com.laroka.backend.payment.entity.PaymentStatus;
 @Repository
 public interface PaymentRepository extends JpaRepository<Payment, UUID> {
     Optional<Payment> findByOrderId(UUID orderId);
+    Optional<Payment> findByMercadopagoPaymentId(String mercadopagoPaymentId);
     boolean existsByOrderIdAndStatusIn(UUID orderId, List<PaymentStatus> statuses);
 }

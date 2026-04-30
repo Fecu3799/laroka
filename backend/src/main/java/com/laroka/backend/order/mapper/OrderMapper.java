@@ -15,6 +15,7 @@ import com.laroka.backend.order.entity.Order;
 import com.laroka.backend.order.entity.OrderItem;
 import com.laroka.backend.order.entity.OrderOrigin;
 import com.laroka.backend.order.entity.OrderStatusHistory;
+import com.laroka.backend.payment.entity.Payment;
 
 @Component
 public class OrderMapper {
@@ -52,9 +53,11 @@ public class OrderMapper {
                 .build();
     }
 
-    public OrderStatusResponseDTO toStatusResponseDTO(Order order, List<OrderStatusHistory> history) {
+    public OrderStatusResponseDTO toStatusResponseDTO(Order order, List<OrderStatusHistory> history,
+            Payment payment) {
         return OrderStatusResponseDTO.builder()
                 .status(order.getStatus())
+                .paymentStatus(payment != null ? payment.getStatus() : null)
                 .orderType(order.getOrderType())
                 .branchName(order.getBranch().getName())
                 .subtotal(order.getSubtotal())
