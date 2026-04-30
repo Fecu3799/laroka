@@ -141,8 +141,12 @@ public class PaymentService {
         for (String part : xSignature.split(",")) {
             String[] kv = part.split("=", 2);
             if (kv.length == 2) {
-                if ("ts".equals(kv[0].trim())) ts = kv[1].trim();
-                if ("v1".equals(kv[0].trim())) v1 = kv[1].trim();
+                if ("ts".equals(kv[0].trim())) {
+                    ts = kv[1].trim();
+                }
+                if ("v1".equals(kv[0].trim())) {
+                    v1 = kv[1].trim();
+                }
             }
         }
 
@@ -169,7 +173,9 @@ public class PaymentService {
     }
 
     private PaymentStatus mapMpStatus(String mpStatus) {
-        if (mpStatus == null) return PaymentStatus.PENDING;
+        if (mpStatus == null) {
+            return PaymentStatus.PENDING;
+        }
         return switch (mpStatus.toLowerCase()) {
             case "approved" -> PaymentStatus.APPROVED;
             case "rejected" -> PaymentStatus.REJECTED;

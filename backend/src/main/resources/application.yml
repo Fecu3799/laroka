@@ -46,6 +46,9 @@ mercadopago:
   key: ${MERCADOPAGO_KEY:}
   webhook-secret: ${MERCADOPAGO_WEBHOOK_SECRET:}
 
+order:
+  expiration-minutes: ${ORDER_EXPIRATION_MINUTES:30}
+
 r2:
   access-key: ${R2_ACCESS_KEY:}
   secret-key: ${R2_SECRET_KEY:}
