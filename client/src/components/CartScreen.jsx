@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { CheckoutScreen } from './CheckoutScreen'
 
 function formatPrice(price) {
   return `$${Number(price).toLocaleString('es-AR')}`
@@ -134,6 +135,9 @@ function ExtraCard({ extra, cartQty, onAdd }) {
 
 export function CartScreen({ items, extras = [], onBack, onRemove, onUpdateQty, onClear, onAddExtra }) {
   const [confirmClear, setConfirmClear] = useState(false)
+  const [showCheckout, setShowCheckout] = useState(false)
+
+  if (showCheckout) return <CheckoutScreen onBack={() => setShowCheckout(false)} />
 
   const total = items.reduce((sum, i) => sum + i.price * i.qty, 0)
   const count = items.reduce((sum, i) => sum + i.qty, 0)
@@ -217,7 +221,7 @@ export function CartScreen({ items, extras = [], onBack, onRemove, onUpdateQty, 
           <span className="cart-subtotal-label">SUBTOTAL</span>
           <span className="cart-subtotal-amount">{formatPrice(total)}</span>
         </div>
-        <button className="cart-pay-btn">
+        <button className="cart-pay-btn" onClick={() => setShowCheckout(true)}>
           IR A PAGAR <ArrowRightIcon />
         </button>
       </div>
