@@ -1,5 +1,10 @@
 import { useState } from 'react'
 import styles from './CheckoutScreen.module.css'
+import { usePreferredBranch } from '../hooks/usePreferredBranch'
+
+function formatPrice(amount) {
+  return `$${Number(amount).toLocaleString('es-AR')}`
+}
 
 function BackIcon() {
   return (
@@ -65,16 +70,22 @@ function MercadoPagoIcon() {
   )
 }
 
-export function CheckoutScreen({ onBack }) {
+export function CheckoutScreen({ onBack, items = [] }) {
+  const { deliveryFee, serviceFee } = usePreferredBranch()
   const [orderType, setOrderType] = useState('delivery')
   const [nombre, setNombre] = useState('')
   const [telefono, setTelefono] = useState('')
   const [direccion, setDireccion] = useState('')
   const [notas, setNotas] = useState('')
   const [paymentMethod, setPaymentMethod] = useState('efectivo')
+  const [summaryOpen, setSummaryOpen] = useState(false)
 
   const isDelivery = orderType === 'delivery'
   const isEfectivo = paymentMethod === 'efectivo'
+
+  const subtotal = items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0)
+  const totalQty = items.reduce((sum, item) => sum + item.quantity, 0)
+  const total = subtotal + Number(serviceFee) + (isDelivery ? Number(deliveryFee) : 0)
 
   return (
     <div className={styles.screen}>
@@ -148,15 +159,44 @@ export function CheckoutScreen({ onBack }) {
           />
         </div>
 
-        {/* Resumen del pedido — colapsado */}
+        {/* Resumen del pedido */}
         <div className={styles.summaryCard}>
-          <div className={styles.summaryHeader}>
+          <button className={styles.summaryHeader} onClick={() => setSummaryOpen(o => !o)}>
             <span className={styles.summaryTitle}>Resumen del pedido</span>
-            <span className={styles.summaryMeta}>2 productos · $5.600</span>
-            <span className={styles.summaryChevron}>
+            <span className={styles.summaryMeta}>{totalQty} producto{totalQty !== 1 ? 's' : ''} · {formatPrice(subtotal)}</span>
+            <span className={`${styles.summaryChevron}${summaryOpen ? ` ${styles.summaryChevronOpen}` : ''}`}>
               <ChevronDownIcon />
             </span>
-          </div>
+          </button>
+          {summaryOpen && (
+            <div className={styles.summaryBody}>
+              {items.map((item, i) => (
+                <div key={i} className={styles.summaryItemRow}>
+                  <span className={styles.summaryItemQtyName}>{item.quantity}× {item.name}</span>
+                  <span className={styles.summaryItemPrice}>{formatPrice(item.unitPrice * item.quantity)}</span>
+                </div>
+              ))}
+              <div className={styles.summarySeparator} />
+              <div className={styles.summaryFeeRow}>
+                <span className={styles.summaryFeeLabel}>Subtotal</span>
+                <span className={styles.summaryFeeValue}>{formatPrice(subtotal)}</span>
+              </div>
+              <div className={styles.summaryFeeRow}>
+                <span className={styles.summaryFeeLabel}>Cargo de servicio</span>
+                <span className={styles.summaryFeeValue}>{formatPrice(serviceFee)}</span>
+              </div>
+              {isDelivery && (
+                <div className={styles.summaryFeeRow}>
+                  <span className={styles.summaryFeeLabel}>Cargo de delivery</span>
+                  <span className={styles.summaryFeeValue}>{formatPrice(deliveryFee)}</span>
+                </div>
+              )}
+              <div className={styles.summaryTotalRow}>
+                <span className={styles.summaryTotalLabel}>TOTAL</span>
+                <span className={styles.summaryTotalAmount}>{formatPrice(total)}</span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Medio de pago */}
@@ -189,7 +229,7 @@ export function CheckoutScreen({ onBack }) {
       <div className={styles.ctaWrapper}>
         <div className={styles.ctaTotalRow}>
           <span className={styles.ctaTotalLabel}>TOTAL</span>
-          <span className={styles.ctaTotalAmount}>$6.300</span>
+          <span className={styles.ctaTotalAmount}>{formatPrice(total)}</span>
         </div>
         <button className={styles.ctaBtn}>
           <span className={styles.ctaBtnText}>{isEfectivo ? 'CONFIRMAR PEDIDO' : 'IR A PAGAR'}</span>

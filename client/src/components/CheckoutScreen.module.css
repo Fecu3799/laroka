@@ -201,6 +201,98 @@
   display: flex;
   align-items: center;
   flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.summaryChevronOpen {
+  transform: rotate(180deg);
+}
+
+.summaryHeader {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  cursor: pointer;
+  background: none;
+  border: none;
+  width: 100%;
+  padding: 0;
+  text-align: left;
+}
+
+.summaryBody {
+  margin-top: 12px;
+  overflow-y: auto;
+  max-height: 220px;
+  scrollbar-width: none;
+}
+
+.summaryBody::-webkit-scrollbar {
+  display: none;
+}
+
+.summaryItemRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 3px 0;
+}
+
+.summaryItemQtyName {
+  font-family: 'Inria Sans', sans-serif;
+  font-size: 14px;
+  color: #fff;
+}
+
+.summaryItemPrice {
+  font-family: 'Inria Sans', sans-serif;
+  font-size: 14px;
+  color: #fff;
+}
+
+.summarySeparator {
+  border-top: 1px solid rgba(101, 163, 105, 0.2);
+  margin: 10px 0;
+}
+
+.summaryFeeRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 3px 0;
+}
+
+.summaryFeeLabel {
+  font-family: 'Inria Sans', sans-serif;
+  font-size: 13px;
+  color: var(--co-text-sec);
+}
+
+.summaryFeeValue {
+  font-family: 'Inria Sans', sans-serif;
+  font-size: 13px;
+  color: var(--co-text-sec);
+}
+
+.summaryTotalRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 8px 0 2px;
+}
+
+.summaryTotalLabel {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 800;
+  font-size: 18px;
+  color: #fff;
+}
+
+.summaryTotalAmount {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 800;
+  font-size: 24px;
+  color: var(--co-gold);
 }
 
 /* ── Payment section ── */
