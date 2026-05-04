@@ -70,7 +70,7 @@ function MercadoPagoIcon() {
   )
 }
 
-export function CheckoutScreen({ onBack, items = [] }) {
+export function CheckoutScreen({ onBack, onConfirm, items = [] }) {
   const { deliveryFee, serviceFee } = usePreferredBranch()
   const [orderType, setOrderType] = useState('delivery')
   const [nombre, setNombre] = useState('')
@@ -79,6 +79,7 @@ export function CheckoutScreen({ onBack, items = [] }) {
   const [notas, setNotas] = useState('')
   const [paymentMethod, setPaymentMethod] = useState('efectivo')
   const [summaryOpen, setSummaryOpen] = useState(false)
+  const [errors, setErrors] = useState({ nombre: '', telefono: '', direccion: '' })
 
   const isDelivery = orderType === 'delivery'
   const isEfectivo = paymentMethod === 'efectivo'
@@ -86,6 +87,23 @@ export function CheckoutScreen({ onBack, items = [] }) {
   const subtotal = items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0)
   const totalQty = items.reduce((sum, item) => sum + item.quantity, 0)
   const total = subtotal + Number(serviceFee) + (isDelivery ? Number(deliveryFee) : 0)
+
+  const isFormValid = nombre.trim() && telefono.trim() && (!isDelivery || direccion.trim())
+
+  const handleConfirm = () => {
+    if (!isEfectivo) {
+      // TODO: Sprint 4-F — initiate payment flow
+      return
+    }
+    const newErrors = {
+      nombre: nombre.trim() ? '' : 'Ingresá tu nombre',
+      telefono: telefono.trim() ? '' : 'Ingresá tu teléfono',
+      direccion: isDelivery && !direccion.trim() ? 'Ingresá la dirección de entrega' : '',
+    }
+    setErrors(newErrors)
+    if (Object.values(newErrors).some(Boolean)) return
+    onConfirm({ orderType, nombre: nombre.trim(), telefono: telefono.trim(), direccion: direccion.trim(), notas: notas.trim(), paymentMethod: 'CASH' })
+  }
 
   return (
     <div className={styles.screen}>
@@ -123,8 +141,9 @@ export function CheckoutScreen({ onBack, items = [] }) {
                 className={styles.input}
                 placeholder="¿Cómo te llamás?"
                 value={nombre}
-                onChange={e => setNombre(e.target.value)}
+                onChange={e => { setNombre(e.target.value); setErrors(prev => ({ ...prev, nombre: '' })) }}
               />
+              {errors.nombre && <span className={styles.fieldError}>{errors.nombre}</span>}
             </div>
             <div className={styles.inputGroup}>
               <label className={styles.inputLabel}>Teléfono</label>
@@ -132,8 +151,9 @@ export function CheckoutScreen({ onBack, items = [] }) {
                 className={styles.input}
                 placeholder="11 0000-0000"
                 value={telefono}
-                onChange={e => setTelefono(e.target.value)}
+                onChange={e => { setTelefono(e.target.value); setErrors(prev => ({ ...prev, telefono: '' })) }}
               />
+              {errors.telefono && <span className={styles.fieldError}>{errors.telefono}</span>}
             </div>
           </div>
           <div className={styles.inputGroupFull} style={{ display: isDelivery ? undefined : 'none' }}>
@@ -142,8 +162,9 @@ export function CheckoutScreen({ onBack, items = [] }) {
               className={styles.input}
               placeholder="Calle y número, piso, depto"
               value={direccion}
-              onChange={e => setDireccion(e.target.value)}
+              onChange={e => { setDireccion(e.target.value); setErrors(prev => ({ ...prev, direccion: '' })) }}
             />
+            {errors.direccion && <span className={styles.fieldError}>{errors.direccion}</span>}
           </div>
         </div>
 
@@ -231,7 +252,11 @@ export function CheckoutScreen({ onBack, items = [] }) {
           <span className={styles.ctaTotalLabel}>TOTAL</span>
           <span className={styles.ctaTotalAmount}>{formatPrice(total)}</span>
         </div>
-        <button className={styles.ctaBtn}>
+        <button
+          className={styles.ctaBtn}
+          style={!isFormValid ? { opacity: 0.5, pointerEvents: 'none' } : undefined}
+          onClick={handleConfirm}
+        >
           <span className={styles.ctaBtnText}>{isEfectivo ? 'CONFIRMAR PEDIDO' : 'IR A PAGAR'}</span>
           <ArrowRightIcon />
         </button>
