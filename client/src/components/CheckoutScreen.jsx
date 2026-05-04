@@ -84,8 +84,8 @@ export function CheckoutScreen({ onBack, onConfirm, items = [] }) {
   const isDelivery = orderType === 'delivery'
   const isEfectivo = paymentMethod === 'efectivo'
 
-  const subtotal = items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0)
-  const totalQty = items.reduce((sum, item) => sum + item.quantity, 0)
+  const subtotal = items.reduce((sum, item) => sum + item.price * item.qty, 0)
+  const totalQty = items.reduce((sum, item) => sum + item.qty, 0)
   const total = subtotal + Number(serviceFee) + (isDelivery ? Number(deliveryFee) : 0)
 
   const isFormValid = nombre.trim() && telefono.trim() && (!isDelivery || direccion.trim())
@@ -193,8 +193,8 @@ export function CheckoutScreen({ onBack, onConfirm, items = [] }) {
             <div className={styles.summaryBody}>
               {items.map((item, i) => (
                 <div key={i} className={styles.summaryItemRow}>
-                  <span className={styles.summaryItemQtyName}>{item.quantity}× {item.name}</span>
-                  <span className={styles.summaryItemPrice}>{formatPrice(item.unitPrice * item.quantity)}</span>
+                  <span className={styles.summaryItemQtyName}>{item.qty}× {item.name}</span>
+                  <span className={styles.summaryItemPrice}>{formatPrice(item.price * item.qty)}</span>
                 </div>
               ))}
               <div className={styles.summarySeparator} />
@@ -230,7 +230,7 @@ export function CheckoutScreen({ onBack, onConfirm, items = [] }) {
               onClick={() => setPaymentMethod('efectivo')}
             >
               <span className={styles.paymentIcon}><EfectivoIcon /></span>
-              <span className={styles.paymentName}>Efectivo / QR</span>
+              <span className={styles.paymentName}>Efectivo</span>
               <span className={styles.paymentSub}>{isDelivery ? 'Al recibir' : 'Al retirar'}</span>
             </button>
             <button

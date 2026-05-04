@@ -7,11 +7,17 @@ function readStorage() {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return { id: null, name: null, deliveryFee: 0, serviceFee: 0 }
     const parsed = JSON.parse(raw)
-    if (parsed && typeof parsed === 'object') return {
-      id: parsed.id ?? null,
-      name: parsed.name ?? null,
-      deliveryFee: Number(parsed.deliveryFee) || 0,
-      serviceFee: Number(parsed.serviceFee) || 0,
+    if (parsed && typeof parsed === 'object') {
+      if (parsed.deliveryFee == null || parsed.serviceFee == null) {
+        localStorage.removeItem(STORAGE_KEY)
+        return { id: null, name: null, deliveryFee: 0, serviceFee: 0 }
+      }
+      return {
+        id: parsed.id ?? null,
+        name: parsed.name ?? null,
+        deliveryFee: Number(parsed.deliveryFee) || 0,
+        serviceFee: Number(parsed.serviceFee) || 0,
+      }
     }
     // legacy: plain numeric string
     const id = parseInt(raw, 10)

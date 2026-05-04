@@ -137,7 +137,7 @@ export function CartScreen({ items, extras = [], onBack, onRemove, onUpdateQty, 
   const [confirmClear, setConfirmClear] = useState(false)
   const [showCheckout, setShowCheckout] = useState(false)
 
-  if (showCheckout) return <CheckoutScreen onBack={() => setShowCheckout(false)} />
+  if (showCheckout) return <CheckoutScreen items={items} onBack={() => setShowCheckout(false)} />
 
   const total = items.reduce((sum, i) => sum + i.price * i.qty, 0)
   const count = items.reduce((sum, i) => sum + i.qty, 0)

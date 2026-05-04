@@ -23,10 +23,10 @@ function App() {
     setScreen(preferredBranchId ? 'menu' : 'selection')
   }, [preferredBranchId])
 
-  const handleBranchSelect = useCallback((branchId, branchName) => {
-    saveBranch(branchId, branchName)
-    setSelectedBranchId(branchId)
-    setSelectedBranchName(branchName)
+  const handleBranchSelect = useCallback(({ id, name, deliveryFee, serviceFee }) => {
+    saveBranch({ id, name, deliveryFee, serviceFee })
+    setSelectedBranchId(id)
+    setSelectedBranchName(name)
     setExiting(true)
     exitTimerRef.current = setTimeout(() => {
       setScreen('menu')
