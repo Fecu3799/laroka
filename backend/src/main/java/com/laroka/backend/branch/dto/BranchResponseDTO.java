@@ -17,6 +17,8 @@ public class BranchResponseDTO {
 	private Integer id;
 	private String name;
 	private String address;
+	private Integer estimatedDeliveryMinutes;
+	private String phone;
 	private Integer pizzeriaId;
 	private PizzeriaResponseDTO pizzeria;
 	private LocalDateTime createdAt;
