@@ -5,6 +5,7 @@ import { BottomNav } from './BottomNav'
 import { BranchDropdown } from './BranchDropdown'
 import { ProductDetailScreen } from './ProductDetailScreen'
 import { CartScreen } from './CartScreen'
+import { OrderTrackingBanner } from './OrderTrackingBanner'
 import { useCart } from '../hooks/useCart'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080'
@@ -234,6 +235,10 @@ export function MenuScreen({ branchId, branchName, onSwitchBranch }) {
             />
           </div>
         </header>
+
+        <div style={isMenuTab ? undefined : { display: 'none' }}>
+          <OrderTrackingBanner />
+        </div>
 
         {isMenuTab && (
           <>
