@@ -1,75 +1,125 @@
 .screen {
   position: fixed;
   inset: 0;
-  background: var(--bg-primary);
+  height: 100dvh;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  align-items: center;
   justify-content: center;
-  z-index: 100;
-  overflow: hidden;
+  align-items: center;
+  background: var(--bg-primary);
 }
 
+/* Glow ellipse fixed at 50% 38% of the screen — do not move */
+.screen::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse 320px 280px at 50% 38%,
+    rgba(9, 94, 47, 0.55) 0%,
+    transparent 70%
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── Content ──────────────────────────────────────────────── */
+
 .content {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 20px;
-  padding: 0 24px;
-  text-align: center;
+  gap: 12px;
+  width: 100%;
+}
+
+/* ── Illustration ─────────────────────────────────────────── */
+
+.illustrationWrapper {
+  position: relative;
+  width: 72%;
+  max-width: 280px;
 }
 
 .illustration {
-  width: 60%;
-  max-width: 280px;
-  animation:
-    slideIn 600ms ease-out forwards,
-    bounce 300ms ease-out 600ms forwards;
+  width: 100%;
+  position: relative;
+  z-index: 2;
+  display: block;
 }
 
-@keyframes slideIn {
-  from {
-    transform: translateX(100%);
-  }
-  to {
-    transform: translateX(0);
-  }
+.trailImage {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 1;
+  pointer-events: none;
 }
 
-@keyframes bounce {
-  0%   { transform: translateX(0); }
-  33%  { transform: translateX(-8px); }
-  66%  { transform: translateX(4px); }
-  100% { transform: translateX(0); }
+/* ── Particles ────────────────────────────────────────────── */
+
+.particle {
+  position: absolute;
+  border-radius: 50%;
+  background: var(--accent);
+  z-index: 0;
+  pointer-events: none;
+  animation: sparkle 900ms ease-in-out infinite;
 }
+
+@keyframes sparkle {
+  0%   { transform: translateY(0)     scale(0);   opacity: 0; }
+  35%  { transform: translateY(-18px) scale(1.2); opacity: 1; }
+  100% { transform: translateY(-50px) scale(0);   opacity: 0; }
+}
+
+/* ── Typography ───────────────────────────────────────────── */
 
 .title {
   font-family: 'Barlow Condensed', sans-serif;
   font-weight: 800;
-  font-size: 2rem;
-  color: var(--text-primary);
+  font-size: 30px;
+  color: var(--accent);
   margin: 0;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.titleLine {
+  width: 56px;
+  height: 2px;
+  background: var(--accent);
+  margin: 0 auto;
 }
 
 .subtitle {
   font-family: 'Inria Sans', sans-serif;
-  font-size: 14px;
+  font-size: 13px;
   color: var(--text-primary);
   opacity: 0.6;
   margin: 0;
+  text-align: center;
+  white-space: nowrap;
 }
 
-.progressBar {
-  position: absolute;
+/* ── Progress bar (disabled) ──────────────────────────────── */
+
+.progressTrack {
+  position: fixed;
   bottom: 0;
   left: 0;
-  height: 4px;
-  background: var(--accent);
-  width: 0%;
-  animation: progress 3000ms linear forwards;
+  right: 0;
+  height: 3px;
+  background-color: color-mix(in srgb, var(--border) 30%, transparent);
+  z-index: 2;
 }
 
-@keyframes progress {
-  from { width: 0%; }
-  to   { width: 100%; }
+.progressFill {
+  height: 100%;
+  width: 0%;
+  background-color: var(--accent);
 }
