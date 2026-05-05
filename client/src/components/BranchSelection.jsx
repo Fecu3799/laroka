@@ -66,12 +66,12 @@ export function BranchSelection({ onSelect }) {
 
   const retry = useCallback(() => retryRef.current?.(), [])
 
-  const handleBranchClick = useCallback((branchId, branchName, deliveryFee, serviceFee) => {
+  const handleBranchClick = useCallback((branchId, branchName, deliveryFee, serviceFee, phone, estimatedDeliveryMinutes) => {
     if (slidingId) return
     setSlidingId(branchId)
     prefetchMenuImages(branchId)
     slideTimerRef.current = setTimeout(() => {
-      onSelect({ id: branchId, name: branchName, deliveryFee, serviceFee })
+      onSelect({ id: branchId, name: branchName, deliveryFee, serviceFee, phone, estimatedDeliveryMinutes })
     }, SLIDE_DURATION)
   }, [slidingId, onSelect])
 
@@ -129,7 +129,7 @@ export function BranchSelection({ onSelect }) {
               <li key={branch.id}>
                 <button
                   className={`branch-btn${slidingId === branch.id ? ' branch-btn--sliding' : ''}`}
-                  onClick={() => handleBranchClick(branch.id, branch.name, branch.deliveryFee, branch.serviceFee)}
+                  onClick={() => handleBranchClick(branch.id, branch.name, branch.deliveryFee, branch.serviceFee, branch.phone, branch.estimatedDeliveryMinutes)}
                   aria-label={`Seleccionar sucursal ${branch.name}`}
                 >
                   <CityThumb index={index} name={branch.name} />

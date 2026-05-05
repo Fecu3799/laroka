@@ -57,6 +57,7 @@ public class OrderMapper {
                 .status(order.getStatus())
                 .orderType(order.getOrderType())
                 .branchName(order.getBranch().getName())
+                .deliveryAddress(order.getDeliveryAddress())
                 .subtotal(order.getSubtotal())
                 .deliveryFee(order.getDeliveryFee())
                 .serviceFee(order.getServiceFee())

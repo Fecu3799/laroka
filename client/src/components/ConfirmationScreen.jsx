@@ -39,9 +39,11 @@ export function ConfirmationScreen({ orderId, onComplete }) {
       if (!orders.includes(orderId)) {
         orders.push(orderId)
         localStorage.setItem('laroka_active_orders', JSON.stringify(orders))
+        window.dispatchEvent(new Event('laroka_orders_updated'))
       }
     } catch {
       localStorage.setItem('laroka_active_orders', JSON.stringify([orderId]))
+      window.dispatchEvent(new Event('laroka_orders_updated'))
     }
 
     // timer disabled — screen stays until further notice
