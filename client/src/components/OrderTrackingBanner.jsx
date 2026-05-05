@@ -36,7 +36,10 @@ function readActiveOrders() {
 function removeFromStorage(orderId) {
   try {
     const current = readActiveOrders()
-    localStorage.setItem('laroka_active_orders', JSON.stringify(current.filter(id => id !== orderId)))
+    localStorage.setItem(
+      'laroka_active_orders',
+      JSON.stringify(current.filter(id => id !== orderId))
+    )
   } catch {}
 }
 
@@ -54,17 +57,69 @@ function PhoneIcon() {
   )
 }
 
+function OrderSlide({ order, estimatedDeliveryMinutes, onPhoneClick }) {
+  if (!order) {
+    return <div className={styles.slideLoading} aria-busy="true" />
+  }
+
+  const progress = PROGRESS[order.status] ?? 10
+  const isDelivery = order.orderType === 'DELIVERY'
+
+  return (
+    <div className={styles.slideContent}>
+      <div className={styles.topRow}>
+        <div className={styles.titleBlock}>
+          <span className={styles.title}>Pedido en proceso</span>
+          {estimatedDeliveryMinutes && (
+            <span className={styles.eta}>Llega en ~{estimatedDeliveryMinutes} min</span>
+          )}
+        </div>
+        <button className={styles.phoneBtn} aria-label="Llamar al local" onClick={onPhoneClick}>
+          <PhoneIcon />
+        </button>
+      </div>
+
+      <div className={styles.metaRow}>
+        <span className={styles.badge} data-status={order.status}>
+          {STATUS_LABELS[order.status] ?? order.status}
+        </span>
+        {isDelivery && order.deliveryAddress && (
+          <span className={styles.address}>{order.deliveryAddress}</span>
+        )}
+      </div>
+
+      <div className={styles.progressRow}>
+        <span className={styles.progressEmoji} aria-hidden="true">🏪</span>
+        <div className={styles.progressTrack}>
+          <div className={styles.progressFill} style={{ width: `${progress}%` }} />
+          <span className={styles.scooter} style={{ left: `${progress}%` }} aria-hidden="true">
+            🛵
+          </span>
+        </div>
+        <span className={styles.progressEmoji} aria-hidden="true">🏠</span>
+      </div>
+    </div>
+  )
+}
+
 export function OrderTrackingBanner() {
   const { estimatedDeliveryMinutes, phone } = usePreferredBranch()
 
   const [orderIds, setOrderIds] = useState(() => readActiveOrders())
   const [ordersData, setOrdersData] = useState({})
+  const [activeIndex, setActiveIndex] = useState(0)
 
-  // Always-current ref to avoid stale closures inside the interval
   const orderIdsRef = useRef(orderIds)
   orderIdsRef.current = orderIds
 
-  // Re-read localStorage and append any new orderIds without restarting the poll
+  const touchStartRef = useRef(null)
+
+  // Clamp activeIndex when an order is removed
+  useEffect(() => {
+    setActiveIndex(prev => Math.min(prev, Math.max(0, orderIds.length - 1)))
+  }, [orderIds.length])
+
+  // Re-read localStorage and append new orderIds without restarting the poll
   const reloadOrders = useCallback(() => {
     const fresh = readActiveOrders()
     setOrderIds(prev => {
@@ -83,6 +138,7 @@ export function OrderTrackingBanner() {
     }
   }, [reloadOrders])
 
+  // Single interval iterates all active orderIds via ref — no restart on add
   useEffect(() => {
     if (orderIds.length === 0) return
 
@@ -95,7 +151,6 @@ export function OrderTrackingBanner() {
           const res = await fetch(`${API_BASE}/orders/${id}/status`)
           if (!res.ok) continue
           const data = await res.json()
-
           if (!active) return
 
           if (TERMINAL_STATUSES.includes(data.status)) {
@@ -119,19 +174,24 @@ export function OrderTrackingBanner() {
       active = false
       clearInterval(interval)
     }
-  // Dep booleano: el intervalo solo se crea/destruye cuando se pasa de 0↔1+
-  // Agregar orderIds nuevos solo actualiza el ref, no reinicia el intervalo
+  // Boolean dep: interval only created/destroyed when transitioning 0 ↔ 1+
   }, [orderIds.length > 0])
 
-  if (orderIds.length === 0) return null
+  const handleTouchStart = (e) => {
+    touchStartRef.current = e.touches[0].clientX
+  }
 
-  // Show first order that has data; skip while loading
-  const activeId = orderIds.find(id => ordersData[id])
-  if (!activeId) return null
-
-  const order = ordersData[activeId]
-  const progress = PROGRESS[order.status] ?? 10
-  const isDelivery = order.orderType === 'DELIVERY'
+  const handleTouchEnd = (e) => {
+    if (touchStartRef.current === null) return
+    const delta = e.changedTouches[0].clientX - touchStartRef.current
+    const n = orderIdsRef.current.length
+    if (delta < -50) {
+      setActiveIndex(i => Math.min(n - 1, i + 1))
+    } else if (delta > 50) {
+      setActiveIndex(i => Math.max(0, i - 1))
+    }
+    touchStartRef.current = null
+  }
 
   const handlePhoneClick = () => {
     if (phone && window.confirm('¿Llamar al local?')) {
@@ -139,46 +199,54 @@ export function OrderTrackingBanner() {
     }
   }
 
+  if (orderIds.length === 0) return null
+
+  const n = orderIds.length
+  const clampedIndex = Math.min(activeIndex, n - 1)
+
   return (
-    <div className={styles.banner}>
-      {/* Fila superior */}
-      <div className={styles.topRow}>
-        <div className={styles.titleBlock}>
-          <span className={styles.title}>Pedido en proceso</span>
-          {estimatedDeliveryMinutes && (
-            <span className={styles.eta}>Llega en ~{estimatedDeliveryMinutes} min</span>
-          )}
-        </div>
-        <button className={styles.phoneBtn} aria-label="Llamar al local" onClick={handlePhoneClick}>
-          <PhoneIcon />
-        </button>
-      </div>
-
-      {/* Badge de estado + dirección */}
-      <div className={styles.metaRow}>
-        <span className={styles.badge} data-status={order.status}>
-          {STATUS_LABELS[order.status] ?? order.status}
-        </span>
-        {isDelivery && order.deliveryAddress && (
-          <span className={styles.address}>{order.deliveryAddress}</span>
-        )}
-      </div>
-
-      {/* Barra de progreso */}
-      <div className={styles.progressRow}>
-        <span className={styles.progressEmoji} aria-hidden="true">🏪</span>
-        <div className={styles.progressTrack}>
-          <div className={styles.progressFill} style={{ width: `${progress}%` }} />
-          <span
-            className={styles.scooter}
-            style={{ left: `${progress}%` }}
-            aria-hidden="true"
+    <>
+      <div className={styles.banner}>
+        <div
+          className={styles.slidesOuter}
+          onTouchStart={n > 1 ? handleTouchStart : undefined}
+          onTouchEnd={n > 1 ? handleTouchEnd : undefined}
+        >
+          <div
+            className={styles.slidesInner}
+            style={{
+              width: `${100 * n}%`,
+              transform: `translateX(${-clampedIndex * (100 / n)}%)`,
+            }}
           >
-            🛵
-          </span>
+            {orderIds.map(id => (
+              <div
+                key={id}
+                className={styles.slide}
+                style={{ width: `${100 / n}%` }}
+              >
+                <OrderSlide
+                  order={ordersData[id]}
+                  estimatedDeliveryMinutes={estimatedDeliveryMinutes}
+                  onPhoneClick={handlePhoneClick}
+                />
+              </div>
+            ))}
+          </div>
         </div>
-        <span className={styles.progressEmoji} aria-hidden="true">🏠</span>
       </div>
-    </div>
+
+      {n > 1 && (
+        <div className={styles.dots} aria-hidden="true">
+          {orderIds.map((id, i) => (
+            <div
+              key={id}
+              className={styles.dot}
+              data-active={i === clampedIndex}
+            />
+          ))}
+        </div>
+      )}
+    </>
   )
 }
