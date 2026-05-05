@@ -159,6 +159,7 @@ export function CartScreen({ items, extras = [], onBack, onRemove, onUpdateQty, 
     })
     if (!res.ok) throw new Error('Error al crear el pedido')
     const data = await res.json()
+    onClear()
     setConfirmedOrderId(data.orderId)
   }
 
