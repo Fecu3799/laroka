@@ -80,6 +80,7 @@ export function CheckoutScreen({ onBack, onConfirm, items = [] }) {
   const [paymentMethod, setPaymentMethod] = useState('efectivo')
   const [summaryOpen, setSummaryOpen] = useState(false)
   const [errors, setErrors] = useState({ nombre: '', telefono: '', direccion: '' })
+  const [submitting, setSubmitting] = useState(false)
 
   const isDelivery = orderType === 'delivery'
   const isEfectivo = paymentMethod === 'efectivo'
@@ -90,7 +91,7 @@ export function CheckoutScreen({ onBack, onConfirm, items = [] }) {
 
   const isFormValid = nombre.trim() && telefono.trim() && (!isDelivery || direccion.trim())
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (!isEfectivo) {
       // TODO: Sprint 4-F — initiate payment flow
       return
@@ -102,7 +103,12 @@ export function CheckoutScreen({ onBack, onConfirm, items = [] }) {
     }
     setErrors(newErrors)
     if (Object.values(newErrors).some(Boolean)) return
-    onConfirm({ orderType, nombre: nombre.trim(), telefono: telefono.trim(), direccion: direccion.trim(), notas: notas.trim(), paymentMethod: 'CASH' })
+    setSubmitting(true)
+    try {
+      await onConfirm({ orderType, nombre: nombre.trim(), telefono: telefono.trim(), direccion: direccion.trim(), notas: notas.trim(), paymentMethod: 'CASH' })
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -254,7 +260,7 @@ export function CheckoutScreen({ onBack, onConfirm, items = [] }) {
         </div>
         <button
           className={styles.ctaBtn}
-          style={!isFormValid ? { opacity: 0.5, pointerEvents: 'none' } : undefined}
+          style={(!isFormValid || submitting) ? { opacity: 0.5, pointerEvents: 'none' } : undefined}
           onClick={handleConfirm}
         >
           <span className={styles.ctaBtnText}>{isEfectivo ? 'CONFIRMAR PEDIDO' : 'IR A PAGAR'}</span>

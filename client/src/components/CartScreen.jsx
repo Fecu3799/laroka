@@ -1,5 +1,9 @@
 import { useState } from 'react'
 import { CheckoutScreen } from './CheckoutScreen'
+import { ConfirmationScreen } from './ConfirmationScreen'
+import { usePreferredBranch } from '../hooks/usePreferredBranch'
+
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080'
 
 function formatPrice(price) {
   return `$${Number(price).toLocaleString('es-AR')}`
@@ -134,10 +138,37 @@ function ExtraCard({ extra, cartQty, onAdd }) {
 }
 
 export function CartScreen({ items, extras = [], onBack, onRemove, onUpdateQty, onClear, onAddExtra }) {
+  const { preferredBranchId } = usePreferredBranch()
   const [confirmClear, setConfirmClear] = useState(false)
   const [showCheckout, setShowCheckout] = useState(false)
+  const [confirmedOrderId, setConfirmedOrderId] = useState(null)
 
-  if (showCheckout) return <CheckoutScreen items={items} onBack={() => setShowCheckout(false)} />
+  const handleConfirm = async (formData) => {
+    const payload = {
+      branchId: preferredBranchId,
+      orderType: formData.orderType === 'delivery' ? 'DELIVERY' : 'TAKEAWAY',
+      deliveryAddress: formData.direccion || null,
+      notes: formData.notas || null,
+      paymentMethod: formData.paymentMethod,
+      items: items.map(i => ({ productId: i.id, quantity: i.qty })),
+    }
+    const res = await fetch(`${API_BASE}/orders`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    if (!res.ok) throw new Error('Error al crear el pedido')
+    const data = await res.json()
+    setConfirmedOrderId(data.orderId)
+  }
+
+  if (confirmedOrderId) {
+    return <ConfirmationScreen orderId={confirmedOrderId} onComplete={onBack} />
+  }
+
+  if (showCheckout) {
+    return <CheckoutScreen items={items} onBack={() => setShowCheckout(false)} onConfirm={handleConfirm} />
+  }
 
   const total = items.reduce((sum, i) => sum + i.price * i.qty, 0)
   const count = items.reduce((sum, i) => sum + i.qty, 0)
