@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { usePreferredBranch } from '../hooks/usePreferredBranch'
+import { readActiveOrders, removeActiveOrder } from '../utils/activeOrders'
 import styles from './OrderTrackingBanner.module.css'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080'
@@ -24,31 +25,6 @@ const STATUS_LABELS = {
   CANCELLATION_REQUESTED: 'CANCELACIÓN SOL.',
 }
 
-function readActiveOrders() {
-  try {
-    const raw = localStorage.getItem('laroka_active_orders')
-    if (!raw) return []
-    const parsed = JSON.parse(raw)
-    return parsed.map(e =>
-      typeof e === 'object' && e && e.orderId
-        ? e
-        : { orderId: e, branchId: null }
-    )
-  } catch {
-    return []
-  }
-}
-
-function removeFromStorage(orderId) {
-  try {
-    const current = readActiveOrders()
-    localStorage.setItem(
-      'laroka_active_orders',
-      JSON.stringify(current.filter(e => e.orderId !== orderId))
-    )
-    window.dispatchEvent(new Event('laroka_orders_updated'))
-  } catch {}
-}
 
 const DELIVERY_STEPS = ['RECEIVED', 'IN_PREPARATION', 'ON_THE_WAY', 'DELIVERED']
 const TAKEAWAY_STEPS = ['RECEIVED', 'IN_PREPARATION', 'READY_FOR_PICKUP', 'DELIVERED']
@@ -115,6 +91,7 @@ function OrderSlide({ orderId, order, isExpanded, items, itemsLoading, itemsErro
       const res = await fetch(`${API_BASE}/orders/${orderId}/cancel`, { method: 'POST' })
       if (res.ok) setCancelRequested(true)
     } catch {
+      // ignore
     } finally {
       setCancelling(false)
     }
@@ -257,45 +234,35 @@ export function OrderTrackingBanner({ branchId }) {
   const { estimatedDeliveryMinutes, phone } = usePreferredBranch()
 
   // All tracked entries — polling runs on all of them regardless of branch
-  const [orderEntries, setOrderEntries] = useState(() => {
-    try {
-      const raw = localStorage.getItem('laroka_active_orders')
-      return raw ? JSON.parse(raw) : []
-    } catch {
-      return []
-    }
-  })
+  const [orderEntries, setOrderEntries] = useState(() => readActiveOrders())
   const [ordersData, setOrdersData] = useState({})
   const [activeIndex, setActiveIndex] = useState(0)
   const [isExpanded, setIsExpanded] = useState(false)
   const [ordersItems, setOrdersItems] = useState({})
 
   const orderEntriesRef = useRef(orderEntries)
-  orderEntriesRef.current = orderEntries
   const ordersItemsRef = useRef(ordersItems)
-  ordersItemsRef.current = ordersItems
-
   const touchStartRef = useRef(null)
   const visibleEntriesRef = useRef([])
   const clampedIndexRef = useRef(0)
   const isExpandedRef = useRef(false)
-  isExpandedRef.current = isExpanded
 
   // Derived from prop — recalculates immediately whenever branchId changes
   const visibleEntries = orderEntries.filter(e => e.branchId === branchId)
   const n = visibleEntries.length
   const clampedIndex = Math.min(activeIndex, Math.max(0, n - 1))
-  visibleEntriesRef.current = visibleEntries
-  clampedIndexRef.current = clampedIndex
 
-  // Clamp activeIndex when a visible order is removed
+  // Keep refs in sync after every render
   useEffect(() => {
-    setActiveIndex(prev => Math.min(prev, Math.max(0, n - 1)))
-  }, [n])
+    orderEntriesRef.current = orderEntries
+    ordersItemsRef.current = ordersItems
+    isExpandedRef.current = isExpanded
+    visibleEntriesRef.current = visibleEntries
+    clampedIndexRef.current = clampedIndex
+  })
 
   // Merge newly added entries without restarting the poll
   const reloadOrders = useCallback(() => {
-    console.log('BANNER EVENT RECEIVED')
     const fresh = readActiveOrders()
     setOrderEntries(prev => {
       const existingIds = new Set(prev.map(e => e.orderId))
@@ -365,7 +332,7 @@ export function OrderTrackingBanner({ branchId }) {
           if (!active) return
 
           if (TERMINAL_STATUSES.includes(data.status)) {
-            removeFromStorage(orderId)
+            removeActiveOrder(orderId)
             setOrderEntries(prev => prev.filter(e => e.orderId !== orderId))
             setOrdersData(prev => {
               const next = { ...prev }
@@ -375,7 +342,9 @@ export function OrderTrackingBanner({ branchId }) {
           } else {
             setOrdersData(prev => ({ ...prev, [orderId]: data }))
           }
-        } catch {}
+        } catch {
+          // ignore
+        }
       }
     }
 
@@ -386,6 +355,7 @@ export function OrderTrackingBanner({ branchId }) {
       clearInterval(interval)
     }
   // Boolean dep: interval only created/destroyed when transitioning 0 ↔ 1+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderEntries.length > 0])
 
   const handleTouchStart = (e) => {

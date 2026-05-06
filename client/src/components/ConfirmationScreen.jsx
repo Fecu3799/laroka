@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
-import { motion } from 'framer-motion'
 import repartidorImg from '../assets/repartidor.png'
 import styles from './ConfirmationScreen.module.css'
+import { addActiveOrder } from '../utils/activeOrders'
 
 // 12 particles distributed along upper semicircular arc around the illustration
 const PARTICLES = [
@@ -19,44 +19,20 @@ const PARTICLES = [
   { left: '90%', top: '38%', size: 7, delay: 60 },
 ]
 
-// Trail copies lag behind main image — positive delay = lags in animation time
 const TRAILS = [
-  { opacity: 0.12, delay: 0.07 },
-  { opacity: 0.07, delay: 0.14 },
-  { opacity: 0.03, delay: 0.21 },
+  { opacity: 0.12 },
+  { opacity: 0.07 },
+  { opacity: 0.03 },
 ]
-
-// Spring handles both the fast easeOut-like entry and the oscillation bounce
-const SPRING = { type: 'spring', stiffness: 180, damping: 12 }
 
 export function ConfirmationScreen({ orderId, branchId, onComplete }) {
   const timerRef = useRef(null)
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem('laroka_active_orders')
-      const orders = raw ? JSON.parse(raw) : []
-      const exists = orders.some(e => (typeof e === 'object' ? e.orderId : e) === orderId)
-      if (!exists) {
-        console.log('CONFIRMATION — writing orderId:', orderId)
-        orders.push({ orderId, branchId })
-        localStorage.setItem('laroka_active_orders', JSON.stringify(orders))
-        console.log('CONFIRMATION — dispatching event')
-        window.dispatchEvent(new Event('laroka_orders_updated'))
-      }
-    } catch {
-      console.log('CONFIRMATION — writing orderId:', orderId)
-      localStorage.setItem('laroka_active_orders', JSON.stringify([{ orderId, branchId }]))
-      console.log('CONFIRMATION — dispatching event')
-      window.dispatchEvent(new Event('laroka_orders_updated'))
-    }
-
-    // timer disabled — screen stays until further notice
-    timerRef.current = setTimeout(() => {
-      console.log('CONFIRMATION — calling onComplete')
-      onComplete()
-    }, 3000)
+    addActiveOrder(orderId, branchId)
+    timerRef.current = setTimeout(onComplete, 3000)
     return () => clearTimeout(timerRef.current)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   return (
@@ -78,49 +54,29 @@ export function ConfirmationScreen({ orderId, branchId, onComplete }) {
           ))}
 
           {TRAILS.map((t, i) => (
-            <motion.img
+            <img
               key={i}
               src={repartidorImg}
               alt=""
               aria-hidden="true"
               className={styles.trailImage}
               style={{ opacity: t.opacity }}
-              initial={{ x: 400 }}
-              animate={{ x: 0 }}
-              transition={{ ...SPRING, delay: t.delay }}
             />
           ))}
 
-          <motion.img
+          <img
             src={repartidorImg}
             alt=""
             aria-hidden="true"
             className={styles.illustration}
-            initial={{ x: 400 }}
-            animate={{ x: 0 }}
-            transition={SPRING}
           />
         </div>
 
-        <motion.h1
-          className={styles.title}
-          initial={{ y: 16, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.4, ease: 'easeOut', delay: 0.45 }}
-        >
-          ¡Pedido confirmado!
-        </motion.h1>
+        <h1 className={styles.title}>¡Pedido confirmado!</h1>
 
         <div className={styles.titleLine} />
 
-        <motion.p
-          className={styles.subtitle}
-          initial={{ y: 16, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.4, ease: 'easeOut', delay: 0.6 }}
-        >
-          Pedido recibido! En breves estará en preparación
-        </motion.p>
+        <p className={styles.subtitle}>Pedido recibido! En breves estará en preparación</p>
       </div>
 
       <div className={styles.progressTrack}>

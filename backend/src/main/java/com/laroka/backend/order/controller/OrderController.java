@@ -19,7 +19,6 @@ import com.laroka.backend.order.dto.OrderItemStatusDTO;
 import com.laroka.backend.order.dto.OrderStatusResponseDTO;
 import com.laroka.backend.order.entity.Order;
 import com.laroka.backend.order.entity.OrderItem;
-import com.laroka.backend.order.entity.OrderStatusHistory;
 import com.laroka.backend.order.mapper.OrderMapper;
 import com.laroka.backend.order.service.OrderCreationResult;
 import com.laroka.backend.order.service.OrderService;
