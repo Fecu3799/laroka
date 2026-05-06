@@ -65,19 +65,6 @@ function PhoneIcon() {
 }
 
 function OrderSlide({ order, estimatedDeliveryMinutes, onPhoneClick }) {
-  const [visible, setVisible] = useState(false)
-  const loadedRef = useRef(false)
-
-  useEffect(() => {
-    loadedRef.current = false
-    setVisible(false)
-    if (order) {
-      loadedRef.current = true
-      const id = requestAnimationFrame(() => setVisible(true))
-      return () => cancelAnimationFrame(id)
-    }
-  }, [order?.orderId])
-
   if (!order) {
     return (
       <div className={styles.slideContent} aria-busy="true" aria-label="Cargando pedido">
@@ -92,10 +79,7 @@ function OrderSlide({ order, estimatedDeliveryMinutes, onPhoneClick }) {
   const isDelivery = order.orderType === 'DELIVERY'
 
   return (
-    <div
-      className={styles.slideContent}
-      style={{ opacity: visible ? 1 : 0, transition: 'opacity 200ms ease' }}
-    >
+    <div className={styles.slideContent}>
       <div className={styles.topRow}>
         <div className={styles.titleBlock}>
           <span className={styles.title}>Pedido en proceso</span>
@@ -135,7 +119,14 @@ export function OrderTrackingBanner({ branchId }) {
   const { estimatedDeliveryMinutes, phone } = usePreferredBranch()
 
   // All tracked entries — polling runs on all of them regardless of branch
-  const [orderEntries, setOrderEntries] = useState(() => readActiveOrders())
+  const [orderEntries, setOrderEntries] = useState(() => {
+    try {
+      const raw = localStorage.getItem('laroka_active_orders')
+      return raw ? JSON.parse(raw) : []
+    } catch {
+      return []
+    }
+  })
   const [ordersData, setOrdersData] = useState({})
   const [activeIndex, setActiveIndex] = useState(0)
 
@@ -155,6 +146,7 @@ export function OrderTrackingBanner({ branchId }) {
 
   // Merge newly added entries without restarting the poll
   const reloadOrders = useCallback(() => {
+    console.log('BANNER EVENT RECEIVED')
     const fresh = readActiveOrders()
     setOrderEntries(prev => {
       const existingIds = new Set(prev.map(e => e.orderId))

@@ -38,17 +38,24 @@ export function ConfirmationScreen({ orderId, branchId, onComplete }) {
       const orders = raw ? JSON.parse(raw) : []
       const exists = orders.some(e => (typeof e === 'object' ? e.orderId : e) === orderId)
       if (!exists) {
+        console.log('CONFIRMATION — writing orderId:', orderId)
         orders.push({ orderId, branchId })
         localStorage.setItem('laroka_active_orders', JSON.stringify(orders))
+        console.log('CONFIRMATION — dispatching event')
         window.dispatchEvent(new Event('laroka_orders_updated'))
       }
     } catch {
+      console.log('CONFIRMATION — writing orderId:', orderId)
       localStorage.setItem('laroka_active_orders', JSON.stringify([{ orderId, branchId }]))
+      console.log('CONFIRMATION — dispatching event')
       window.dispatchEvent(new Event('laroka_orders_updated'))
     }
 
     // timer disabled — screen stays until further notice
-    timerRef.current = setTimeout(onComplete, 3000)
+    timerRef.current = setTimeout(() => {
+      console.log('CONFIRMATION — calling onComplete')
+      onComplete()
+    }, 3000)
     return () => clearTimeout(timerRef.current)
   }, [])
 
