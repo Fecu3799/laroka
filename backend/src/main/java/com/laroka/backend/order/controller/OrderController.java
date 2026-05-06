@@ -22,7 +22,6 @@ import com.laroka.backend.order.entity.OrderItem;
 import com.laroka.backend.order.mapper.OrderMapper;
 import com.laroka.backend.order.service.OrderCreationResult;
 import com.laroka.backend.order.service.OrderService;
-import com.laroka.backend.payment.service.PaymentService;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
