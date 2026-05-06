@@ -23,10 +23,10 @@ function App() {
     setScreen(preferredBranchId ? 'menu' : 'selection')
   }, [preferredBranchId])
 
-  const handleBranchSelect = useCallback((branchId, branchName) => {
-    saveBranch(branchId, branchName)
-    setSelectedBranchId(branchId)
-    setSelectedBranchName(branchName)
+  const handleBranchSelect = useCallback(({ id, name, deliveryFee, serviceFee, phone, estimatedDeliveryMinutes }) => {
+    saveBranch({ id, name, deliveryFee, serviceFee, phone, estimatedDeliveryMinutes })
+    setSelectedBranchId(id)
+    setSelectedBranchName(name)
     setExiting(true)
     exitTimerRef.current = setTimeout(() => {
       setScreen('menu')
@@ -41,10 +41,10 @@ function App() {
     setScreen('selection')
   }, [clearBranch])
 
-  const handleSwitchBranch = useCallback((newBranchId, newBranchName) => {
-    saveBranch(newBranchId, newBranchName)
-    setSelectedBranchId(newBranchId)
-    setSelectedBranchName(newBranchName)
+  const handleSwitchBranch = useCallback((branch) => {
+    saveBranch(branch)
+    setSelectedBranchId(branch.id)
+    setSelectedBranchName(branch.name)
   }, [saveBranch])
 
   if (screen === 'splash') {

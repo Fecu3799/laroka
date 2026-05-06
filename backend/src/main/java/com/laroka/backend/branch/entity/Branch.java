@@ -45,6 +45,12 @@ public class Branch {
 	@Column(name = "service_fee", nullable = false, precision = 10, scale = 2)
 	private BigDecimal serviceFee;
 
+	@Column(name = "estimated_delivery_minutes", nullable = false)
+	private Integer estimatedDeliveryMinutes;
+
+	@Column(name = "phone", nullable = false)
+	private String phone;
+
 	@ManyToOne(fetch = FetchType.LAZY)
 	@JoinColumn(name = "pizzeria_id", nullable = false)
 	private Pizzeria pizzeria;

@@ -1,0 +1,428 @@
+.screen {
+  --co-bg: #000;
+  --co-card: #071a0f;
+  --co-border: rgba(101, 163, 105, 0.13);
+  --co-gold: #FECD18;
+  --co-green: #095E2F;
+  --co-text-sec: rgba(255, 255, 255, 0.45);
+  --co-section-lbl: rgba(254, 205, 24, 0.70);
+
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--co-bg);
+  overflow: hidden;
+}
+
+/* ── Back button ── */
+.backBtn {
+  position: absolute;
+  left: 0;
+  background: none;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ── Scroll area ── */
+.scrollArea {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.scrollArea::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── Toggle ── */
+.toggleRow {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 30px;
+}
+
+.toggleBtnActive,
+.toggleBtnInactive {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 20px;
+  border-radius: 50px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.toggleBtnActive {
+  background: var(--co-green);
+  border: 1.5px solid var(--co-gold);
+  color: #fff;
+}
+
+.toggleBtnInactive {
+  background: transparent;
+  border: 1.5px solid rgba(101, 163, 105, 0.35);
+  color: var(--co-text-sec);
+}
+
+/* ── Card base ── */
+.card {
+  background: var(--co-card);
+  border: 1px solid var(--co-border);
+  border-radius: 14px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ── Section label ── */
+.sectionLabel {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--co-section-lbl);
+  text-align: center;
+}
+
+/* ── Inputs ── */
+.inputRow {
+  display: flex;
+  gap: 8px;
+}
+
+.inputGroup {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.inputGroupFull {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.inputLabel {
+  font-family: 'Inria Sans', sans-serif;
+  font-size: 11px;
+  color: var(--co-text-sec);
+}
+
+.input {
+  height: 42px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--co-border);
+  border-radius: 8px;
+  padding: 0 12px;
+  font-family: 'Inria Sans', sans-serif;
+  font-size: 14px;
+  color: var(--co-text-sec);
+  width: 100%;
+  outline: none;
+}
+
+.input::placeholder {
+  color: rgba(255, 255, 255, 0.22);
+}
+
+/* ── Textarea ── */
+.textarea {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--co-border);
+  border-radius: 8px;
+  padding: 11px 12px;
+  font-family: 'Inria Sans', sans-serif;
+  font-size: 14px;
+  color: var(--co-text-sec);
+  resize: none;
+  width: 100%;
+  line-height: 1.55;
+  outline: none;
+}
+
+.textarea::placeholder {
+  color: rgba(255, 255, 255, 0.22);
+}
+
+/* ── Summary card ── */
+.summaryCard {
+  background: var(--co-card);
+  border: 1px solid var(--co-border);
+  border-radius: 14px;
+  padding: 14px 16px;
+}
+
+.summaryHeader {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.summaryTitle {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700;
+  font-size: 16px;
+  color: #fff;
+  white-space: nowrap;
+}
+
+.summaryMeta {
+  font-family: 'Inria Sans', sans-serif;
+  font-size: 13px;
+  color: var(--co-text-sec);
+  margin-left: 8px;
+  white-space: nowrap;
+}
+
+.summaryChevron {
+  margin-left: auto;
+  color: var(--co-text-sec);
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.summaryChevronOpen {
+  transform: rotate(180deg);
+}
+
+.summaryHeader {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  cursor: pointer;
+  background: none;
+  border: none;
+  width: 100%;
+  padding: 0;
+  text-align: left;
+}
+
+.summaryBody {
+  margin-top: 12px;
+  overflow-y: auto;
+  max-height: 220px;
+  scrollbar-width: none;
+}
+
+.summaryBody::-webkit-scrollbar {
+  display: none;
+}
+
+.summaryItemRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 3px 0;
+}
+
+.summaryItemQtyName {
+  font-family: 'Inria Sans', sans-serif;
+  font-size: 14px;
+  color: #fff;
+}
+
+.summaryItemPrice {
+  font-family: 'Inria Sans', sans-serif;
+  font-size: 14px;
+  color: #fff;
+}
+
+.summarySeparator {
+  border-top: 1px solid rgba(101, 163, 105, 0.2);
+  margin: 10px 0;
+}
+
+.summaryFeeRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 3px 0;
+}
+
+.summaryFeeLabel {
+  font-family: 'Inria Sans', sans-serif;
+  font-size: 13px;
+  color: var(--co-text-sec);
+}
+
+.summaryFeeValue {
+  font-family: 'Inria Sans', sans-serif;
+  font-size: 13px;
+  color: var(--co-text-sec);
+}
+
+.summaryTotalRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 8px 0 2px;
+}
+
+.summaryTotalLabel {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 800;
+  font-size: 18px;
+  color: #fff;
+}
+
+.summaryTotalAmount {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 800;
+  font-size: 24px;
+  color: var(--co-gold);
+}
+
+/* ── Payment section ── */
+.paymentSection {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.paymentRow {
+  display: flex;
+  gap: 8px;
+}
+
+.paymentBtnActive,
+.paymentBtnInactive {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 16px 12px 14px;
+  border-radius: 14px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.paymentBtnActive {
+  background: rgba(254, 205, 24, 0.07);
+  border: 1.5px solid var(--co-gold);
+}
+
+.paymentBtnInactive {
+  background: var(--co-card);
+  border: 1px solid var(--co-border);
+}
+
+.paymentIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 2px;
+}
+
+.paymentBtnActive .paymentIcon {
+  color: var(--co-gold);
+}
+
+.paymentBtnInactive .paymentIcon {
+  color: var(--co-text-sec);
+}
+
+.paymentName {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.02em;
+}
+
+.paymentBtnActive .paymentName {
+  color: var(--co-gold);
+}
+
+.paymentBtnInactive .paymentName {
+  color: var(--co-text-sec);
+}
+
+.paymentSub {
+  font-family: 'Inria Sans', sans-serif;
+  font-size: 11px;
+  color: var(--co-text-sec);
+}
+
+/* ── CTA fijo ── */
+.ctaWrapper {
+  flex-shrink: 0;
+  background: var(--co-card);
+  border-top: 1px solid var(--co-border);
+  padding: 14px 18px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.ctaTotalRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.ctaTotalLabel {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700;
+  font-size: 18px;
+  color: #fff;
+}
+
+.ctaTotalAmount {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 800;
+  font-size: 24px;
+  color: var(--co-gold);
+}
+
+.ctaBtn {
+  width: 100%;
+  padding: 15px;
+  border-radius: 28px;
+  border: none;
+  background: linear-gradient(135deg, #095E2F, #0d7838);
+  box-shadow: 0 4px 20px rgba(9, 94, 47, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--co-gold);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: filter 0.15s;
+}
+
+.ctaBtn:active {
+  filter: brightness(0.88);
+}
+
+.ctaBtnText {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 800;
+  font-size: 20px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--co-gold);
+}

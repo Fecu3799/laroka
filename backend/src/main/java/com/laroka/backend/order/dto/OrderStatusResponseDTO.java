@@ -26,5 +26,6 @@ public class OrderStatusResponseDTO {
     private BigDecimal deliveryFee;
     private BigDecimal serviceFee;
     private BigDecimal totalAmount;
+    private String deliveryAddress;
     private List<OrderStatusHistoryDTO> history;
 }

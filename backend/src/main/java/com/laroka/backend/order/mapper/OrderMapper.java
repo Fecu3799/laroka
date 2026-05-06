@@ -9,13 +9,13 @@ import com.laroka.backend.catalog.entity.Product;
 import com.laroka.backend.order.dto.CreateOrderRequestDTO;
 import com.laroka.backend.order.dto.CreateOrderResponseDTO;
 import com.laroka.backend.order.dto.OrderItemResponseDTO;
+import com.laroka.backend.order.dto.OrderItemStatusDTO;
 import com.laroka.backend.order.dto.OrderStatusHistoryDTO;
 import com.laroka.backend.order.dto.OrderStatusResponseDTO;
 import com.laroka.backend.order.entity.Order;
 import com.laroka.backend.order.entity.OrderItem;
 import com.laroka.backend.order.entity.OrderOrigin;
 import com.laroka.backend.order.entity.OrderStatusHistory;
-import com.laroka.backend.payment.entity.Payment;
 
 @Component
 public class OrderMapper {
@@ -53,13 +53,12 @@ public class OrderMapper {
                 .build();
     }
 
-    public OrderStatusResponseDTO toStatusResponseDTO(Order order, List<OrderStatusHistory> history,
-            Payment payment) {
+    public OrderStatusResponseDTO toStatusResponseDTO(Order order, List<OrderStatusHistory> history) {
         return OrderStatusResponseDTO.builder()
                 .status(order.getStatus())
-                .paymentStatus(payment != null ? payment.getStatus() : null)
                 .orderType(order.getOrderType())
                 .branchName(order.getBranch().getName())
+                .deliveryAddress(order.getDeliveryAddress())
                 .subtotal(order.getSubtotal())
                 .deliveryFee(order.getDeliveryFee())
                 .serviceFee(order.getServiceFee())
@@ -73,6 +72,19 @@ public class OrderMapper {
                 .id(item.getId())
                 .productId(item.getProduct().getId())
                 .productName(item.getProduct().getName())
+                .quantity(item.getQuantity())
+                .unitPrice(item.getUnitPrice())
+                .subtotal(item.getSubtotal())
+                .build();
+    }
+
+    public List<OrderItemStatusDTO> toItemStatusDTOList(List<OrderItem> items) {
+        return items.stream().map(this::toItemStatusDTO).toList();
+    }
+
+    private OrderItemStatusDTO toItemStatusDTO(OrderItem item) {
+        return OrderItemStatusDTO.builder()
+                .name(item.getProduct().getName())
                 .quantity(item.getQuantity())
                 .unitPrice(item.getUnitPrice())
                 .subtotal(item.getSubtotal())

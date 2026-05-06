@@ -294,7 +294,8 @@
 }
 
 .menu-logo {
-  width: 110px;
+  width: 130px;
+  padding-top: 10px;
 }
 
 /* Branch selector button */
@@ -1661,4 +1662,18 @@
   justify-content: center;
   padding: 0 3px;
   line-height: 1;
+}
+
+/* Active order dot indicator */
+.branch-active-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-danger);
+  flex-shrink: 0;
+  margin-right: 4px;
+  vertical-align: middle;
+  position: relative;
+  top: -1px;
 }

@@ -5,9 +5,25 @@ import { BottomNav } from './BottomNav'
 import { BranchDropdown } from './BranchDropdown'
 import { ProductDetailScreen } from './ProductDetailScreen'
 import { CartScreen } from './CartScreen'
+import { OrderTrackingBanner } from './OrderTrackingBanner'
 import { useCart } from '../hooks/useCart'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+
+function readActiveBranchIds() {
+  try {
+    const raw = localStorage.getItem('laroka_active_orders')
+    if (!raw) return new Set()
+    const entries = JSON.parse(raw)
+    return new Set(
+      entries
+        .map(e => (typeof e === 'object' && e ? e.branchId : null))
+        .filter(id => id != null)
+    )
+  } catch {
+    return new Set()
+  }
+}
 
 function formatPrice(price) {
   return `$${Number(price).toLocaleString('es-AR')}`
@@ -111,6 +127,20 @@ export function MenuScreen({ branchId, branchName, onSwitchBranch }) {
   const retryRef = useRef(null)
   const prevCategoryIndexRef = useRef(0)
   const { items, addItem, removeItem, updateQty, clearCart, count } = useCart()
+  const [activeBranchIds, setActiveBranchIds] = useState(() => readActiveBranchIds())
+
+  const syncActiveBranchIds = useCallback(() => {
+    setActiveBranchIds(readActiveBranchIds())
+  }, [])
+
+  useEffect(() => {
+    window.addEventListener('laroka_orders_updated', syncActiveBranchIds)
+    window.addEventListener('storage', syncActiveBranchIds)
+    return () => {
+      window.removeEventListener('laroka_orders_updated', syncActiveBranchIds)
+      window.removeEventListener('storage', syncActiveBranchIds)
+    }
+  }, [syncActiveBranchIds])
 
   const handleSelectProduct = useCallback((product) => {
     const cat = categories.find(c => c.products.some(p => p.id === product.id))
@@ -179,6 +209,9 @@ export function MenuScreen({ branchId, branchName, onSwitchBranch }) {
   const isMenuTab = activeTab === 'menu'
   const isProfileTab = activeTab === 'profile'
 
+  const hasCurrentBranchOrder = branchId != null && activeBranchIds.has(branchId)
+  const hasOtherBranchOrder = !hasCurrentBranchOrder && activeBranchIds.size > 0
+
   useEffect(() => {
     if (!drawerOpen) return
     let cancelled = false
@@ -200,7 +233,7 @@ export function MenuScreen({ branchId, branchName, onSwitchBranch }) {
     if (newBranchId !== branchId) {
       const branch = branches.find(b => b.id === newBranchId)
       if (branch) {
-        onSwitchBranch(newBranchId, branch.name)
+        onSwitchBranch(branch)
       }
     }
   }
@@ -221,9 +254,13 @@ export function MenuScreen({ branchId, branchName, onSwitchBranch }) {
               aria-expanded={drawerOpen}
             >
               <span className="menu-branch-label">
+                {hasOtherBranchOrder && <span className="branch-active-dot" aria-hidden="true" />}
                 Sucursal <ChevronDown />
               </span>
-              <span className="menu-branch-name">{branchName || '—'}</span>
+              <span className="menu-branch-name">
+                {hasCurrentBranchOrder && <span className="branch-active-dot" aria-hidden="true" />}
+                {branchName || '—'}
+              </span>
             </button>
             <BranchDropdown
               isOpen={drawerOpen}
@@ -231,9 +268,14 @@ export function MenuScreen({ branchId, branchName, onSwitchBranch }) {
               currentBranchId={branchId}
               onClose={() => setDrawerOpen(false)}
               onSelectBranch={handleSelectBranchFromDrawer}
+              activeBranchIds={activeBranchIds}
             />
           </div>
         </header>
+
+        <div style={isMenuTab ? undefined : { display: 'none' }}>
+          <OrderTrackingBanner branchId={branchId} />
+        </div>
 
         {isMenuTab && (
           <>
