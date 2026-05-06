@@ -52,7 +52,7 @@ public class OrderController {
     }
 
     @GetMapping("/{id}/status")
-    @Operation(summary = "Get order status", description = "Returns the current status and full state history of an order.")
+    @Operation(summary = "Get order status", description = "Returns the current status, payment status, and full state history of an order.")
     public ResponseEntity<OrderStatusResponseDTO> getOrderStatus(@PathVariable UUID id) {
         Order order = orderService.findByIdWithHistory(id);
         return ResponseEntity.ok(orderMapper.toStatusResponseDTO(order, order.getStatusHistory()));

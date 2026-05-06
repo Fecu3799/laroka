@@ -25,7 +25,6 @@ import com.laroka.backend.catalog.entity.BranchProduct;
 import com.laroka.backend.catalog.entity.Product;
 import com.laroka.backend.catalog.repository.BranchProductRepository;
 import com.laroka.backend.catalog.repository.ProductRepository;
-import com.laroka.backend.order.domain.OrderStateMachine;
 import com.laroka.backend.order.entity.Order;
 import com.laroka.backend.order.entity.OrderItem;
 import com.laroka.backend.order.entity.OrderOrigin;
