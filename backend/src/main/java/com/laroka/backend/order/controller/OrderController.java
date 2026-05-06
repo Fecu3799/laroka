@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.laroka.backend.order.dto.CreateOrderRequestDTO;
 import com.laroka.backend.order.dto.CreateOrderResponseDTO;
+import com.laroka.backend.order.dto.OrderItemStatusDTO;
 import com.laroka.backend.order.dto.OrderStatusResponseDTO;
 import com.laroka.backend.order.entity.Order;
 import com.laroka.backend.order.entity.OrderItem;
@@ -56,5 +57,11 @@ public class OrderController {
     public ResponseEntity<OrderStatusResponseDTO> getOrderStatus(@PathVariable UUID id) {
         Order order = orderService.findByIdWithHistory(id);
         return ResponseEntity.ok(orderMapper.toStatusResponseDTO(order, order.getStatusHistory()));
+    }
+
+    @GetMapping("/{id}/items")
+    @Operation(summary = "Get order items", description = "Returns the list of items for an order.")
+    public ResponseEntity<List<OrderItemStatusDTO>> getOrderItems(@PathVariable UUID id) {
+        return ResponseEntity.ok(orderMapper.toItemStatusDTOList(orderService.findItemsByOrderId(id)));
     }
 }

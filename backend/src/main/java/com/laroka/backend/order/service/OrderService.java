@@ -24,6 +24,7 @@ import com.laroka.backend.order.entity.OrderStatusHistory;
 import com.laroka.backend.order.entity.OrderType;
 import com.laroka.backend.order.entity.PaymentMethod;
 import com.laroka.backend.order.exception.OrderNotFoundException;
+import com.laroka.backend.order.repository.OrderItemRepository;
 import com.laroka.backend.order.repository.OrderRepository;
 import com.laroka.backend.order.repository.OrderStatusHistoryRepository;
 import com.laroka.backend.shared.exception.BusinessException;
@@ -38,6 +39,7 @@ public class OrderService {
 
     private final OrderRepository orderRepository;
     private final OrderStatusHistoryRepository historyRepository;
+    private final OrderItemRepository orderItemRepository;
     private final BranchRepository branchRepository;
     private final ProductRepository productRepository;
     private final BranchProductRepository branchProductRepository;
@@ -95,6 +97,15 @@ public class OrderService {
             throw new OrderNotFoundException(orderId);
         }
         return historyRepository.findByOrderIdOrderByChangedAtAsc(orderId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<OrderItem> findItemsByOrderId(UUID orderId) {
+        if (!orderRepository.existsById(orderId)) {
+            log.warn("Order not found | orderId={}", orderId);
+            throw new OrderNotFoundException(orderId);
+        }
+        return orderItemRepository.findByOrderIdWithProduct(orderId);
     }
 
     private OrderCreationResult doCreateOrder(Order order, List<OrderItem> items,
