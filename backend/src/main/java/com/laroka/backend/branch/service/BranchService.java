@@ -45,6 +45,8 @@ public class BranchService {
 		Pizzeria pizzeria = validatePizzeriaExists(updates.getPizzeria().getId());
 		branch.setName(updates.getName());
 		branch.setAddress(updates.getAddress());
+		branch.setEstimatedDeliveryMinutes(updates.getEstimatedDeliveryMinutes());
+		branch.setPhone(updates.getPhone());
 		branch.setPizzeria(pizzeria);
 		return repository.save(branch);
 	}

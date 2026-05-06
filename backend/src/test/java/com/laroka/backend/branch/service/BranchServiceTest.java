@@ -39,7 +39,8 @@ class BranchServiceTest {
 	}
 
 	private Branch branch(Pizzeria pizzeria) {
-		return Branch.builder().id(1).name("Playa Unión").address("Av. Principal 123").pizzeria(pizzeria).build();
+		return Branch.builder().id(1).name("Playa Unión").address("Av. Principal 123")
+			.estimatedDeliveryMinutes(30).phone("+542804123456").pizzeria(pizzeria).build();
 	}
 
 	@Test
@@ -105,7 +106,8 @@ class BranchServiceTest {
 
 	@Test
 	void create_invalidPizzeria_throwsPizzeriaNotFoundException() {
-		Branch branch = Branch.builder().id(1).name("Test").address("Addr").pizzeria(Pizzeria.builder().id(99).build()).build();
+		Branch branch = Branch.builder().id(1).name("Test").address("Addr")
+			.estimatedDeliveryMinutes(30).phone("+54280000000").pizzeria(Pizzeria.builder().id(99).build()).build();
 		when(pizzeriaRepository.findById(99)).thenReturn(Optional.empty());
 
 		assertThatThrownBy(() -> service.create(branch))
@@ -116,7 +118,8 @@ class BranchServiceTest {
 	void update_existingBranch_updatesAndReturns() {
 		Pizzeria p = pizzeria();
 		Branch existing = branch(p);
-		Branch updates = Branch.builder().name("Rawson").address("Nueva 456").pizzeria(p).build();
+		Branch updates = Branch.builder().name("Rawson").address("Nueva 456")
+			.estimatedDeliveryMinutes(25).phone("+542804234567").pizzeria(p).build();
 		when(branchRepository.findById(1)).thenReturn(Optional.of(existing));
 		when(pizzeriaRepository.findById(1)).thenReturn(Optional.of(p));
 		when(branchRepository.save(any(Branch.class))).thenReturn(existing);

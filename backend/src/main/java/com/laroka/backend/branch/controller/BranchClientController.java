@@ -36,6 +36,12 @@ public class BranchClientController {
 		return ResponseEntity.ok(branchService.findAll().stream().map(branchMapper::toPublicDTO).toList());
 	}
 
+	@GetMapping("/{id}")
+	@Operation(summary = "Get branch by ID", description = "Returns branch information including delivery and service fees")
+	public ResponseEntity<BranchPublicDTO> findById(@PathVariable Integer id) {
+		return ResponseEntity.ok(branchMapper.toPublicDTO(branchService.findById(id)));
+	}
+
 	@GetMapping("/{id}/menu")
 	@Operation(summary = "Get branch menu", description = "Returns menu for a specific branch with available products grouped by category")
 	public ResponseEntity<List<MenuCategoryDTO>> getMenu(@PathVariable Integer id) {

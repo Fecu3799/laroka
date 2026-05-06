@@ -9,6 +9,7 @@ import com.laroka.backend.catalog.entity.Product;
 import com.laroka.backend.order.dto.CreateOrderRequestDTO;
 import com.laroka.backend.order.dto.CreateOrderResponseDTO;
 import com.laroka.backend.order.dto.OrderItemResponseDTO;
+import com.laroka.backend.order.dto.OrderItemStatusDTO;
 import com.laroka.backend.order.dto.OrderStatusHistoryDTO;
 import com.laroka.backend.order.dto.OrderStatusResponseDTO;
 import com.laroka.backend.order.entity.Order;
@@ -57,6 +58,7 @@ public class OrderMapper {
                 .status(order.getStatus())
                 .orderType(order.getOrderType())
                 .branchName(order.getBranch().getName())
+                .deliveryAddress(order.getDeliveryAddress())
                 .subtotal(order.getSubtotal())
                 .deliveryFee(order.getDeliveryFee())
                 .serviceFee(order.getServiceFee())
@@ -70,6 +72,19 @@ public class OrderMapper {
                 .id(item.getId())
                 .productId(item.getProduct().getId())
                 .productName(item.getProduct().getName())
+                .quantity(item.getQuantity())
+                .unitPrice(item.getUnitPrice())
+                .subtotal(item.getSubtotal())
+                .build();
+    }
+
+    public List<OrderItemStatusDTO> toItemStatusDTOList(List<OrderItem> items) {
+        return items.stream().map(this::toItemStatusDTO).toList();
+    }
+
+    private OrderItemStatusDTO toItemStatusDTO(OrderItem item) {
+        return OrderItemStatusDTO.builder()
+                .name(item.getProduct().getName())
                 .quantity(item.getQuantity())
                 .unitPrice(item.getUnitPrice())
                 .subtotal(item.getSubtotal())

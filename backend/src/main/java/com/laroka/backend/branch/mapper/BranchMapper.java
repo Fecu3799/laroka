@@ -25,6 +25,8 @@ public class BranchMapper {
 			.id(branch.getId())
 			.name(branch.getName())
 			.address(branch.getAddress())
+			.estimatedDeliveryMinutes(branch.getEstimatedDeliveryMinutes())
+			.phone(branch.getPhone())
 			.pizzeriaId(branch.getPizzeria().getId())
 			.pizzeria(pizzeriaMapper.toResponseDTO(branch.getPizzeria()))
 			.createdAt(branch.getCreatedAt())
@@ -42,6 +44,8 @@ public class BranchMapper {
 			.address(branch.getAddress())
 			.deliveryFee(branch.getDeliveryFee())
 			.serviceFee(branch.getServiceFee())
+			.estimatedDeliveryMinutes(branch.getEstimatedDeliveryMinutes())
+			.phone(branch.getPhone())
 			.build();
 	}
 
@@ -52,6 +56,8 @@ public class BranchMapper {
 		return Branch.builder()
 			.name(dto.getName())
 			.address(dto.getAddress())
+			.estimatedDeliveryMinutes(dto.getEstimatedDeliveryMinutes())
+			.phone(dto.getPhone())
 			.pizzeria(Pizzeria.builder().id(dto.getPizzeriaId()).build())
 			.build();
 	}

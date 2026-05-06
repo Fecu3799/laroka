@@ -8,9 +8,18 @@ run-backoffice:
 	cd backoffice && npm run dev
 
 test:
+	 make test-back && make test-front
+
+test-back:
 	cd backend && ./mvnw test
 
+test-front:
+	cd client && npm test
+
 lint:
+	make lint-back && make lint-front
+
+lint-back:
 	cd backend && ./mvnw checkstyle:check
 
 lint-front:

@@ -17,4 +17,6 @@ public class BranchPublicDTO {
 	private String address;
 	private BigDecimal deliveryFee;
 	private BigDecimal serviceFee;
+	private Integer estimatedDeliveryMinutes;
+	private String phone;
 }

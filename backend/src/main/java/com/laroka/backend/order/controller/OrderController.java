@@ -15,10 +15,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.laroka.backend.order.dto.CreateOrderRequestDTO;
 import com.laroka.backend.order.dto.CreateOrderResponseDTO;
+import com.laroka.backend.order.dto.OrderItemStatusDTO;
 import com.laroka.backend.order.dto.OrderStatusResponseDTO;
 import com.laroka.backend.order.entity.Order;
 import com.laroka.backend.order.entity.OrderItem;
-import com.laroka.backend.order.entity.OrderStatusHistory;
 import com.laroka.backend.order.mapper.OrderMapper;
 import com.laroka.backend.order.service.OrderCreationResult;
 import com.laroka.backend.order.service.OrderService;
@@ -54,8 +54,13 @@ public class OrderController {
     @GetMapping("/{id}/status")
     @Operation(summary = "Get order status", description = "Returns the current status and full state history of an order.")
     public ResponseEntity<OrderStatusResponseDTO> getOrderStatus(@PathVariable UUID id) {
-        Order order = orderService.findById(id);
-        List<OrderStatusHistory> history = orderService.getHistory(id);
-        return ResponseEntity.ok(orderMapper.toStatusResponseDTO(order, history));
+        Order order = orderService.findByIdWithHistory(id);
+        return ResponseEntity.ok(orderMapper.toStatusResponseDTO(order, order.getStatusHistory()));
+    }
+
+    @GetMapping("/{id}/items")
+    @Operation(summary = "Get order items", description = "Returns the list of items for an order.")
+    public ResponseEntity<List<OrderItemStatusDTO>> getOrderItems(@PathVariable UUID id) {
+        return ResponseEntity.ok(orderMapper.toItemStatusDTOList(orderService.findItemsByOrderId(id)));
     }
 }

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 
-export function BranchDropdown({ isOpen, branches, onClose, onSelectBranch, currentBranchId }) {
+export function BranchDropdown({ isOpen, branches, onClose, onSelectBranch, currentBranchId, activeBranchIds = new Set() }) {
   const dropdownRef = useRef(null)
 
   useEffect(() => {
@@ -42,6 +42,9 @@ export function BranchDropdown({ isOpen, branches, onClose, onSelectBranch, curr
                 role="option"
                 aria-selected={currentBranchId === branch.id}
               >
+                {activeBranchIds.has(branch.id) && (
+                  <span className="branch-active-dot" aria-hidden="true" />
+                )}
                 {branch.name}
               </button>
             </li>
