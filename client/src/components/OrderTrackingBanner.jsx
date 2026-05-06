@@ -27,7 +27,13 @@ const STATUS_LABELS = {
 function readActiveOrders() {
   try {
     const raw = localStorage.getItem('laroka_active_orders')
-    return raw ? JSON.parse(raw) : []
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    return parsed.map(e =>
+      typeof e === 'object' && e && e.orderId
+        ? e
+        : { orderId: e, branchId: null }
+    )
   } catch {
     return []
   }
@@ -38,8 +44,9 @@ function removeFromStorage(orderId) {
     const current = readActiveOrders()
     localStorage.setItem(
       'laroka_active_orders',
-      JSON.stringify(current.filter(id => id !== orderId))
+      JSON.stringify(current.filter(e => e.orderId !== orderId))
     )
+    window.dispatchEvent(new Event('laroka_orders_updated'))
   } catch {}
 }
 
@@ -58,15 +65,37 @@ function PhoneIcon() {
 }
 
 function OrderSlide({ order, estimatedDeliveryMinutes, onPhoneClick }) {
+  const [visible, setVisible] = useState(false)
+  const loadedRef = useRef(false)
+
+  useEffect(() => {
+    loadedRef.current = false
+    setVisible(false)
+    if (order) {
+      loadedRef.current = true
+      const id = requestAnimationFrame(() => setVisible(true))
+      return () => cancelAnimationFrame(id)
+    }
+  }, [order?.orderId])
+
   if (!order) {
-    return <div className={styles.slideLoading} aria-busy="true" />
+    return (
+      <div className={styles.slideContent} aria-busy="true" aria-label="Cargando pedido">
+        <div className={`${styles.skeletonBlock} ${styles.skeletonTitle}`} />
+        <div className={`${styles.skeletonBlock} ${styles.skeletonBadge}`} />
+        <div className={`${styles.skeletonBlock} ${styles.skeletonProgress}`} />
+      </div>
+    )
   }
 
   const progress = PROGRESS[order.status] ?? 10
   const isDelivery = order.orderType === 'DELIVERY'
 
   return (
-    <div className={styles.slideContent}>
+    <div
+      className={styles.slideContent}
+      style={{ opacity: visible ? 1 : 0, transition: 'opacity 200ms ease' }}
+    >
       <div className={styles.topRow}>
         <div className={styles.titleBlock}>
           <span className={styles.title}>Pedido en proceso</span>
@@ -102,29 +131,34 @@ function OrderSlide({ order, estimatedDeliveryMinutes, onPhoneClick }) {
   )
 }
 
-export function OrderTrackingBanner() {
+export function OrderTrackingBanner({ branchId }) {
   const { estimatedDeliveryMinutes, phone } = usePreferredBranch()
 
-  const [orderIds, setOrderIds] = useState(() => readActiveOrders())
+  // All tracked entries — polling runs on all of them regardless of branch
+  const [orderEntries, setOrderEntries] = useState(() => readActiveOrders())
   const [ordersData, setOrdersData] = useState({})
   const [activeIndex, setActiveIndex] = useState(0)
 
-  const orderIdsRef = useRef(orderIds)
-  orderIdsRef.current = orderIds
+  const orderEntriesRef = useRef(orderEntries)
+  orderEntriesRef.current = orderEntries
 
   const touchStartRef = useRef(null)
 
-  // Clamp activeIndex when an order is removed
-  useEffect(() => {
-    setActiveIndex(prev => Math.min(prev, Math.max(0, orderIds.length - 1)))
-  }, [orderIds.length])
+  // Derived from prop — recalculates immediately whenever branchId changes
+  const visibleEntries = orderEntries.filter(e => e.branchId === branchId)
+  const n = visibleEntries.length
 
-  // Re-read localStorage and append new orderIds without restarting the poll
+  // Clamp activeIndex when a visible order is removed
+  useEffect(() => {
+    setActiveIndex(prev => Math.min(prev, Math.max(0, n - 1)))
+  }, [n])
+
+  // Merge newly added entries without restarting the poll
   const reloadOrders = useCallback(() => {
     const fresh = readActiveOrders()
-    setOrderIds(prev => {
-      const existing = new Set(prev)
-      const added = fresh.filter(id => !existing.has(id))
+    setOrderEntries(prev => {
+      const existingIds = new Set(prev.map(e => e.orderId))
+      const added = fresh.filter(e => !existingIds.has(e.orderId))
       return added.length > 0 ? [...prev, ...added] : prev
     })
   }, [])
@@ -138,31 +172,32 @@ export function OrderTrackingBanner() {
     }
   }, [reloadOrders])
 
-  // Single interval iterates all active orderIds via ref — no restart on add
+  // Single interval polls all tracked entries via ref — no restart when one is added
   useEffect(() => {
-    if (orderIds.length === 0) return
+    if (orderEntries.length === 0) return
 
     let active = true
 
     const poll = async () => {
-      for (const id of orderIdsRef.current) {
+      for (const entry of orderEntriesRef.current) {
         if (!active) return
+        const { orderId } = entry
         try {
-          const res = await fetch(`${API_BASE}/orders/${id}/status`)
+          const res = await fetch(`${API_BASE}/orders/${orderId}/status`)
           if (!res.ok) continue
           const data = await res.json()
           if (!active) return
 
           if (TERMINAL_STATUSES.includes(data.status)) {
-            removeFromStorage(id)
-            setOrderIds(prev => prev.filter(oid => oid !== id))
+            removeFromStorage(orderId)
+            setOrderEntries(prev => prev.filter(e => e.orderId !== orderId))
             setOrdersData(prev => {
               const next = { ...prev }
-              delete next[id]
+              delete next[orderId]
               return next
             })
           } else {
-            setOrdersData(prev => ({ ...prev, [id]: data }))
+            setOrdersData(prev => ({ ...prev, [orderId]: data }))
           }
         } catch {}
       }
@@ -175,7 +210,7 @@ export function OrderTrackingBanner() {
       clearInterval(interval)
     }
   // Boolean dep: interval only created/destroyed when transitioning 0 ↔ 1+
-  }, [orderIds.length > 0])
+  }, [orderEntries.length > 0])
 
   const handleTouchStart = (e) => {
     touchStartRef.current = e.touches[0].clientX
@@ -184,7 +219,6 @@ export function OrderTrackingBanner() {
   const handleTouchEnd = (e) => {
     if (touchStartRef.current === null) return
     const delta = e.changedTouches[0].clientX - touchStartRef.current
-    const n = orderIdsRef.current.length
     if (delta < -50) {
       setActiveIndex(i => Math.min(n - 1, i + 1))
     } else if (delta > 50) {
@@ -199,9 +233,9 @@ export function OrderTrackingBanner() {
     }
   }
 
-  if (orderIds.length === 0) return null
+  // Polling runs in background even when nothing is visible for this branch
+  if (n === 0) return null
 
-  const n = orderIds.length
   const clampedIndex = Math.min(activeIndex, n - 1)
 
   return (
@@ -219,14 +253,14 @@ export function OrderTrackingBanner() {
               transform: `translateX(${-clampedIndex * (100 / n)}%)`,
             }}
           >
-            {orderIds.map(id => (
+            {visibleEntries.map(({ orderId }) => (
               <div
-                key={id}
+                key={orderId}
                 className={styles.slide}
                 style={{ width: `${100 / n}%` }}
               >
                 <OrderSlide
-                  order={ordersData[id]}
+                  order={ordersData[orderId]}
                   estimatedDeliveryMinutes={estimatedDeliveryMinutes}
                   onPhoneClick={handlePhoneClick}
                 />
@@ -238,9 +272,9 @@ export function OrderTrackingBanner() {
 
       {n > 1 && (
         <div className={styles.dots} aria-hidden="true">
-          {orderIds.map((id, i) => (
+          {visibleEntries.map(({ orderId }, i) => (
             <div
-              key={id}
+              key={orderId}
               className={styles.dot}
               data-active={i === clampedIndex}
             />

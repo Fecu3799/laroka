@@ -29,20 +29,21 @@ const TRAILS = [
 // Spring handles both the fast easeOut-like entry and the oscillation bounce
 const SPRING = { type: 'spring', stiffness: 180, damping: 12 }
 
-export function ConfirmationScreen({ orderId, onComplete }) {
+export function ConfirmationScreen({ orderId, branchId, onComplete }) {
   const timerRef = useRef(null)
 
   useEffect(() => {
     try {
       const raw = localStorage.getItem('laroka_active_orders')
       const orders = raw ? JSON.parse(raw) : []
-      if (!orders.includes(orderId)) {
-        orders.push(orderId)
+      const exists = orders.some(e => (typeof e === 'object' ? e.orderId : e) === orderId)
+      if (!exists) {
+        orders.push({ orderId, branchId })
         localStorage.setItem('laroka_active_orders', JSON.stringify(orders))
         window.dispatchEvent(new Event('laroka_orders_updated'))
       }
     } catch {
-      localStorage.setItem('laroka_active_orders', JSON.stringify([orderId]))
+      localStorage.setItem('laroka_active_orders', JSON.stringify([{ orderId, branchId }]))
       window.dispatchEvent(new Event('laroka_orders_updated'))
     }
 

@@ -21,4 +21,8 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
     @EntityGraph(attributePaths = {"branch", "items", "items.product"})
     @Query("SELECT o FROM Order o WHERE o.id = :id")
     Optional<Order> findByIdWithDetails(@Param("id") UUID id);
+
+    @EntityGraph(attributePaths = {"branch", "statusHistory"})
+    @Query("SELECT o FROM Order o WHERE o.id = :id")
+    Optional<Order> findByIdWithBranchAndHistory(@Param("id") UUID id);
 }

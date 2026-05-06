@@ -41,10 +41,10 @@ function App() {
     setScreen('selection')
   }, [clearBranch])
 
-  const handleSwitchBranch = useCallback((newBranchId, newBranchName) => {
-    saveBranch(newBranchId, newBranchName)
-    setSelectedBranchId(newBranchId)
-    setSelectedBranchName(newBranchName)
+  const handleSwitchBranch = useCallback((branch) => {
+    saveBranch(branch)
+    setSelectedBranchId(branch.id)
+    setSelectedBranchName(branch.name)
   }, [saveBranch])
 
   if (screen === 'splash') {

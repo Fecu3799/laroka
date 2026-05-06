@@ -29,7 +29,9 @@ import com.laroka.backend.order.repository.OrderStatusHistoryRepository;
 import com.laroka.backend.shared.exception.BusinessException;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class OrderService {
@@ -46,7 +48,11 @@ public class OrderService {
                                            PaymentMethod paymentMethod, String idempotencyKey) {
         if (idempotencyKey != null && !idempotencyKey.isBlank()) {
             return idempotencyStore.get(idempotencyKey)
-                    .map(cached -> new OrderCreationResult(cached, true))
+                    .map(cached -> {
+                        log.info("Idempotency key hit — returning existing order | orderId={} key={}",
+                                cached.getId(), idempotencyKey);
+                        return new OrderCreationResult(cached, true);
+                    })
                     .orElseGet(() -> doCreateOrder(order, items, paymentMethod, idempotencyKey));
         }
         return doCreateOrder(order, items, paymentMethod, null);
@@ -55,19 +61,37 @@ public class OrderService {
     @Transactional
     public Order transitionStatus(UUID orderId, OrderStatus newStatus) {
         Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new OrderNotFoundException(orderId));
+                .orElseThrow(() -> {
+                    log.warn("Order not found | orderId={}", orderId);
+                    return new OrderNotFoundException(orderId);
+                });
         return doTransition(order, newStatus);
     }
 
     @Transactional(readOnly = true)
     public Order findById(UUID id) {
         return orderRepository.findByIdWithBranch(id)
-                .orElseThrow(() -> new OrderNotFoundException(id));
+                .orElseThrow(() -> {
+                    log.warn("Order not found | orderId={}", id);
+                    return new OrderNotFoundException(id);
+                });
+    }
+
+    @Transactional(readOnly = true)
+    public Order findByIdWithHistory(UUID id) {
+        Order order = orderRepository.findByIdWithBranchAndHistory(id)
+                .orElseThrow(() -> {
+                    log.warn("Order not found | orderId={}", id);
+                    return new OrderNotFoundException(id);
+                });
+        log.debug("Order status poll | orderId={} currentStatus={}", id, order.getStatus());
+        return order;
     }
 
     @Transactional(readOnly = true)
     public List<OrderStatusHistory> getHistory(UUID orderId) {
         if (!orderRepository.existsById(orderId)) {
+            log.warn("Order not found | orderId={}", orderId);
             throw new OrderNotFoundException(orderId);
         }
         return historyRepository.findByOrderIdOrderByChangedAtAsc(orderId);
@@ -80,7 +104,10 @@ public class OrderService {
         }
 
         Branch branch = branchRepository.findById(order.getBranch().getId())
-                .orElseThrow(() -> new BranchNotFoundException(order.getBranch().getId()));
+                .orElseThrow(() -> {
+                    log.warn("Branch not found | branchId={}", order.getBranch().getId());
+                    return new BranchNotFoundException(order.getBranch().getId());
+                });
 
         if (order.getOrderType() == OrderType.DELIVERY
                 && (order.getDeliveryAddress() == null || order.getDeliveryAddress().isBlank())) {
@@ -138,7 +165,13 @@ public class OrderService {
         Order saved = orderRepository.save(order);
         recordHistory(saved, null, OrderStatus.PENDING_PAYMENT);
 
+        log.info("Order created | orderId={} branchId={} orderType={} paymentMethod={} subtotal={} deliveryFee={} serviceFee={} total={} origin={}",
+                saved.getId(), saved.getBranch().getId(), saved.getOrderType(),
+                paymentMethod, saved.getSubtotal(), saved.getDeliveryFee(),
+                saved.getServiceFee(), saved.getTotalAmount(), saved.getOrigin());
+
         if (paymentMethod == PaymentMethod.CASH) {
+            log.info("Cash order auto-received | orderId={}", saved.getId());
             saved = doTransition(saved, OrderStatus.RECEIVED);
         }
 
@@ -163,6 +196,7 @@ public class OrderService {
         order.setStatus(newStatus);
         Order saved = orderRepository.save(order);
         recordHistory(saved, previous, newStatus);
+        log.info("Order status transition | orderId={} from={} to={}", saved.getId(), previous, newStatus);
         return saved;
     }
 

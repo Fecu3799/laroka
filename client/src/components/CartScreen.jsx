@@ -164,7 +164,7 @@ export function CartScreen({ items, extras = [], onBack, onRemove, onUpdateQty, 
   }
 
   if (confirmedOrderId) {
-    return <ConfirmationScreen orderId={confirmedOrderId} onComplete={onBack} />
+    return <ConfirmationScreen orderId={confirmedOrderId} branchId={preferredBranchId} onComplete={onBack} />
   }
 
   if (showCheckout) {
