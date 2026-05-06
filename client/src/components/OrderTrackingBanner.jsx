@@ -50,6 +50,46 @@ function removeFromStorage(orderId) {
   } catch {}
 }
 
+const DELIVERY_STEPS = ['RECEIVED', 'IN_PREPARATION', 'ON_THE_WAY', 'DELIVERED']
+const TAKEAWAY_STEPS = ['RECEIVED', 'IN_PREPARATION', 'READY_FOR_PICKUP', 'DELIVERED']
+
+const STEP_LABELS = {
+  RECEIVED: 'Recibido',
+  IN_PREPARATION: 'En preparación',
+  ON_THE_WAY: 'En camino',
+  READY_FOR_PICKUP: 'Listo para retirar',
+  DELIVERED: 'Entregado',
+}
+
+function formatPrice(amount) {
+  return `$${Number(amount).toLocaleString('es-AR')}`
+}
+
+function formatTime(isoString) {
+  return new Date(isoString).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
+}
+
+function ItemsSkeleton() {
+  return (
+    <div className={styles.itemsSkeleton}>
+      {[140, 180, 110].map((w, i) => (
+        <div key={i} className={styles.skeletonItemRow}>
+          <div className={`${styles.skeletonBlock} ${styles.skeletonItemName}`} style={{ width: w }} />
+          <div className={`${styles.skeletonBlock} ${styles.skeletonItemPrice}`} />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function ChevronIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
 function PhoneIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -64,7 +104,22 @@ function PhoneIcon() {
   )
 }
 
-function OrderSlide({ order, estimatedDeliveryMinutes, onPhoneClick }) {
+function OrderSlide({ orderId, order, isExpanded, items, itemsLoading, itemsError, onToggleExpand, estimatedDeliveryMinutes, onPhoneClick }) {
+  const [cancelling, setCancelling] = useState(false)
+  const [cancelRequested, setCancelRequested] = useState(false)
+
+  const handleCancel = async () => {
+    if (!window.confirm('¿Cancelar el pedido?')) return
+    setCancelling(true)
+    try {
+      const res = await fetch(`${API_BASE}/orders/${orderId}/cancel`, { method: 'POST' })
+      if (res.ok) setCancelRequested(true)
+    } catch {
+    } finally {
+      setCancelling(false)
+    }
+  }
+
   if (!order) {
     return (
       <div className={styles.slideContent} aria-busy="true" aria-label="Cargando pedido">
@@ -77,6 +132,9 @@ function OrderSlide({ order, estimatedDeliveryMinutes, onPhoneClick }) {
 
   const progress = PROGRESS[order.status] ?? 10
   const isDelivery = order.orderType === 'DELIVERY'
+  const steps = isDelivery ? DELIVERY_STEPS : TAKEAWAY_STEPS
+  const historyMap = {}
+  for (const h of (order.history ?? [])) historyMap[h.toStatus] = h
 
   return (
     <div className={styles.slideContent}>
@@ -111,6 +169,86 @@ function OrderSlide({ order, estimatedDeliveryMinutes, onPhoneClick }) {
         </div>
         <span className={styles.progressEmoji} aria-hidden="true">🏠</span>
       </div>
+
+      {isExpanded && (
+        <div className={styles.expandPanel}>
+          <div className={styles.panelSeparator} />
+
+          <p className={styles.sectionLabel}>HISTORIAL</p>
+          <ul className={styles.historyList}>
+            {steps.map(step => {
+              const entry = historyMap[step]
+              return (
+                <li key={step} className={styles.historyItem}>
+                  <span className={styles.historyBullet} data-done={!!entry} />
+                  <span className={styles.historyLabel} data-done={!!entry}>
+                    {STEP_LABELS[step]}
+                  </span>
+                  <span className={styles.historyTime}>
+                    {entry ? formatTime(entry.changedAt) : '—'}
+                  </span>
+                </li>
+              )
+            })}
+          </ul>
+
+          <p className={styles.sectionLabel}>TU PEDIDO</p>
+          {itemsLoading && <ItemsSkeleton />}
+          {itemsError && (
+            <p className={styles.itemsError}>No se pudieron cargar los items.</p>
+          )}
+          {items && (
+            <>
+              <ul className={styles.itemsList}>
+                {items.map((item, i) => (
+                  <li key={i} className={styles.itemRow}>
+                    <span className={styles.itemQtyName}>{item.quantity}× {item.name}</span>
+                    <span className={styles.itemPrice}>{formatPrice(item.subtotal)}</span>
+                  </li>
+                ))}
+              </ul>
+              <div className={styles.totalsContainer}>
+                <div className={styles.totalRow}>
+                  <span>Subtotal</span>
+                  <span>{formatPrice(order.subtotal)}</span>
+                </div>
+                {isDelivery && (
+                  <div className={styles.totalRow}>
+                    <span>Cargo de delivery</span>
+                    <span>{formatPrice(order.deliveryFee)}</span>
+                  </div>
+                )}
+                <div className={styles.totalRow}>
+                  <span>Cargo de servicio</span>
+                  <span>{formatPrice(order.serviceFee)}</span>
+                </div>
+                <div className={styles.totalsSeparator} />
+                <div className={`${styles.totalRow} ${styles.totalRowFinal}`}>
+                  <span>Total</span>
+                  <span>{formatPrice(order.totalAmount)}</span>
+                </div>
+              </div>
+            </>
+          )}
+
+          {order.status === 'RECEIVED' && !cancelRequested && (
+            <button
+              className={styles.cancelBtn}
+              onClick={handleCancel}
+              disabled={cancelling}
+            >
+              {cancelling ? 'CANCELANDO...' : 'CANCELAR PEDIDO'}
+            </button>
+          )}
+        </div>
+      )}
+
+      <button className={styles.expandBtn} onClick={onToggleExpand}>
+        {isExpanded ? 'OCULTAR DETALLES' : 'VER DETALLES'}
+        <span className={`${styles.expandChevron}${isExpanded ? ` ${styles.expandChevronOpen}` : ''}`}>
+          <ChevronIcon />
+        </span>
+      </button>
     </div>
   )
 }
@@ -129,15 +267,26 @@ export function OrderTrackingBanner({ branchId }) {
   })
   const [ordersData, setOrdersData] = useState({})
   const [activeIndex, setActiveIndex] = useState(0)
+  const [isExpanded, setIsExpanded] = useState(false)
+  const [ordersItems, setOrdersItems] = useState({})
 
   const orderEntriesRef = useRef(orderEntries)
   orderEntriesRef.current = orderEntries
+  const ordersItemsRef = useRef(ordersItems)
+  ordersItemsRef.current = ordersItems
 
   const touchStartRef = useRef(null)
+  const visibleEntriesRef = useRef([])
+  const clampedIndexRef = useRef(0)
+  const isExpandedRef = useRef(false)
+  isExpandedRef.current = isExpanded
 
   // Derived from prop — recalculates immediately whenever branchId changes
   const visibleEntries = orderEntries.filter(e => e.branchId === branchId)
   const n = visibleEntries.length
+  const clampedIndex = Math.min(activeIndex, Math.max(0, n - 1))
+  visibleEntriesRef.current = visibleEntries
+  clampedIndexRef.current = clampedIndex
 
   // Clamp activeIndex when a visible order is removed
   useEffect(() => {
@@ -163,6 +312,41 @@ export function OrderTrackingBanner({ branchId }) {
       window.removeEventListener('storage', reloadOrders)
     }
   }, [reloadOrders])
+
+  const fetchItems = useCallback(async (orderId) => {
+    const cur = ordersItemsRef.current[orderId]
+    if (cur?.loading || cur?.data != null) return
+    ordersItemsRef.current = {
+      ...ordersItemsRef.current,
+      [orderId]: { data: null, loading: true, error: false },
+    }
+    setOrdersItems(prev => ({ ...prev, [orderId]: { data: null, loading: true, error: false } }))
+    try {
+      const res = await fetch(`${API_BASE}/orders/${orderId}/items`)
+      if (!res.ok) throw new Error()
+      const data = await res.json()
+      setOrdersItems(prev => ({ ...prev, [orderId]: { data, loading: false, error: false } }))
+    } catch {
+      setOrdersItems(prev => ({ ...prev, [orderId]: { data: null, loading: false, error: true } }))
+    }
+  }, [])
+
+  const handleToggleExpand = useCallback(() => {
+    const opening = !isExpandedRef.current
+    setIsExpanded(opening)
+    if (opening) {
+      const entries = visibleEntriesRef.current
+      const activeId = entries[clampedIndexRef.current]?.orderId
+      if (activeId) fetchItems(activeId)
+      let delay = 300
+      for (const { orderId } of entries) {
+        if (orderId !== activeId) {
+          setTimeout(() => fetchItems(orderId), delay)
+          delay += 300
+        }
+      }
+    }
+  }, [fetchItems])
 
   // Single interval polls all tracked entries via ref — no restart when one is added
   useEffect(() => {
@@ -228,8 +412,6 @@ export function OrderTrackingBanner({ branchId }) {
   // Polling runs in background even when nothing is visible for this branch
   if (n === 0) return null
 
-  const clampedIndex = Math.min(activeIndex, n - 1)
-
   return (
     <>
       <div className={styles.banner}>
@@ -252,7 +434,13 @@ export function OrderTrackingBanner({ branchId }) {
                 style={{ width: `${100 / n}%` }}
               >
                 <OrderSlide
+                  orderId={orderId}
                   order={ordersData[orderId]}
+                  isExpanded={isExpanded}
+                  items={ordersItems[orderId]?.data ?? null}
+                  itemsLoading={ordersItems[orderId]?.loading ?? false}
+                  itemsError={ordersItems[orderId]?.error ?? false}
+                  onToggleExpand={handleToggleExpand}
                   estimatedDeliveryMinutes={estimatedDeliveryMinutes}
                   onPhoneClick={handlePhoneClick}
                 />
