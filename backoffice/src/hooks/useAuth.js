@@ -36,8 +36,8 @@ export default function useAuth() {
     role: payload?.role ?? null,
     branchId: payload?.branchId ?? null,
     branchName: payload?.branchName ?? null,
-    pizzeriaId: payload?.pizzeriaId ?? null,
-    pizzeriaName: payload?.pizzeriaName ?? null,
+    tenantId: payload?.tenantId ?? null,
+    tenantName: payload?.tenantName ?? null,
     isAuthenticated: payload !== null,
     isExpired,
   }

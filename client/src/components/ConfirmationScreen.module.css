@@ -42,6 +42,21 @@
   position: relative;
   width: 72%;
   max-width: 280px;
+  animation:
+    slideIn 600ms ease-out forwards,
+    bounce 300ms ease-out 600ms forwards;
+}
+
+@keyframes slideIn {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+
+@keyframes bounce {
+  0%   { transform: translateX(0); }
+  33%  { transform: translateX(-8px); }
+  66%  { transform: translateX(4px); }
+  100% { transform: translateX(0); }
 }
 
 .illustration {

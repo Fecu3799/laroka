@@ -52,7 +52,7 @@ const NAV = [
 
 export default function Layout() {
   const navigate = useNavigate()
-  const { branchName, pizzeriaName } = useAuth()
+  const { branchName, tenantName } = useAuth()
   const [time, setTime] = useState(new Date())
 
   function handleLogout() {
@@ -125,7 +125,7 @@ export default function Layout() {
               </svg>
             </span>
             <span className="layout-header-title">PANEL DE CONTROL</span>
-            <span className="layout-header-pizzeria">{pizzeriaName ?? '—'}</span>
+            <span className="layout-header-tenant">{tenantName ?? '—'}</span>
           </div>
           <div className="layout-header-right">
             <span className="layout-header-theme">Verde oscuro</span>

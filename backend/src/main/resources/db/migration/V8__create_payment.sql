@@ -3,8 +3,8 @@
 CREATE TABLE payment (
     id UUID PRIMARY KEY,
     order_id UUID NOT NULL,
-    mercadopago_payment_id VARCHAR(255) NOT NULL,
-    mercadopago_preference_id VARCHAR(255) NOT NULL,
+    mercadopago_payment_id VARCHAR(255),
+    mercadopago_preference_id VARCHAR(255),
     status VARCHAR(30) NOT NULL,
     method VARCHAR(30) NOT NULL,
     paid_at TIMESTAMP,
