@@ -12,6 +12,8 @@ CREATE TABLE staff_user (
     CONSTRAINT fk_staff_user_branch FOREIGN KEY (branch_id) REFERENCES branch(id)
 );
 
+CREATE INDEX idx_staff_user_branch_id ON staff_user(branch_id);
+
 -- TODO: En producción, generar hashes BCrypt con herramientas especializadas (e.g., Java BCryptPasswordEncoder)
 -- Passwords de desarrollo local (NUNCA usar en producción):
 -- Usuario ADMIN: admin@laroka.com / admin123

@@ -166,7 +166,7 @@ public class OrderService {
 
         order.setId(UUID.randomUUID());
         order.setBranch(branch);
-        order.setPizzeria(branch.getPizzeria());
+        order.setTenant(branch.getTenant());
         order.setStatus(OrderStatus.PENDING_PAYMENT);
         order.setSubtotal(subtotal);
         order.setDeliveryFee(deliveryFee);

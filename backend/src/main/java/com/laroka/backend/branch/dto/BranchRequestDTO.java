@@ -19,8 +19,8 @@ public class BranchRequestDTO {
 	@NotBlank(message = "Branch address is required")
 	private String address;
 
-	@NotNull(message = "Pizzeria ID is required")
-	private Integer pizzeriaId;
+	@NotNull(message = "Tenant ID is required")
+	private Integer tenantId;
 
 	@NotNull(message = "Estimated delivery minutes is required")
 	@Min(value = 1, message = "Estimated delivery minutes must be at least 1")

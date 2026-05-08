@@ -6,8 +6,8 @@ import com.laroka.backend.branch.dto.BranchPublicDTO;
 import com.laroka.backend.branch.dto.BranchRequestDTO;
 import com.laroka.backend.branch.dto.BranchResponseDTO;
 import com.laroka.backend.branch.entity.Branch;
-import com.laroka.backend.pizzeria.entity.Pizzeria;
-import com.laroka.backend.pizzeria.mapper.PizzeriaMapper;
+import com.laroka.backend.tenant.entity.Tenant;
+import com.laroka.backend.tenant.mapper.TenantMapper;
 
 import lombok.RequiredArgsConstructor;
 
@@ -15,7 +15,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class BranchMapper {
 
-	private final PizzeriaMapper pizzeriaMapper;
+	private final TenantMapper tenantMapper;
 
 	public BranchResponseDTO toResponseDTO(Branch branch) {
 		if (branch == null) {
@@ -27,8 +27,8 @@ public class BranchMapper {
 			.address(branch.getAddress())
 			.estimatedDeliveryMinutes(branch.getEstimatedDeliveryMinutes())
 			.phone(branch.getPhone())
-			.pizzeriaId(branch.getPizzeria().getId())
-			.pizzeria(pizzeriaMapper.toResponseDTO(branch.getPizzeria()))
+			.tenantId(branch.getTenant().getId())
+			.tenant(tenantMapper.toResponseDTO(branch.getTenant()))
 			.createdAt(branch.getCreatedAt())
 			.updatedAt(branch.getUpdatedAt())
 			.build();
@@ -58,7 +58,7 @@ public class BranchMapper {
 			.address(dto.getAddress())
 			.estimatedDeliveryMinutes(dto.getEstimatedDeliveryMinutes())
 			.phone(dto.getPhone())
-			.pizzeria(Pizzeria.builder().id(dto.getPizzeriaId()).build())
+			.tenant(Tenant.builder().id(dto.getTenantId()).build())
 			.build();
 	}
 }

@@ -9,7 +9,7 @@ import com.laroka.backend.catalog.entity.Category;
 
 @Repository
 public interface CategoryRepository extends JpaRepository<Category, Integer> {
-	List<Category> findByPizzeriaId(Integer pizzeriaId);
+	List<Category> findByTenantId(Integer tenantId);
 
-	Category findByNameAndPizzeriaId(String name, Integer pizzeriaId);
+	Category findByNameAndTenantId(String name, Integer tenantId);
 }

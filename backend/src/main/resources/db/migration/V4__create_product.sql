@@ -1,29 +1,26 @@
 -- V4__create_product.sql - Catálogo maestro de productos y disponibilidad por sucursal
 
--- Categorías seed
-INSERT INTO category (name, pizzeria_id) VALUES
-    ('Pizzas', 1),
-    ('Empanadas', 1),
-    ('Bebidas', 1);
-
 -- Tabla de productos (catálogo maestro de la pizzería, sin branch_id)
 CREATE TABLE product (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     description TEXT,
-    price DECIMAL(10, 2) NOT NULL,
+    price NUMERIC(10, 2) NOT NULL,
     image_url VARCHAR(500),
     available BOOLEAN NOT NULL DEFAULT true,
     category_id INTEGER NOT NULL,
-    pizzeria_id INTEGER NOT NULL,
+    tenant_id INTEGER NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_product_category FOREIGN KEY (category_id) REFERENCES category(id),
-    CONSTRAINT fk_product_pizzeria FOREIGN KEY (pizzeria_id) REFERENCES pizzeria(id)
+    CONSTRAINT fk_product_tenant FOREIGN KEY (tenant_id) REFERENCES tenant(id)
 );
 
+CREATE INDEX idx_product_tenant_id ON product(tenant_id);
+CREATE INDEX idx_product_category_id ON product(category_id);
+
 -- Productos seed
-INSERT INTO product (name, description, price, category_id, pizzeria_id) VALUES
+INSERT INTO product (name, description, price, category_id, tenant_id) VALUES
     ('Muzzarella',  'Salsa de tomate y muzzarella',                            2800.00, 1, 1),
     ('Napolitana',  'Salsa de tomate, muzzarella, tomate y ajo',               3200.00, 1, 1),
     ('Fugazzeta',   'Muzzarella, cebolla y aceitunas',                          3400.00, 1, 1),
@@ -38,18 +35,19 @@ INSERT INTO product (name, description, price, category_id, pizzeria_id) VALUES
 CREATE TABLE branch_product (
     branch_id  INTEGER NOT NULL,
     product_id INTEGER NOT NULL,
-    available      BOOLEAN        NOT NULL DEFAULT true,
-    price_override DECIMAL(10, 2),
+    available BOOLEAN NOT NULL DEFAULT true,
+    price_override NUMERIC(10, 2),
     PRIMARY KEY (branch_id, product_id),
     CONSTRAINT fk_branch_product_branch  FOREIGN KEY (branch_id)  REFERENCES branch(id),
     CONSTRAINT fk_branch_product_product FOREIGN KEY (product_id) REFERENCES product(id)
 );
+
+CREATE INDEX idx_branch_product_product_id ON branch_product(product_id);
 
 -- Seed: todos los productos activos disponibles en las 3 sucursales
 INSERT INTO branch_product (branch_id, product_id)
 SELECT b.id, p.id
 FROM branch b
 CROSS JOIN product p
-WHERE b.pizzeria_id = 1
-  AND p.pizzeria_id = 1
-  AND p.available = true;
+WHERE b.tenant_id = 1
+  AND p.tenant_id = 1;

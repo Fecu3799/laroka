@@ -5,8 +5,8 @@ import org.springframework.stereotype.Component;
 import com.laroka.backend.catalog.dto.CategoryRequestDTO;
 import com.laroka.backend.catalog.dto.CategoryResponseDTO;
 import com.laroka.backend.catalog.entity.Category;
-import com.laroka.backend.pizzeria.entity.Pizzeria;
-import com.laroka.backend.pizzeria.mapper.PizzeriaMapper;
+import com.laroka.backend.tenant.entity.Tenant;
+import com.laroka.backend.tenant.mapper.TenantMapper;
 
 import lombok.RequiredArgsConstructor;
 
@@ -14,7 +14,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class CategoryMapper {
 
-	private final PizzeriaMapper pizzeriaMapper;
+	private final TenantMapper tenantMapper;
 
 	public CategoryResponseDTO toResponseDTO(Category category) {
 		if (category == null) {
@@ -23,8 +23,8 @@ public class CategoryMapper {
 		return CategoryResponseDTO.builder()
 			.id(category.getId())
 			.name(category.getName())
-			.pizzeriaId(category.getPizzeria().getId())
-			.pizzeria(pizzeriaMapper.toResponseDTO(category.getPizzeria()))
+			.tenantId(category.getTenant().getId())
+			.tenant(tenantMapper.toResponseDTO(category.getTenant()))
 			.createdAt(category.getCreatedAt())
 			.updatedAt(category.getUpdatedAt())
 			.build();
@@ -36,7 +36,7 @@ public class CategoryMapper {
 		}
 		return Category.builder()
 			.name(dto.getName())
-			.pizzeria(Pizzeria.builder().id(dto.getPizzeriaId()).build())
+			.tenant(Tenant.builder().id(dto.getTenantId()).build())
 			.build();
 	}
 }

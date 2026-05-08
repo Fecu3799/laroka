@@ -1,4 +1,4 @@
-package com.laroka.backend.pizzeria.entity;
+package com.laroka.backend.tenant.entity;
 
 import java.time.LocalDateTime;
 
@@ -16,12 +16,12 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "pizzeria")
+@Table(name = "tenant")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Pizzeria {
+public class Tenant {
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)

@@ -15,8 +15,8 @@ public class OpenApiConfig {
 	public OpenAPI larokaOpenAPI() {
 		return new OpenAPI()
 			.info(new Info()
-				.title("LaRoka API")
-				.description("Pizza Order Management System API")
+				.title("Laroka API")
+				.description("Order Management System API")
 				.version("1.0.0"));
 	}
 }

@@ -1,4 +1,4 @@
-package com.laroka.backend.pizzeria.dto;
+package com.laroka.backend.tenant.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
@@ -10,7 +10,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class PizzeriaRequestDTO {
-	@NotBlank(message = "Pizzeria name is required")
+public class TenantRequestDTO {
+	@NotBlank(message = "Tenant name is required")
 	private String name;
 }

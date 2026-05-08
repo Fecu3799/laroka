@@ -1,12 +1,12 @@
--- V1__init.sql - Tabla pizzeria base del sistema
--- Entidad raíz para soporte multi-pizzería desde v1
+-- V1__init.sql - Tabla tenant base del sistema
+-- Entidad raíz para soporte multi-comercio desde v1
 
-CREATE TABLE pizzeria (
+CREATE TABLE tenant (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL UNIQUE,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- Insertar pizzería inicial
-INSERT INTO pizzeria (name) VALUES ('LaRoka');
+-- Insertar tenant inicial
+INSERT INTO tenant (name) VALUES ('LaRoka');

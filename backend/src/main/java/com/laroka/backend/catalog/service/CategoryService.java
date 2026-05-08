@@ -7,9 +7,9 @@ import org.springframework.stereotype.Service;
 import com.laroka.backend.catalog.entity.Category;
 import com.laroka.backend.catalog.exception.CategoryNotFoundException;
 import com.laroka.backend.catalog.repository.CategoryRepository;
-import com.laroka.backend.pizzeria.entity.Pizzeria;
-import com.laroka.backend.pizzeria.exception.PizzeriaNotFoundException;
-import com.laroka.backend.pizzeria.repository.PizzeriaRepository;
+import com.laroka.backend.tenant.entity.Tenant;
+import com.laroka.backend.tenant.exception.TenantNotFoundException;
+import com.laroka.backend.tenant.repository.TenantRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -18,16 +18,16 @@ import lombok.RequiredArgsConstructor;
 public class CategoryService {
 
 	private final CategoryRepository repository;
-	private final PizzeriaRepository pizzeriaRepository;
+	private final TenantRepository tenantRepository;
 
 	public Category findById(Integer id) {
 		return repository.findById(id)
 			.orElseThrow(() -> new CategoryNotFoundException(id));
 	}
 
-	public List<Category> findByPizzeria(Integer pizzeriaId) {
-		validatePizzeriaExists(pizzeriaId);
-		return repository.findByPizzeriaId(pizzeriaId);
+	public List<Category> findByTenant(Integer tenantId) {
+		validateTenantExists(tenantId);
+		return repository.findByTenantId(tenantId);
 	}
 
 	public List<Category> findAll() {
@@ -35,16 +35,16 @@ public class CategoryService {
 	}
 
 	public Category create(Category category) {
-		Pizzeria pizzeria = validatePizzeriaExists(category.getPizzeria().getId());
-		category.setPizzeria(pizzeria);
+		Tenant tenant = validateTenantExists(category.getTenant().getId());
+		category.setTenant(tenant);
 		return repository.save(category);
 	}
 
 	public Category update(Integer id, Category updates) {
 		Category category = findById(id);
-		Pizzeria pizzeria = validatePizzeriaExists(updates.getPizzeria().getId());
+		Tenant tenant = validateTenantExists(updates.getTenant().getId());
 		category.setName(updates.getName());
-		category.setPizzeria(pizzeria);
+		category.setTenant(tenant);
 		return repository.save(category);
 	}
 
@@ -52,8 +52,8 @@ public class CategoryService {
 		repository.delete(findById(id));
 	}
 
-	private Pizzeria validatePizzeriaExists(Integer pizzeriaId) {
-		return pizzeriaRepository.findById(pizzeriaId)
-			.orElseThrow(() -> new PizzeriaNotFoundException(pizzeriaId));
+	private Tenant validateTenantExists(Integer tenantId) {
+		return tenantRepository.findById(tenantId)
+			.orElseThrow(() -> new TenantNotFoundException(tenantId));
 	}
 }

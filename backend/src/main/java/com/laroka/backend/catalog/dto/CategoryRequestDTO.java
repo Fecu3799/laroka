@@ -15,6 +15,6 @@ public class CategoryRequestDTO {
 	@NotBlank(message = "Category name is required")
 	private String name;
 
-	@NotNull(message = "Pizzeria ID is required")
-	private Integer pizzeriaId;
+	@NotNull(message = "Tenant ID is required")
+	private Integer tenantId;
 }

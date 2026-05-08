@@ -3,7 +3,7 @@ package com.laroka.backend.branch.entity;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-import com.laroka.backend.pizzeria.entity.Pizzeria;
+import com.laroka.backend.tenant.entity.Tenant;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -52,8 +52,8 @@ public class Branch {
 	private String phone;
 
 	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "pizzeria_id", nullable = false)
-	private Pizzeria pizzeria;
+	@JoinColumn(name = "tenant_id", nullable = false)
+	private Tenant tenant;
 
 	@Column(name = "created_at", nullable = false, updatable = false)
 	private LocalDateTime createdAt;

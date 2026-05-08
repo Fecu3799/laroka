@@ -42,10 +42,10 @@ public class BranchController {
 	}
 
 	@GetMapping
-	@Operation(summary = "List branches", description = "Returns all branches, optionally filtered by pizzeria")
-	public ResponseEntity<List<BranchResponseDTO>> findAll(@RequestParam(required = false) Integer pizzeriaId) {
-		List<Branch> branches = pizzeriaId != null
-			? service.findByPizzeria(pizzeriaId)
+	@Operation(summary = "List branches", description = "Returns all branches, optionally filtered by tenant")
+	public ResponseEntity<List<BranchResponseDTO>> findAll(@RequestParam(required = false) Integer tenantId) {
+		List<Branch> branches = tenantId != null
+			? service.findByTenant(tenantId)
 			: service.findAll();
 		return ResponseEntity.ok(branches.stream().map(mapper::toResponseDTO).toList());
 	}

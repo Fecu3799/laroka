@@ -26,11 +26,9 @@ public class ProductRequestDTO {
 
     private String imageUrl;
 
-    private Boolean available;
-
     @NotNull(message = "Category ID is required")
     private Integer categoryId;
 
-    @NotNull(message = "Pizzeria ID is required")
-    private Integer pizzeriaId;
+    @NotNull(message = "Tenant ID is required")
+    private Integer tenantId;
 }

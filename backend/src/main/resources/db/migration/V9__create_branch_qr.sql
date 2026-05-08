@@ -10,6 +10,8 @@ CREATE TABLE branch_qr (
     CONSTRAINT fk_branch_qr_branch FOREIGN KEY (branch_id) REFERENCES branch(id)
 );
 
+CREATE INDEX idx_branch_qr_branch_id ON branch_qr(branch_id);
+
 -- Seed con valores placeholder para dev
 INSERT INTO branch_qr (branch_id, mp_pos_id, mp_qr_id, active) VALUES
     (1, 'POS_PLAYA_UNION_DEV', 'QR_PLAYA_UNION_DEV', true),

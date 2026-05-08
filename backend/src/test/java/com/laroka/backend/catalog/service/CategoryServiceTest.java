@@ -18,9 +18,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.laroka.backend.catalog.entity.Category;
 import com.laroka.backend.catalog.exception.CategoryNotFoundException;
 import com.laroka.backend.catalog.repository.CategoryRepository;
-import com.laroka.backend.pizzeria.entity.Pizzeria;
-import com.laroka.backend.pizzeria.exception.PizzeriaNotFoundException;
-import com.laroka.backend.pizzeria.repository.PizzeriaRepository;
+import com.laroka.backend.tenant.entity.Tenant;
+import com.laroka.backend.tenant.exception.TenantNotFoundException;
+import com.laroka.backend.tenant.repository.TenantRepository;
 
 @ExtendWith(MockitoExtension.class)
 class CategoryServiceTest {
@@ -29,22 +29,22 @@ class CategoryServiceTest {
 	private CategoryRepository categoryRepository;
 
 	@Mock
-	private PizzeriaRepository pizzeriaRepository;
+	private TenantRepository tenantRepository;
 
 	@InjectMocks
 	private CategoryService service;
 
-	private Pizzeria pizzeria() {
-		return Pizzeria.builder().id(1).name("LaRoka").build();
+	private Tenant tenant() {
+		return Tenant.builder().id(1).name("LaRoka").build();
 	}
 
-	private Category category(Pizzeria pizzeria) {
-		return Category.builder().id(1).name("Pizzas").pizzeria(pizzeria).build();
+	private Category category(Tenant tenant) {
+		return Category.builder().id(1).name("Pizzas").tenant(tenant).build();
 	}
 
 	@Test
 	void findById_returnsExistingCategory() {
-		Category category = category(pizzeria());
+		Category category = category(tenant());
 		when(categoryRepository.findById(1)).thenReturn(Optional.of(category));
 
 		Category result = service.findById(1);
@@ -63,7 +63,7 @@ class CategoryServiceTest {
 
 	@Test
 	void findAll_returnsAllCategories() {
-		Pizzeria p = pizzeria();
+		Tenant p = tenant();
 		when(categoryRepository.findAll()).thenReturn(List.of(category(p), category(p)));
 
 		List<Category> result = service.findAll();
@@ -72,29 +72,29 @@ class CategoryServiceTest {
 	}
 
 	@Test
-	void findByPizzeria_validPizzeria_returnsCategories() {
-		Pizzeria p = pizzeria();
-		when(pizzeriaRepository.findById(1)).thenReturn(Optional.of(p));
-		when(categoryRepository.findByPizzeriaId(1)).thenReturn(List.of(category(p)));
+	void findByTenant_validTenant_returnsCategories() {
+		Tenant p = tenant();
+		when(tenantRepository.findById(1)).thenReturn(Optional.of(p));
+		when(categoryRepository.findByTenantId(1)).thenReturn(List.of(category(p)));
 
-		List<Category> result = service.findByPizzeria(1);
+		List<Category> result = service.findByTenant(1);
 
 		assertThat(result).hasSize(1);
 	}
 
 	@Test
-	void findByPizzeria_invalidPizzeria_throwsPizzeriaNotFoundException() {
-		when(pizzeriaRepository.findById(99)).thenReturn(Optional.empty());
+	void findByTenant_invalidTenant_throwsTenantNotFoundException() {
+		when(tenantRepository.findById(99)).thenReturn(Optional.empty());
 
-		assertThatThrownBy(() -> service.findByPizzeria(99))
-			.isInstanceOf(PizzeriaNotFoundException.class);
+		assertThatThrownBy(() -> service.findByTenant(99))
+			.isInstanceOf(TenantNotFoundException.class);
 	}
 
 	@Test
 	void create_validCategory_savesAndReturns() {
-		Pizzeria p = pizzeria();
+		Tenant p = tenant();
 		Category category = category(p);
-		when(pizzeriaRepository.findById(1)).thenReturn(Optional.of(p));
+		when(tenantRepository.findById(1)).thenReturn(Optional.of(p));
 		when(categoryRepository.save(any(Category.class))).thenReturn(category);
 
 		Category result = service.create(category);
@@ -104,21 +104,21 @@ class CategoryServiceTest {
 	}
 
 	@Test
-	void create_invalidPizzeria_throwsPizzeriaNotFoundException() {
-		Category category = Category.builder().id(1).name("Test").pizzeria(Pizzeria.builder().id(99).build()).build();
-		when(pizzeriaRepository.findById(99)).thenReturn(Optional.empty());
+	void create_invalidTenant_throwsTenantNotFoundException() {
+		Category category = Category.builder().id(1).name("Test").tenant(Tenant.builder().id(99).build()).build();
+		when(tenantRepository.findById(99)).thenReturn(Optional.empty());
 
 		assertThatThrownBy(() -> service.create(category))
-			.isInstanceOf(PizzeriaNotFoundException.class);
+			.isInstanceOf(TenantNotFoundException.class);
 	}
 
 	@Test
 	void update_existingCategory_updatesAndReturns() {
-		Pizzeria p = pizzeria();
+		Tenant p = tenant();
 		Category existing = category(p);
-		Category updates = Category.builder().name("Empanadas").pizzeria(p).build();
+		Category updates = Category.builder().name("Empanadas").tenant(p).build();
 		when(categoryRepository.findById(1)).thenReturn(Optional.of(existing));
-		when(pizzeriaRepository.findById(1)).thenReturn(Optional.of(p));
+		when(tenantRepository.findById(1)).thenReturn(Optional.of(p));
 		when(categoryRepository.save(any(Category.class))).thenReturn(existing);
 
 		Category result = service.update(1, updates);
@@ -130,13 +130,13 @@ class CategoryServiceTest {
 	void update_notFound_throwsCategoryNotFoundException() {
 		when(categoryRepository.findById(99)).thenReturn(Optional.empty());
 
-		assertThatThrownBy(() -> service.update(99, category(pizzeria())))
+		assertThatThrownBy(() -> service.update(99, category(tenant())))
 			.isInstanceOf(CategoryNotFoundException.class);
 	}
 
 	@Test
 	void delete_existingCategory_deletes() {
-		Category category = category(pizzeria());
+		Category category = category(tenant());
 		when(categoryRepository.findById(1)).thenReturn(Optional.of(category));
 
 		service.delete(1);

@@ -15,9 +15,9 @@ import com.laroka.backend.catalog.exception.ProductNotFoundException;
 import com.laroka.backend.catalog.repository.BranchProductRepository;
 import com.laroka.backend.catalog.repository.CategoryRepository;
 import com.laroka.backend.catalog.repository.ProductRepository;
-import com.laroka.backend.pizzeria.entity.Pizzeria;
-import com.laroka.backend.pizzeria.exception.PizzeriaNotFoundException;
-import com.laroka.backend.pizzeria.repository.PizzeriaRepository;
+import com.laroka.backend.tenant.entity.Tenant;
+import com.laroka.backend.tenant.exception.TenantNotFoundException;
+import com.laroka.backend.tenant.repository.TenantRepository;
 import com.laroka.backend.shared.exception.BusinessException;
 
 import lombok.RequiredArgsConstructor;
@@ -30,7 +30,7 @@ public class ProductService {
 	private final CategoryRepository categoryRepository;
 	private final BranchRepository branchRepository;
 	private final BranchProductRepository branchProductRepository;
-	private final PizzeriaRepository pizzeriaRepository;
+	private final TenantRepository tenantRepository;
 
 	public Product findById(Integer id) {
 		return repository.findById(id)
@@ -47,9 +47,9 @@ public class ProductService {
 		return repository.findByCategoryId(categoryId);
 	}
 
-	public List<Product> findByPizzeria(Integer pizzeriaId) {
-		validatePizzeriaExists(pizzeriaId);
-		return repository.findByPizzeriaId(pizzeriaId);
+	public List<Product> findByTenant(Integer tenantId) {
+		validateTenantExists(tenantId);
+		return repository.findByTenantId(tenantId);
 	}
 
 	public List<Product> findAll() {
@@ -58,23 +58,22 @@ public class ProductService {
 
 	public Product create(Product product) {
 		Category category = validateCategoryExists(product.getCategory().getId());
-		Pizzeria pizzeria = validatePizzeriaExists(product.getPizzeria().getId());
+		Tenant tenant = validateTenantExists(product.getTenant().getId());
 		product.setCategory(category);
-		product.setPizzeria(pizzeria);
+		product.setTenant(tenant);
 		return repository.save(product);
 	}
 
 	public Product update(Integer id, Product updates) {
 		Product product = findById(id);
 		Category category = validateCategoryExists(updates.getCategory().getId());
-		Pizzeria pizzeria = validatePizzeriaExists(updates.getPizzeria().getId());
+		Tenant tenant = validateTenantExists(updates.getTenant().getId());
 		product.setName(updates.getName());
 		product.setDescription(updates.getDescription());
 		product.setPrice(updates.getPrice());
 		product.setImageUrl(updates.getImageUrl());
-		product.setAvailable(updates.getAvailable());
 		product.setCategory(category);
-		product.setPizzeria(pizzeria);
+		product.setTenant(tenant);
 		return repository.save(product);
 	}
 
@@ -103,8 +102,8 @@ public class ProductService {
 			.orElseThrow(() -> new BranchNotFoundException(branchId));
 	}
 
-	private Pizzeria validatePizzeriaExists(Integer pizzeriaId) {
-		return pizzeriaRepository.findById(pizzeriaId)
-			.orElseThrow(() -> new PizzeriaNotFoundException(pizzeriaId));
+	private Tenant validateTenantExists(Integer tenantId) {
+		return tenantRepository.findById(tenantId)
+			.orElseThrow(() -> new TenantNotFoundException(tenantId));
 	}
 }

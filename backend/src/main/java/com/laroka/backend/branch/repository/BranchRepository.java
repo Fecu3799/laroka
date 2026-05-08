@@ -9,7 +9,7 @@ import com.laroka.backend.branch.entity.Branch;
 
 @Repository
 public interface BranchRepository extends JpaRepository<Branch, Integer> {
-	List<Branch> findByPizzeriaId(Integer pizzeriaId);
+	List<Branch> findByTenantId(Integer tenantId);
 
-	Branch findByNameAndPizzeriaId(String name, Integer pizzeriaId);
+	Branch findByNameAndTenantId(String name, Integer tenantId);
 }

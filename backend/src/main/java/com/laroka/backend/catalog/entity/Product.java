@@ -3,7 +3,7 @@ package com.laroka.backend.catalog.entity;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-import com.laroka.backend.pizzeria.entity.Pizzeria;
+import com.laroka.backend.tenant.entity.Tenant;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -57,8 +57,8 @@ public class Product {
 	private Category category;
 
 	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "pizzeria_id", nullable = false)
-	private Pizzeria pizzeria;
+	@JoinColumn(name = "tenant_id", nullable = false)
+	private Tenant tenant;
 
 	@Column(name = "created_at", nullable = false, updatable = false)
 	private LocalDateTime createdAt;
@@ -70,9 +70,6 @@ public class Product {
 	protected void onCreate() {
 		createdAt = LocalDateTime.now();
 		updatedAt = LocalDateTime.now();
-		if (available == null) {
-			available = true;
-		}
 	}
 
 	@PreUpdate

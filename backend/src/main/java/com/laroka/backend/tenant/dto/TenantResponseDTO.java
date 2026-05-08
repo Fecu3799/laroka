@@ -1,4 +1,4 @@
-package com.laroka.backend.pizzeria.dto;
+package com.laroka.backend.tenant.dto;
 
 import java.time.LocalDateTime;
 
@@ -11,7 +11,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class PizzeriaResponseDTO {
+public class TenantResponseDTO {
 	private Integer id;
 	private String name;
 	private LocalDateTime createdAt;

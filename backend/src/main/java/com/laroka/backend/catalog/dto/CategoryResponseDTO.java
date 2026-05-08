@@ -2,7 +2,7 @@ package com.laroka.backend.catalog.dto;
 
 import java.time.LocalDateTime;
 
-import com.laroka.backend.pizzeria.dto.PizzeriaResponseDTO;
+import com.laroka.backend.tenant.dto.TenantResponseDTO;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -16,8 +16,8 @@ import lombok.NoArgsConstructor;
 public class CategoryResponseDTO {
 	private Integer id;
 	private String name;
-	private Integer pizzeriaId;
-	private PizzeriaResponseDTO pizzeria;
+	private Integer tenantId;
+	private TenantResponseDTO tenant;
 	private LocalDateTime createdAt;
 	private LocalDateTime updatedAt;
 }

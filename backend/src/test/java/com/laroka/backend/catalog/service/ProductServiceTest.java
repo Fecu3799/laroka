@@ -28,9 +28,9 @@ import com.laroka.backend.catalog.exception.ProductNotFoundException;
 import com.laroka.backend.catalog.repository.BranchProductRepository;
 import com.laroka.backend.catalog.repository.CategoryRepository;
 import com.laroka.backend.catalog.repository.ProductRepository;
-import com.laroka.backend.pizzeria.entity.Pizzeria;
-import com.laroka.backend.pizzeria.exception.PizzeriaNotFoundException;
-import com.laroka.backend.pizzeria.repository.PizzeriaRepository;
+import com.laroka.backend.tenant.entity.Tenant;
+import com.laroka.backend.tenant.exception.TenantNotFoundException;
+import com.laroka.backend.tenant.repository.TenantRepository;
 import com.laroka.backend.shared.exception.BusinessException;
 
 @ExtendWith(MockitoExtension.class)
@@ -40,32 +40,31 @@ class ProductServiceTest {
 	@Mock private CategoryRepository categoryRepository;
 	@Mock private BranchRepository branchRepository;
 	@Mock private BranchProductRepository branchProductRepository;
-	@Mock private PizzeriaRepository pizzeriaRepository;
+	@Mock private TenantRepository tenantRepository;
 
 	@InjectMocks
 	private ProductService service;
 
-	private Pizzeria pizzeria() {
-		return Pizzeria.builder().id(1).name("LaRoka").build();
+	private Tenant tenant() {
+		return Tenant.builder().id(1).name("LaRoka").build();
 	}
 
-	private Branch branch(Pizzeria pizzeria) {
-		return Branch.builder().id(1).name("Playa Unión").address("Av. Principal 123").pizzeria(pizzeria).build();
+	private Branch branch(Tenant tenant) {
+		return Branch.builder().id(1).name("Playa Unión").address("Av. Principal 123").tenant(tenant).build();
 	}
 
-	private Category category(Pizzeria pizzeria) {
-		return Category.builder().id(1).name("Pizzas").pizzeria(pizzeria).build();
+	private Category category(Tenant tenant) {
+		return Category.builder().id(1).name("Pizzas").tenant(tenant).build();
 	}
 
-	private Product product(Category category, Pizzeria pizzeria) {
+	private Product product(Category category, Tenant tenant) {
 		return Product.builder()
 			.id(1)
 			.name("Muzzarella")
 			.description("Clásica")
 			.price(new BigDecimal("2800.00"))
-			.available(true)
 			.category(category)
-			.pizzeria(pizzeria)
+			.tenant(tenant)
 			.build();
 	}
 
@@ -82,7 +81,7 @@ class ProductServiceTest {
 
 	@Test
 	void findById_returnsExistingProduct() {
-		Pizzeria p = pizzeria();
+		Tenant p = tenant();
 		Product product = product(category(p), p);
 		when(productRepository.findById(1)).thenReturn(Optional.of(product));
 
@@ -112,7 +111,7 @@ class ProductServiceTest {
 
 	@Test
 	void getMenuForBranch_returnsOnlyAvailableProducts() {
-		Pizzeria p = pizzeria();
+		Tenant p = tenant();
 		Branch b = branch(p);
 		Product product = product(category(p), p);
 		BranchProduct bp = branchProduct(b, product, null);
@@ -127,7 +126,7 @@ class ProductServiceTest {
 
 	@Test
 	void getMenuForBranch_withoutPriceOverride_branchProductHasNullOverride() {
-		Pizzeria p = pizzeria();
+		Tenant p = tenant();
 		Branch b = branch(p);
 		Product product = product(category(p), p);
 		BranchProduct bp = branchProduct(b, product, null);
@@ -142,7 +141,7 @@ class ProductServiceTest {
 
 	@Test
 	void getMenuForBranch_withPriceOverride_branchProductHasOverride() {
-		Pizzeria p = pizzeria();
+		Tenant p = tenant();
 		Branch b = branch(p);
 		Product product = product(category(p), p);
 		BranchProduct bp = branchProduct(b, product, new BigDecimal("3100.00"));
@@ -164,25 +163,25 @@ class ProductServiceTest {
 			.isInstanceOf(CategoryNotFoundException.class);
 	}
 
-	// --- findByPizzeria ---
+	// --- findByTenant ---
 
 	@Test
-	void findByPizzeria_invalidPizzeria_throwsPizzeriaNotFoundException() {
-		when(pizzeriaRepository.findById(99)).thenReturn(Optional.empty());
+	void findByTenant_invalidTenant_throwsTenantNotFoundException() {
+		when(tenantRepository.findById(99)).thenReturn(Optional.empty());
 
-		assertThatThrownBy(() -> service.findByPizzeria(99))
-			.isInstanceOf(PizzeriaNotFoundException.class);
+		assertThatThrownBy(() -> service.findByTenant(99))
+			.isInstanceOf(TenantNotFoundException.class);
 	}
 
 	// --- create ---
 
 	@Test
 	void create_validProduct_savesAndReturns() {
-		Pizzeria p = pizzeria();
+		Tenant p = tenant();
 		Category c = category(p);
 		Product product = product(c, p);
 		when(categoryRepository.findById(1)).thenReturn(Optional.of(c));
-		when(pizzeriaRepository.findById(1)).thenReturn(Optional.of(p));
+		when(tenantRepository.findById(1)).thenReturn(Optional.of(p));
 		when(productRepository.save(any(Product.class))).thenReturn(product);
 
 		Product result = service.create(product);
@@ -193,7 +192,7 @@ class ProductServiceTest {
 
 	@Test
 	void create_invalidCategory_throwsCategoryNotFoundException() {
-		Pizzeria p = pizzeria();
+		Tenant p = tenant();
 		Product product = product(category(p), p);
 		when(categoryRepository.findById(1)).thenReturn(Optional.empty());
 
@@ -202,34 +201,33 @@ class ProductServiceTest {
 	}
 
 	@Test
-	void create_invalidPizzeria_throwsPizzeriaNotFoundException() {
-		Pizzeria p = pizzeria();
+	void create_invalidTenant_throwsTenantNotFoundException() {
+		Tenant p = tenant();
 		Product product = product(category(p), p);
 		when(categoryRepository.findById(1)).thenReturn(Optional.of(category(p)));
-		when(pizzeriaRepository.findById(1)).thenReturn(Optional.empty());
+		when(tenantRepository.findById(1)).thenReturn(Optional.empty());
 
 		assertThatThrownBy(() -> service.create(product))
-			.isInstanceOf(PizzeriaNotFoundException.class);
+			.isInstanceOf(TenantNotFoundException.class);
 	}
 
 	// --- update ---
 
 	@Test
 	void update_existingProduct_updatesAndReturns() {
-		Pizzeria p = pizzeria();
+		Tenant p = tenant();
 		Category c = category(p);
 		Product existing = product(c, p);
 		Product updates = Product.builder()
 			.name("Fugazzeta")
 			.description("Con cebolla")
 			.price(new BigDecimal("3400.00"))
-			.available(true)
 			.category(c)
-			.pizzeria(p)
+			.tenant(p)
 			.build();
 		when(productRepository.findById(1)).thenReturn(Optional.of(existing));
 		when(categoryRepository.findById(1)).thenReturn(Optional.of(c));
-		when(pizzeriaRepository.findById(1)).thenReturn(Optional.of(p));
+		when(tenantRepository.findById(1)).thenReturn(Optional.of(p));
 		when(productRepository.save(any(Product.class))).thenReturn(existing);
 
 		Product result = service.update(1, updates);
@@ -240,7 +238,7 @@ class ProductServiceTest {
 	@Test
 	void update_notFound_throwsProductNotFoundException() {
 		when(productRepository.findById(99)).thenReturn(Optional.empty());
-		Pizzeria p = pizzeria();
+		Tenant p = tenant();
 
 		assertThatThrownBy(() -> service.update(99, product(category(p), p)))
 			.isInstanceOf(ProductNotFoundException.class);
@@ -250,7 +248,7 @@ class ProductServiceTest {
 
 	@Test
 	void delete_existingProduct_deletes() {
-		Pizzeria p = pizzeria();
+		Tenant p = tenant();
 		Product product = product(category(p), p);
 		when(productRepository.findById(1)).thenReturn(Optional.of(product));
 
@@ -271,7 +269,7 @@ class ProductServiceTest {
 
 	@Test
 	void updateAvailability_validBranchProduct_updatesAvailability() {
-		Pizzeria p = pizzeria();
+		Tenant p = tenant();
 		Branch b = branch(p);
 		Product product = product(category(p), p);
 		BranchProduct bp = branchProduct(b, product, null);

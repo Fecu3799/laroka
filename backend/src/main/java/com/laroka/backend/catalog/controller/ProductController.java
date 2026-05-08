@@ -46,15 +46,15 @@ public class ProductController {
 	}
 
 	@GetMapping
-	@Operation(summary = "List products", description = "Returns all products, optionally filtered by category or pizzeria")
+	@Operation(summary = "List products", description = "Returns all products, optionally filtered by category or tenant")
 	public ResponseEntity<List<ProductResponseDTO>> findAll(
 			@RequestParam(required = false) Integer categoryId,
-			@RequestParam(required = false) Integer pizzeriaId) {
+			@RequestParam(required = false) Integer tenantId) {
 		List<Product> products;
 		if (categoryId != null) {
 			products = service.findByCategory(categoryId);
-		} else if (pizzeriaId != null) {
-			products = service.findByPizzeria(pizzeriaId);
+		} else if (tenantId != null) {
+			products = service.findByTenant(tenantId);
 		} else {
 			products = service.findAll();
 		}

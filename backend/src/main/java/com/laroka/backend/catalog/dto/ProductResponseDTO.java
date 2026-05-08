@@ -18,9 +18,8 @@ public class ProductResponseDTO {
     private String description;
     private BigDecimal price;
     private String imageUrl;
-    private Boolean available;
     private Integer categoryId;
-    private Integer pizzeriaId;
+    private Integer tenantId;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

@@ -34,7 +34,7 @@ import com.laroka.backend.order.entity.PaymentMethod;
 import com.laroka.backend.order.exception.OrderNotFoundException;
 import com.laroka.backend.order.repository.OrderRepository;
 import com.laroka.backend.order.repository.OrderStatusHistoryRepository;
-import com.laroka.backend.pizzeria.entity.Pizzeria;
+import com.laroka.backend.tenant.entity.Tenant;
 import com.laroka.backend.shared.exception.BusinessException;
 
 @ExtendWith(MockitoExtension.class)
@@ -52,13 +52,13 @@ class OrderServiceTest {
 
     // --- helpers ---
 
-    private Pizzeria pizzeria() {
-        return Pizzeria.builder().id(1).name("LaRoka").build();
+    private Tenant tenant() {
+        return Tenant.builder().id(1).name("LaRoka").build();
     }
 
-    private Branch branch(Pizzeria pizzeria) {
+    private Branch branch(Tenant tenant) {
         return Branch.builder()
-                .id(1).name("Playa Unión").address("Av. Roca 123").pizzeria(pizzeria)
+                .id(1).name("Playa Unión").address("Av. Roca 123").tenant(tenant)
                 .deliveryFee(new BigDecimal("500.00"))
                 .serviceFee(new BigDecimal("200.00"))
                 .build();
@@ -98,7 +98,7 @@ class OrderServiceTest {
                 .status(status)
                 .totalAmount(BigDecimal.TEN)
                 .orderType(OrderType.TAKEAWAY)
-                .branch(branch(pizzeria()))
+                .branch(branch(tenant()))
                 .items(List.of())
                 .build();
     }
@@ -117,7 +117,7 @@ class OrderServiceTest {
 
     @Test
     void createOrder_withBasePrice_usesProductPriceInTotal() {
-        Pizzeria p = pizzeria();
+        Tenant p = tenant();
         Branch branch = branch(p);
         Product product = product(new BigDecimal("2800.00"));
         stubBaseCreation(branch, product);
@@ -133,7 +133,7 @@ class OrderServiceTest {
 
     @Test
     void createOrder_withPriceOverride_usesBranchOverrideInTotal() {
-        Pizzeria p = pizzeria();
+        Tenant p = tenant();
         Branch branch = branch(p);
         Product product = product(new BigDecimal("2800.00"));
 
@@ -160,7 +160,7 @@ class OrderServiceTest {
 
     @Test
     void createOrder_delivery_appliesDeliveryFee() {
-        Pizzeria p = pizzeria();
+        Tenant p = tenant();
         Branch branch = branch(p);
         Product product = product(new BigDecimal("2800.00"));
         stubBaseCreation(branch, product);
@@ -178,7 +178,7 @@ class OrderServiceTest {
 
     @Test
     void createOrder_takeaway_hasZeroDeliveryFee() {
-        Pizzeria p = pizzeria();
+        Tenant p = tenant();
         Branch branch = branch(p);
         Product product = product(new BigDecimal("2800.00"));
         stubBaseCreation(branch, product);
@@ -196,7 +196,7 @@ class OrderServiceTest {
     @Test
     void createOrder_emptyItems_throwsBusinessException() {
         when(idempotencyStore.get(any())).thenReturn(Optional.empty());
-        Branch branch = branch(pizzeria());
+        Branch branch = branch(tenant());
 
         assertThatThrownBy(() ->
                 service.createOrder(takeawayOrder(branch), List.of(), PaymentMethod.MERCADOPAGO, "key-3"))
@@ -208,7 +208,7 @@ class OrderServiceTest {
     void createOrder_branchNotFound_throwsBranchNotFoundException() {
         when(idempotencyStore.get(any())).thenReturn(Optional.empty());
         when(branchRepository.findById(1)).thenReturn(Optional.empty());
-        Branch branch = branch(pizzeria());
+        Branch branch = branch(tenant());
 
         assertThatThrownBy(() ->
                 service.createOrder(takeawayOrder(branch), List.of(itemFor(1, 1)), PaymentMethod.MERCADOPAGO, "key-4"))
@@ -222,7 +222,7 @@ class OrderServiceTest {
         Order cached = minimalSavedOrder(OrderStatus.RECEIVED);
         when(idempotencyStore.get("dup-key")).thenReturn(Optional.of(cached));
 
-        Branch branch = branch(pizzeria());
+        Branch branch = branch(tenant());
         OrderCreationResult result = service.createOrder(
                 takeawayOrder(branch), List.of(itemFor(1, 1)), PaymentMethod.CASH, "dup-key");
 

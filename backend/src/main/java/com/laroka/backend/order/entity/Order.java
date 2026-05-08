@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.UUID;
 
 import com.laroka.backend.branch.entity.Branch;
-import com.laroka.backend.pizzeria.entity.Pizzeria;
+import com.laroka.backend.tenant.entity.Tenant;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -73,8 +73,8 @@ public class Order {
     private Branch branch;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "pizzeria_id", nullable = false)
-    private Pizzeria pizzeria;
+    @JoinColumn(name = "tenant_id", nullable = false)
+    private Tenant tenant;
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OrderItem> items;

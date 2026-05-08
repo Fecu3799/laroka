@@ -1,4 +1,4 @@
-package com.laroka.backend.pizzeria.controller;
+package com.laroka.backend.tenant.controller;
 
 import java.util.List;
 
@@ -15,52 +15,52 @@ import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.validation.Valid;
 
-import com.laroka.backend.pizzeria.dto.PizzeriaRequestDTO;
-import com.laroka.backend.pizzeria.dto.PizzeriaResponseDTO;
-import com.laroka.backend.pizzeria.entity.Pizzeria;
-import com.laroka.backend.pizzeria.mapper.PizzeriaMapper;
-import com.laroka.backend.pizzeria.service.PizzeriaService;
+import com.laroka.backend.tenant.dto.TenantRequestDTO;
+import com.laroka.backend.tenant.dto.TenantResponseDTO;
+import com.laroka.backend.tenant.entity.Tenant;
+import com.laroka.backend.tenant.mapper.TenantMapper;
+import com.laroka.backend.tenant.service.TenantService;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 
 @RestController
-@RequestMapping("/pizzerias")
+@RequestMapping("/tenants")
 @RequiredArgsConstructor
-@Tag(name = "Pizzerias", description = "Manage pizzeria information")
-public class PizzeriaController {
+@Tag(name = "Tenants", description = "Manage tenant information")
+public class TenantController {
 
-	private final PizzeriaService service;
-	private final PizzeriaMapper mapper;
+	private final TenantService service;
+	private final TenantMapper mapper;
 
 	@GetMapping("/{id}")
-	@Operation(summary = "Get pizzeria by ID", description = "Returns a specific pizzeria")
-	public ResponseEntity<PizzeriaResponseDTO> findById(@PathVariable Integer id) {
+	@Operation(summary = "Get tenant by ID", description = "Returns a specific tenant")
+	public ResponseEntity<TenantResponseDTO> findById(@PathVariable Integer id) {
 		return ResponseEntity.ok(mapper.toResponseDTO(service.findById(id)));
 	}
 
 	@GetMapping
-	@Operation(summary = "List all pizzerias", description = "Returns all pizzerias")
-	public ResponseEntity<List<PizzeriaResponseDTO>> findAll() {
+	@Operation(summary = "List all tenants", description = "Returns all tenants")
+	public ResponseEntity<List<TenantResponseDTO>> findAll() {
 		return ResponseEntity.ok(service.findAll().stream().map(mapper::toResponseDTO).toList());
 	}
 
 	@PostMapping
-	@Operation(summary = "Create pizzeria", description = "Creates a new pizzeria")
-	public ResponseEntity<PizzeriaResponseDTO> create(@Valid @RequestBody PizzeriaRequestDTO dto) {
-		Pizzeria saved = service.create(mapper.toEntity(dto));
+	@Operation(summary = "Create tenant", description = "Creates a new tenant")
+	public ResponseEntity<TenantResponseDTO> create(@Valid @RequestBody TenantRequestDTO dto) {
+		Tenant saved = service.create(mapper.toEntity(dto));
 		return ResponseEntity.status(HttpStatus.CREATED).body(mapper.toResponseDTO(saved));
 	}
 
 	@PutMapping("/{id}")
-	@Operation(summary = "Update pizzeria", description = "Updates an existing pizzeria")
-	public ResponseEntity<PizzeriaResponseDTO> update(@PathVariable Integer id, @Valid @RequestBody PizzeriaRequestDTO dto) {
+	@Operation(summary = "Update tenant", description = "Updates an existing tenant")
+	public ResponseEntity<TenantResponseDTO> update(@PathVariable Integer id, @Valid @RequestBody TenantRequestDTO dto) {
 		return ResponseEntity.ok(mapper.toResponseDTO(service.update(id, mapper.toEntity(dto))));
 	}
 
 	@DeleteMapping("/{id}")
-	@Operation(summary = "Delete pizzeria", description = "Deletes a pizzeria")
+	@Operation(summary = "Delete tenant", description = "Deletes a tenant")
 	public ResponseEntity<Void> delete(@PathVariable Integer id) {
 		service.delete(id);
 		return ResponseEntity.noContent().build();

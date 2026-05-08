@@ -42,10 +42,10 @@ public class CategoryController {
 	}
 
 	@GetMapping
-	@Operation(summary = "List categories", description = "Returns all categories, optionally filtered by pizzeria")
-	public ResponseEntity<List<CategoryResponseDTO>> findAll(@RequestParam(required = false) Integer pizzeriaId) {
-		List<Category> categories = pizzeriaId != null
-			? service.findByPizzeria(pizzeriaId)
+	@Operation(summary = "List categories", description = "Returns all categories, optionally filtered by tenant")
+	public ResponseEntity<List<CategoryResponseDTO>> findAll(@RequestParam(required = false) Integer tenantId) {
+		List<Category> categories = tenantId != null
+			? service.findByTenant(tenantId)
 			: service.findAll();
 		return ResponseEntity.ok(categories.stream().map(mapper::toResponseDTO).toList());
 	}

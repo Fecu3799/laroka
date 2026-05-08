@@ -7,9 +7,9 @@ import org.springframework.stereotype.Service;
 import com.laroka.backend.branch.entity.Branch;
 import com.laroka.backend.branch.exception.BranchNotFoundException;
 import com.laroka.backend.branch.repository.BranchRepository;
-import com.laroka.backend.pizzeria.entity.Pizzeria;
-import com.laroka.backend.pizzeria.exception.PizzeriaNotFoundException;
-import com.laroka.backend.pizzeria.repository.PizzeriaRepository;
+import com.laroka.backend.tenant.entity.Tenant;
+import com.laroka.backend.tenant.exception.TenantNotFoundException;
+import com.laroka.backend.tenant.repository.TenantRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -18,16 +18,16 @@ import lombok.RequiredArgsConstructor;
 public class BranchService {
 
 	private final BranchRepository repository;
-	private final PizzeriaRepository pizzeriaRepository;
+	private final TenantRepository tenantRepository;
 
 	public Branch findById(Integer id) {
 		return repository.findById(id)
 			.orElseThrow(() -> new BranchNotFoundException(id));
 	}
 
-	public List<Branch> findByPizzeria(Integer pizzeriaId) {
-		validatePizzeriaExists(pizzeriaId);
-		return repository.findByPizzeriaId(pizzeriaId);
+	public List<Branch> findByTenant(Integer tenantId) {
+		validateTenantExists(tenantId);
+		return repository.findByTenantId(tenantId);
 	}
 
 	public List<Branch> findAll() {
@@ -35,19 +35,19 @@ public class BranchService {
 	}
 
 	public Branch create(Branch branch) {
-		Pizzeria pizzeria = validatePizzeriaExists(branch.getPizzeria().getId());
-		branch.setPizzeria(pizzeria);
+		Tenant tenant = validateTenantExists(branch.getTenant().getId());
+		branch.setTenant(tenant);
 		return repository.save(branch);
 	}
 
 	public Branch update(Integer id, Branch updates) {
 		Branch branch = findById(id);
-		Pizzeria pizzeria = validatePizzeriaExists(updates.getPizzeria().getId());
+		Tenant tenant = validateTenantExists(updates.getTenant().getId());
 		branch.setName(updates.getName());
 		branch.setAddress(updates.getAddress());
 		branch.setEstimatedDeliveryMinutes(updates.getEstimatedDeliveryMinutes());
 		branch.setPhone(updates.getPhone());
-		branch.setPizzeria(pizzeria);
+		branch.setTenant(tenant);
 		return repository.save(branch);
 	}
 
@@ -55,8 +55,8 @@ public class BranchService {
 		repository.delete(findById(id));
 	}
 
-	private Pizzeria validatePizzeriaExists(Integer pizzeriaId) {
-		return pizzeriaRepository.findById(pizzeriaId)
-			.orElseThrow(() -> new PizzeriaNotFoundException(pizzeriaId));
+	private Tenant validateTenantExists(Integer tenantId) {
+		return tenantRepository.findById(tenantId)
+			.orElseThrow(() -> new TenantNotFoundException(tenantId));
 	}
 }
