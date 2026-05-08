@@ -192,9 +192,8 @@ public class OrderService {
             paymentRepository.save(Payment.builder()
                     .id(UUID.randomUUID())
                     .order(saved)
-                    .status(PaymentStatus.APPROVED)
+                    .status(PaymentStatus.PENDING)
                     .method(PaymentMethod.CASH)
-                    .paidAt(LocalDateTime.now())
                     .build());
         }
 
