@@ -8,6 +8,7 @@ const POLL_INTERVAL = 15_000
 const TERMINAL_STATUSES = ['DELIVERED', 'CANCELLED']
 
 const PROGRESS = {
+  PENDING_PAYMENT: 0,
   RECEIVED: 10,
   IN_PREPARATION: 30,
   ON_THE_WAY: 70,
@@ -16,6 +17,7 @@ const PROGRESS = {
 }
 
 const STATUS_LABELS = {
+  PENDING_PAYMENT: 'PAGO EN PROCESO',
   RECEIVED: 'RECIBIDO',
   IN_PREPARATION: 'EN PREPARACIÓN',
   ON_THE_WAY: 'EN CAMINO',
@@ -108,6 +110,7 @@ function OrderSlide({ orderId, order, isExpanded, items, itemsLoading, itemsErro
   }
 
   const progress = PROGRESS[order.status] ?? 10
+  const isPendingPayment = order.status === 'PENDING_PAYMENT'
   const isDelivery = order.orderType === 'DELIVERY'
   const steps = isDelivery ? DELIVERY_STEPS : TAKEAWAY_STEPS
   const historyMap = {}
@@ -117,8 +120,10 @@ function OrderSlide({ orderId, order, isExpanded, items, itemsLoading, itemsErro
     <div className={styles.slideContent}>
       <div className={styles.topRow}>
         <div className={styles.titleBlock}>
-          <span className={styles.title}>Pedido en proceso</span>
-          {estimatedDeliveryMinutes && (
+          <span className={styles.title}>
+            {order.status === 'PENDING_PAYMENT' ? 'Pago en proceso' : 'Pedido en proceso'}
+          </span>
+          {!isPendingPayment && estimatedDeliveryMinutes && (
             <span className={styles.eta}>Llega en ~{estimatedDeliveryMinutes} min</span>
           )}
         </div>
@@ -136,16 +141,18 @@ function OrderSlide({ orderId, order, isExpanded, items, itemsLoading, itemsErro
         )}
       </div>
 
-      <div className={styles.progressRow}>
-        <span className={styles.progressEmoji} aria-hidden="true">🏪</span>
-        <div className={styles.progressTrack}>
-          <div className={styles.progressFill} style={{ width: `${progress}%` }} />
-          <span className={styles.scooter} style={{ left: `${progress}%` }} aria-hidden="true">
-            🛵
-          </span>
+      {!isPendingPayment && (
+        <div className={styles.progressRow} data-testid="progress-bar">
+          <span className={styles.progressEmoji} aria-hidden="true">🏪</span>
+          <div className={styles.progressTrack}>
+            <div className={styles.progressFill} style={{ width: `${progress}%` }} />
+            <span className={styles.scooter} style={{ left: `${progress}%` }} aria-hidden="true">
+              🛵
+            </span>
+          </div>
+          <span className={styles.progressEmoji} aria-hidden="true">🏠</span>
         </div>
-        <span className={styles.progressEmoji} aria-hidden="true">🏠</span>
-      </div>
+      )}
 
       {isExpanded && (
         <div className={styles.expandPanel}>
@@ -220,12 +227,14 @@ function OrderSlide({ orderId, order, isExpanded, items, itemsLoading, itemsErro
         </div>
       )}
 
-      <button className={styles.expandBtn} onClick={onToggleExpand}>
-        {isExpanded ? 'OCULTAR DETALLES' : 'VER DETALLES'}
-        <span className={`${styles.expandChevron}${isExpanded ? ` ${styles.expandChevronOpen}` : ''}`}>
-          <ChevronIcon />
-        </span>
-      </button>
+      {!isPendingPayment && (
+        <button className={styles.expandBtn} onClick={onToggleExpand}>
+          {isExpanded ? 'OCULTAR DETALLES' : 'VER DETALLES'}
+          <span className={`${styles.expandChevron}${isExpanded ? ` ${styles.expandChevronOpen}` : ''}`}>
+            <ChevronIcon />
+          </span>
+        </button>
+      )}
     </div>
   )
 }

@@ -6,10 +6,12 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import com.laroka.backend.payment.dto.InitiatePaymentRequestDTO;
 import com.laroka.backend.payment.dto.InitiatePaymentResponseDTO;
 import com.laroka.backend.payment.dto.WebhookEventDTO;
+import com.laroka.backend.payment.gateway.PaymentGateway;
 import com.laroka.backend.payment.service.PaymentService;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -31,7 +33,13 @@ public class PaymentController {
     public ResponseEntity<InitiatePaymentResponseDTO> initiatePayment(
             @Valid @RequestBody InitiatePaymentRequestDTO dto) {
 
-        String paymentLink = paymentService.initiatePayment(dto.getOrderId());
+        PaymentGateway.BackUrls backUrls = null;
+        if (dto.getBackUrls() != null) {
+            InitiatePaymentRequestDTO.BackUrls dtoUrls = dto.getBackUrls();
+            backUrls = new PaymentGateway.BackUrls(
+                    dtoUrls.getSuccess(), dtoUrls.getFailure(), dtoUrls.getPending());
+        }
+        String paymentLink = paymentService.initiatePayment(dto.getOrderId(), backUrls);
         return ResponseEntity.ok(InitiatePaymentResponseDTO.builder()
                 .paymentLink(paymentLink)
                 .build());
@@ -43,9 +51,10 @@ public class PaymentController {
     public ResponseEntity<Void> handleWebhook(
             @RequestHeader(value = "x-signature", required = false) String xSignature,
             @RequestHeader(value = "x-request-id", required = false) String xRequestId,
+            @RequestParam(value = "data.id", required = false) String dataId,
             @RequestBody WebhookEventDTO event) {
 
-        paymentService.processWebhook(xSignature, xRequestId, event);
+        paymentService.processWebhook(xSignature, xRequestId, dataId, event);
         return ResponseEntity.ok().build();
     }
 }

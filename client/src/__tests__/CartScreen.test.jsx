@@ -1,7 +1,11 @@
-import { describe, it, expect, vi } from 'vitest'
-import { render, screen, act, fireEvent } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render, screen, act, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { CartScreen } from '../components/CartScreen'
+
+vi.mock('../services/paymentsService', () => ({
+  initiatePayment: vi.fn(() => new Promise(() => {})),
+}))
 
 vi.mock('../hooks/usePreferredBranch', () => ({
   usePreferredBranch: () => ({
@@ -80,5 +84,54 @@ describe('CartScreen', () => {
     renderCart()
     // 2000*2 + 1500*1 = 5500
     expect(screen.getByText('$5.500')).toBeInTheDocument()
+  })
+})
+
+describe('CartScreen — paymentFailure recovery', () => {
+  const FAILURE_DATA = {
+    orderId: 'order-42',
+    formData: {
+      orderType: 'takeaway',
+      nombre: 'Juan',
+      telefono: '1122334455',
+      direccion: '',
+      notas: '',
+    },
+  }
+
+  beforeEach(() => sessionStorage.clear())
+  afterEach(() => sessionStorage.clear())
+
+  it('muestra el checkout desde el primer render cuando paymentFailure está presente', () => {
+    renderCart(ITEMS, { paymentFailure: FAILURE_DATA })
+    expect(screen.getByText('TUS DATOS')).toBeInTheDocument()
+  })
+
+  it('muestra FailureModal desde el primer render cuando paymentFailure está presente', () => {
+    renderCart(ITEMS, { paymentFailure: FAILURE_DATA })
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByText('Pago rechazado')).toBeInTheDocument()
+  })
+
+  it('persiste laroka_checkout_recovery en sessionStorage al confirmar con MercadoPago', async () => {
+    const user = userEvent.setup()
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ orderId: 'order-99' }),
+    })
+
+    renderCart(ITEMS, { paymentFailure: FAILURE_DATA })
+
+    await user.click(screen.getByRole('button', { name: /mercadopago/i }))
+    await user.click(screen.getByRole('button', { name: /ir a pagar/i }))
+
+    await waitFor(() => {
+      const raw = sessionStorage.getItem('laroka_checkout_recovery')
+      expect(raw).not.toBeNull()
+      const recovery = JSON.parse(raw)
+      expect(recovery.orderId).toBe('order-99')
+      expect(recovery.formData.nombre).toBe('Juan')
+      expect(recovery.items).toHaveLength(ITEMS.length)
+    })
   })
 })

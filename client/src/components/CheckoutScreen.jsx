@@ -70,17 +70,18 @@ function MercadoPagoIcon() {
   )
 }
 
-export function CheckoutScreen({ onBack, onConfirm, items = [] }) {
+export function CheckoutScreen({ onBack, onConfirm, items = [], initialData = null }) {
   const { deliveryFee, serviceFee } = usePreferredBranch()
-  const [orderType, setOrderType] = useState('delivery')
-  const [nombre, setNombre] = useState('')
-  const [telefono, setTelefono] = useState('')
-  const [direccion, setDireccion] = useState('')
-  const [notas, setNotas] = useState('')
+  const [orderType, setOrderType] = useState(initialData?.orderType || 'delivery')
+  const [nombre, setNombre] = useState(initialData?.nombre || '')
+  const [telefono, setTelefono] = useState(initialData?.telefono || '')
+  const [direccion, setDireccion] = useState(initialData?.direccion || '')
+  const [notas, setNotas] = useState(initialData?.notas || '')
   const [paymentMethod, setPaymentMethod] = useState('efectivo')
   const [summaryOpen, setSummaryOpen] = useState(false)
   const [errors, setErrors] = useState({ nombre: '', telefono: '', direccion: '' })
   const [submitting, setSubmitting] = useState(false)
+  const [mpError, setMpError] = useState(null)
 
   const isDelivery = orderType === 'delivery'
   const isEfectivo = paymentMethod === 'efectivo'
@@ -92,10 +93,6 @@ export function CheckoutScreen({ onBack, onConfirm, items = [] }) {
   const isFormValid = nombre.trim() && telefono.trim() && (!isDelivery || direccion.trim())
 
   const handleConfirm = async () => {
-    if (!isEfectivo) {
-      // TODO: Sprint 4-F — initiate payment flow
-      return
-    }
     const newErrors = {
       nombre: nombre.trim() ? '' : 'Ingresá tu nombre',
       telefono: telefono.trim() ? '' : 'Ingresá tu teléfono',
@@ -103,9 +100,21 @@ export function CheckoutScreen({ onBack, onConfirm, items = [] }) {
     }
     setErrors(newErrors)
     if (Object.values(newErrors).some(Boolean)) return
+    setMpError(null)
     setSubmitting(true)
     try {
-      await onConfirm({ orderType, nombre: nombre.trim(), telefono: telefono.trim(), direccion: direccion.trim(), notas: notas.trim(), paymentMethod: 'CASH' })
+      await onConfirm({
+        orderType,
+        nombre: nombre.trim(),
+        telefono: telefono.trim(),
+        direccion: direccion.trim(),
+        notas: notas.trim(),
+        paymentMethod: isEfectivo ? 'CASH' : 'MERCADOPAGO',
+      })
+    } catch {
+      if (!isEfectivo) {
+        setMpError('Hubo un error al iniciar el pago. Intentá nuevamente.')
+      }
     } finally {
       setSubmitting(false)
     }
@@ -254,6 +263,9 @@ export function CheckoutScreen({ onBack, onConfirm, items = [] }) {
 
       {/* CTA fijo */}
       <div className={styles.ctaWrapper}>
+        {mpError && (
+          <p className={styles.mpError}>{mpError}</p>
+        )}
         <div className={styles.ctaTotalRow}>
           <span className={styles.ctaTotalLabel}>TOTAL</span>
           <span className={styles.ctaTotalAmount}>{formatPrice(total)}</span>
@@ -263,8 +275,10 @@ export function CheckoutScreen({ onBack, onConfirm, items = [] }) {
           style={(!isFormValid || submitting) ? { opacity: 0.5, pointerEvents: 'none' } : undefined}
           onClick={handleConfirm}
         >
-          <span className={styles.ctaBtnText}>{isEfectivo ? 'CONFIRMAR PEDIDO' : 'IR A PAGAR'}</span>
-          <ArrowRightIcon />
+          <span className={styles.ctaBtnText}>
+            {submitting && !isEfectivo ? 'PROCESANDO...' : isEfectivo ? 'CONFIRMAR PEDIDO' : 'IR A PAGAR'}
+          </span>
+          {!(submitting && !isEfectivo) && <ArrowRightIcon />}
         </button>
       </div>
     </div>

@@ -426,3 +426,12 @@
   text-transform: uppercase;
   color: var(--co-gold);
 }
+
+.mpError {
+  font-family: 'Inria Sans', sans-serif;
+  font-size: 13px;
+  color: var(--color-danger);
+  margin: 0;
+  text-align: center;
+  line-height: 1.4;
+}

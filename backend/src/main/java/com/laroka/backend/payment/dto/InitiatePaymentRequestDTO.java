@@ -10,4 +10,13 @@ public class InitiatePaymentRequestDTO {
 
     @NotNull
     private UUID orderId;
+
+    private BackUrls backUrls;
+
+    @Data
+    public static class BackUrls {
+        private String success;
+        private String failure;
+        private String pending;
+    }
 }

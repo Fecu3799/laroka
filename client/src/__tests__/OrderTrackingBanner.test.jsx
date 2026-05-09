@@ -133,3 +133,45 @@ describe('OrderTrackingBanner', () => {
     })
   })
 })
+
+describe('OrderTrackingBanner — status PENDING_PAYMENT', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+    localStorage.clear()
+  })
+
+  function setup() {
+    seedOrder('order-pp', 1)
+    mockStatus('order-pp', {
+      status: 'PENDING_PAYMENT',
+      orderType: 'DELIVERY',
+      history: [],
+    })
+    render(<OrderTrackingBanner branchId={1} />)
+  }
+
+  it('muestra el texto "Pago en proceso"', async () => {
+    setup()
+    await waitFor(() => {
+      expect(screen.getByText('Pago en proceso')).toBeInTheDocument()
+    })
+  })
+
+  it('no renderiza la barra de progreso', async () => {
+    setup()
+    await waitFor(() => screen.getByText('Pago en proceso'))
+    expect(document.querySelector('[data-testid="progress-bar"]')).not.toBeInTheDocument()
+  })
+
+  it('no renderiza el tiempo estimado de entrega', async () => {
+    setup()
+    await waitFor(() => screen.getByText('Pago en proceso'))
+    expect(screen.queryByText(/llega en/i)).not.toBeInTheDocument()
+  })
+
+  it('no renderiza el botón de detalles', async () => {
+    setup()
+    await waitFor(() => screen.getByText('Pago en proceso'))
+    expect(screen.queryByRole('button', { name: /ver detalles/i })).not.toBeInTheDocument()
+  })
+})

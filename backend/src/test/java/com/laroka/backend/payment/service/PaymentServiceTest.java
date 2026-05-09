@@ -90,11 +90,11 @@ class PaymentServiceTest {
 
         when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
         when(paymentRepository.existsByOrderIdAndStatusIn(eq(orderId), any())).thenReturn(false);
-        when(paymentGateway.createPreference(eq(orderId), any()))
+        when(paymentGateway.createPreference(eq(orderId), any(), any()))
                 .thenReturn("https://mp.com/pay?pref_id=pref123");
         when(paymentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        String link = service.initiatePayment(orderId);
+        String link = service.initiatePayment(orderId, null);
 
         assertThat(link).isEqualTo("https://mp.com/pay?pref_id=pref123");
         verify(paymentRepository).save(any(Payment.class));
@@ -104,7 +104,7 @@ class PaymentServiceTest {
 
     @Test
     void processWebhook_merchantOrderType_isIgnoredSilently() {
-        service.processWebhook(null, null, event("merchant_order", "order-123"));
+        service.processWebhook(null, null, null, event("merchant_order", "order-123"));
 
         verifyNoInteractions(paymentGateway, paymentRepository, orderService, notificationService);
     }
@@ -129,7 +129,7 @@ class PaymentServiceTest {
                 .id(orderId).status(OrderStatus.PENDING_PAYMENT).branch(branch).build();
         when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
 
-        service.processWebhook(null, null, event("payment", paymentId));
+        service.processWebhook(null, null, paymentId, event("payment", paymentId));
 
         assertThat(pending.getStatus()).isEqualTo(PaymentStatus.APPROVED);
         assertThat(pending.getPaidAt()).isNotNull();
@@ -152,7 +152,7 @@ class PaymentServiceTest {
         when(paymentRepository.findByOrderId(orderId)).thenReturn(Optional.of(pending));
         when(paymentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        service.processWebhook(null, null, event("payment", paymentId));
+        service.processWebhook(null, null, paymentId, event("payment", paymentId));
 
         assertThat(pending.getStatus()).isEqualTo(PaymentStatus.REJECTED);
         verify(orderService, never()).transitionStatus(any(), any());
@@ -167,7 +167,7 @@ class PaymentServiceTest {
         when(paymentRepository.findByMercadopagoPaymentId(paymentId))
                 .thenReturn(Optional.of(approvedPayment(paymentId)));
 
-        service.processWebhook(null, null, event("payment", paymentId));
+        service.processWebhook(null, null, paymentId, event("payment", paymentId));
 
         verify(paymentGateway, never()).fetchPayment(any());
         verify(orderService, never()).transitionStatus(any(), any());
@@ -181,7 +181,7 @@ class PaymentServiceTest {
         ReflectionTestUtils.setField(service, "webhookSecret", "test-secret");
 
         assertThatThrownBy(() ->
-                service.processWebhook("ts=12345,v1=badhash", "req-id-1", event("payment", "mp-pay-004")))
+                service.processWebhook("ts=12345,v1=badhash", "req-id-1", null, event("payment", "mp-pay-004")))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("inválida");
     }
@@ -199,7 +199,7 @@ class PaymentServiceTest {
         when(paymentRepository.findByOrderId(orderId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() ->
-                service.processWebhook(null, null, event("payment", paymentId)))
+                service.processWebhook(null, null, paymentId, event("payment", paymentId)))
                 .isInstanceOf(EntityNotFoundException.class);
     }
 }

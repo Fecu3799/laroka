@@ -1,0 +1,66 @@
+.screen {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-primary);
+  padding: 24px;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+  max-width: 320px;
+}
+
+.iconWrapper {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.iconDanger {
+  color: var(--color-danger);
+}
+
+.iconAccent {
+  color: var(--accent);
+}
+
+.title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700;
+  font-size: 28px;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.message {
+  font-family: 'Inria Sans', sans-serif;
+  font-size: 16px;
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.btn {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: 0.06em;
+  background: var(--accent);
+  color: var(--bg-primary);
+  border: none;
+  border-radius: 12px;
+  padding: 14px 32px;
+  cursor: pointer;
+  margin-top: 8px;
+}

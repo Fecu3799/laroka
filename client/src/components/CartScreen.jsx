@@ -1,7 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { CheckoutScreen } from './CheckoutScreen'
 import { ConfirmationScreen } from './ConfirmationScreen'
+import { FailureModal } from './PaymentModals'
 import { usePreferredBranch } from '../hooks/usePreferredBranch'
+import { addActiveOrder } from '../utils/activeOrders'
+import { initiatePayment } from '../services/paymentsService'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080'
 
@@ -137,11 +140,20 @@ function ExtraCard({ extra, cartQty, onAdd }) {
   )
 }
 
-export function CartScreen({ items, extras = [], onBack, onRemove, onUpdateQty, onClear, onAddExtra }) {
+export function CartScreen({ items, extras = [], onBack, onRemove, onUpdateQty, onClear, onAddExtra, paymentFailure = null, onPaymentFailureConsumed = () => {} }) {
   const { preferredBranchId } = usePreferredBranch()
   const [confirmClear, setConfirmClear] = useState(false)
-  const [showCheckout, setShowCheckout] = useState(false)
+  const [showCheckout, setShowCheckout] = useState(() => !!paymentFailure)
   const [confirmedOrderId, setConfirmedOrderId] = useState(null)
+  const [showFailureModal, setShowFailureModal] = useState(() => !!paymentFailure)
+  const [failureOrderId] = useState(() => paymentFailure?.orderId || null)
+  const [checkoutInitialData, setCheckoutInitialData] = useState(() => paymentFailure?.formData || null)
+
+  useEffect(() => {
+    if (!paymentFailure) return
+    onPaymentFailureConsumed()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paymentFailure])
 
   const handleConfirm = async (formData) => {
     const payload = {
@@ -159,6 +171,28 @@ export function CartScreen({ items, extras = [], onBack, onRemove, onUpdateQty, 
     })
     if (!res.ok) throw new Error('Error al crear el pedido')
     const data = await res.json()
+
+    if (formData.paymentMethod === 'MERCADOPAGO') {
+      addActiveOrder(data.orderId, preferredBranchId)
+      sessionStorage.setItem('laroka_checkout_recovery', JSON.stringify({
+        orderId: data.orderId,
+        items: items.map(i => ({
+          id: i.id, name: i.name, price: i.price, qty: i.qty,
+          imageUrl: i.imageUrl || null, description: i.description || null,
+        })),
+        formData: {
+          orderType: formData.orderType,
+          nombre: formData.nombre,
+          telefono: formData.telefono,
+          direccion: formData.direccion,
+          notas: formData.notas,
+        },
+      }))
+      const paymentLink = await initiatePayment(data.orderId)
+      window.location.href = paymentLink
+      return
+    }
+
     onClear()
     setConfirmedOrderId(data.orderId)
   }
@@ -168,7 +202,24 @@ export function CartScreen({ items, extras = [], onBack, onRemove, onUpdateQty, 
   }
 
   if (showCheckout) {
-    return <CheckoutScreen items={items} onBack={() => setShowCheckout(false)} onConfirm={handleConfirm} />
+    return (
+      <>
+        <CheckoutScreen
+          items={items}
+          onBack={() => { setShowCheckout(false); setCheckoutInitialData(null) }}
+          onConfirm={handleConfirm}
+          initialData={checkoutInitialData}
+        />
+        {showFailureModal && (
+          <FailureModal
+            orderId={failureOrderId}
+            formData={checkoutInitialData}
+            cartItems={items}
+            onClose={() => setShowFailureModal(false)}
+          />
+        )}
+      </>
+    )
   }
 
   const total = items.reduce((sum, i) => sum + i.price * i.qty, 0)
