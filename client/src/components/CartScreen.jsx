@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { CheckoutScreen } from './CheckoutScreen'
 import { ConfirmationScreen } from './ConfirmationScreen'
 import { usePreferredBranch } from '../hooks/usePreferredBranch'
+import { addActiveOrder } from '../utils/activeOrders'
+import { initiatePayment } from '../services/paymentsService'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080'
 
@@ -159,6 +161,14 @@ export function CartScreen({ items, extras = [], onBack, onRemove, onUpdateQty, 
     })
     if (!res.ok) throw new Error('Error al crear el pedido')
     const data = await res.json()
+
+    if (formData.paymentMethod === 'MERCADOPAGO') {
+      addActiveOrder(data.orderId, preferredBranchId)
+      const paymentLink = await initiatePayment(data.orderId)
+      window.location.href = paymentLink
+      return
+    }
+
     onClear()
     setConfirmedOrderId(data.orderId)
   }

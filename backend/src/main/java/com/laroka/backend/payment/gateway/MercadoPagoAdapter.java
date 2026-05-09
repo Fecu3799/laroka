@@ -34,8 +34,8 @@ public class MercadoPagoAdapter implements PaymentGateway {
     }
 
     @Override
-    public String createPreference(UUID orderId, BigDecimal amount) {
-        log.info("createPreference: orderId={}, amount={}", orderId, amount);
+    public String createPreference(UUID orderId, BigDecimal amount, PaymentGateway.BackUrls backUrls) {
+        log.info("createPreference: orderId={}, amount={}, backUrls={}", orderId, amount, backUrls != null);
 
         if (accessToken == null || accessToken.isBlank()) {
             log.warn("createPreference: accessToken not configured, returning sandbox URL");
@@ -49,11 +49,24 @@ public class MercadoPagoAdapter implements PaymentGateway {
                 "currency_id", "ARS"
         );
 
-        Map<String, Object> body = Map.of(
-                "items", List.of(item),
-                "external_reference", orderId.toString(),
-                "notification_url", notificationUrl + "/payments/webhook"
-        );
+        Map<String, Object> body = new java.util.LinkedHashMap<>();
+        body.put("items", List.of(item));
+        body.put("external_reference", orderId.toString());
+        body.put("notification_url", notificationUrl + "/payments/webhook");
+
+        log.info("createPreference: backUrls detail — success={}, failure={}, pending={}", 
+                    backUrls != null ? backUrls.success() : "NULL",
+                    backUrls != null ? backUrls.failure() : "NULL", 
+                    backUrls != null ? backUrls.pending() : "NULL"
+                );
+
+        if (backUrls != null) {
+            body.put("back_urls", Map.of(
+                    "success", backUrls.success(),
+                    "failure", backUrls.failure(),
+                    "pending", backUrls.pending()
+            ));
+        }
 
         try {
             MpPreferenceResponse response = restClient.post()

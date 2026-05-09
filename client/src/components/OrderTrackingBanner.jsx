@@ -8,6 +8,7 @@ const POLL_INTERVAL = 15_000
 const TERMINAL_STATUSES = ['DELIVERED', 'CANCELLED']
 
 const PROGRESS = {
+  PENDING_PAYMENT: 0,
   RECEIVED: 10,
   IN_PREPARATION: 30,
   ON_THE_WAY: 70,
@@ -16,6 +17,7 @@ const PROGRESS = {
 }
 
 const STATUS_LABELS = {
+  PENDING_PAYMENT: 'PAGO EN PROCESO',
   RECEIVED: 'RECIBIDO',
   IN_PREPARATION: 'EN PREPARACIÓN',
   ON_THE_WAY: 'EN CAMINO',
@@ -117,7 +119,9 @@ function OrderSlide({ orderId, order, isExpanded, items, itemsLoading, itemsErro
     <div className={styles.slideContent}>
       <div className={styles.topRow}>
         <div className={styles.titleBlock}>
-          <span className={styles.title}>Pedido en proceso</span>
+          <span className={styles.title}>
+            {order.status === 'PENDING_PAYMENT' ? 'Pago en proceso' : 'Pedido en proceso'}
+          </span>
           {estimatedDeliveryMinutes && (
             <span className={styles.eta}>Llega en ~{estimatedDeliveryMinutes} min</span>
           )}

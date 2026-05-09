@@ -47,7 +47,7 @@ public class PaymentService {
     private String webhookSecret;
 
     @Transactional
-    public String initiatePayment(UUID orderId) {
+    public String initiatePayment(UUID orderId, PaymentGateway.BackUrls backUrls) {
         log.info("initiatePayment: orderId={}, totalAmount will be resolved from order", orderId);
 
         Order order = orderRepository.findById(orderId)
@@ -65,7 +65,7 @@ public class PaymentService {
             throw new BusinessException("Ya existe un pago activo para este pedido");
         }
 
-        String paymentLink = paymentGateway.createPreference(orderId, order.getTotalAmount());
+        String paymentLink = paymentGateway.createPreference(orderId, order.getTotalAmount(), backUrls);
         String preferenceId = extractPreferenceId(paymentLink);
 
         Payment payment = Payment.builder()

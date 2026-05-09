@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 import { SplashScreen } from './components/SplashScreen'
 import { BranchSelection } from './components/BranchSelection'
 import { MenuScreen } from './components/MenuScreen'
+import { PaymentResultScreen } from './components/PaymentResultScreen'
 import { usePreferredBranch } from './hooks/usePreferredBranch'
 import { useTheme } from './hooks/useTheme'
 import './App.css'
@@ -11,7 +12,9 @@ const SCREEN_EXIT_DURATION = 320
 function App() {
   const { preferredBranchId, preferredBranchName, saveBranch, clearBranch } = usePreferredBranch()
   useTheme()
-  const [screen, setScreen] = useState('splash')
+  const [screen, setScreen] = useState(() =>
+    window.location.pathname === '/payment/result' ? 'paymentResult' : 'splash'
+  )
   const [selectedBranchId, setSelectedBranchId] = useState(preferredBranchId)
   const [selectedBranchName, setSelectedBranchName] = useState(preferredBranchName)
   const [exiting, setExiting] = useState(false)
@@ -46,6 +49,20 @@ function App() {
     setSelectedBranchId(branch.id)
     setSelectedBranchName(branch.name)
   }, [saveBranch])
+
+  const handlePaymentResultComplete = useCallback(() => {
+    window.history.replaceState({}, '', '/')
+    setScreen('menu')
+  }, [])
+
+  if (screen === 'paymentResult') {
+    return (
+      <PaymentResultScreen
+        branchId={selectedBranchId}
+        onComplete={handlePaymentResultComplete}
+      />
+    )
+  }
 
   if (screen === 'splash') {
     return <SplashScreen onComplete={handleSplashComplete} />

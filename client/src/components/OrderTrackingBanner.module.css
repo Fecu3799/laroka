@@ -128,6 +128,12 @@
   border: 1px solid transparent;
 }
 
+.badge[data-status="PENDING_PAYMENT"] {
+  background: color-mix(in srgb, var(--text-secondary) 12%, transparent);
+  color: var(--text-secondary);
+  border-color: color-mix(in srgb, var(--text-secondary) 20%, transparent);
+}
+
 .badge[data-status="RECEIVED"] {
   background: color-mix(in srgb, var(--border) 18%, transparent);
   color: var(--border);
