@@ -146,7 +146,7 @@ export function CartScreen({ items, extras = [], onBack, onRemove, onUpdateQty, 
   const [showCheckout, setShowCheckout] = useState(() => !!paymentFailure)
   const [confirmedOrderId, setConfirmedOrderId] = useState(null)
   const [showFailureModal, setShowFailureModal] = useState(() => !!paymentFailure)
-  const [failureOrderId, setFailureOrderId] = useState(() => paymentFailure?.orderId || null)
+  const [failureOrderId] = useState(() => paymentFailure?.orderId || null)
   const [checkoutInitialData, setCheckoutInitialData] = useState(() => paymentFailure?.formData || null)
 
   useEffect(() => {
