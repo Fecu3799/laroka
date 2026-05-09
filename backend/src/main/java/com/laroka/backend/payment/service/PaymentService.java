@@ -30,7 +30,9 @@ import com.laroka.backend.payment.repository.PaymentRepository;
 import com.laroka.backend.shared.exception.BusinessException;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class PaymentService {
@@ -46,8 +48,12 @@ public class PaymentService {
 
     @Transactional
     public String initiatePayment(UUID orderId) {
+        log.info("initiatePayment: orderId={}, totalAmount will be resolved from order", orderId);
+
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new OrderNotFoundException(orderId));
+
+        log.info("initiatePayment: orderId={}, totalAmount={}", orderId, order.getTotalAmount());
 
         if (order.getStatus() != OrderStatus.PENDING_PAYMENT) {
             throw new BusinessException("El pedido no está en estado PENDING_PAYMENT");
@@ -71,27 +77,33 @@ public class PaymentService {
                 .build();
 
         paymentRepository.save(payment);
+        log.info("initiatePayment: payment created and saved — orderId={}, preferenceId={}", orderId, preferenceId);
         return paymentLink;
     }
 
     @Transactional
-    public void processWebhook(String xSignature, String xRequestId, WebhookEventDTO event) {
+    public void processWebhook(String xSignature, String xRequestId, String dataId, WebhookEventDTO event) {
+        log.info("processWebhook: type={}, dataId={}", event.getType(), dataId);
+
         if (!"payment".equals(event.getType())) {
+            log.warn("processWebhook: ignored event type={}", event.getType());
             return;
         }
 
-        String paymentId = String.valueOf(event.getData().get("id"));
+        String paymentId = String.valueOf(dataId);
 
         validateWebhookSignature(xSignature, xRequestId, paymentId);
 
-        // Idempotency: skip if this payment ID was already processed to a final state
         Optional<Payment> existingByPaymentId = paymentRepository.findByMercadopagoPaymentId(paymentId);
         if (existingByPaymentId.isPresent()
                 && existingByPaymentId.get().getStatus() != PaymentStatus.PENDING) {
+            log.warn("processWebhook: duplicate webhook ignored — paymentId={}, currentStatus={}", paymentId, existingByPaymentId.get().getStatus());
             return;
         }
 
         PaymentGateway.PaymentInfo info = paymentGateway.fetchPayment(paymentId);
+        log.info("processWebhook: fetchPayment result — status={}, externalReference={}", info.status(), info.externalReference());
+
         PaymentStatus newStatus = mapMpStatus(info.status());
         UUID orderId = UUID.fromString(info.externalReference());
 
@@ -99,19 +111,23 @@ public class PaymentService {
                 paymentRepository.findByOrderId(orderId)
                         .orElseThrow(() -> new PaymentNotFoundException(orderId)));
 
+        log.info("processWebhook: updating payment — paymentId={}, newStatus={}", payment.getId(), newStatus);
         payment.setMercadopagoPaymentId(paymentId);
         payment.setStatus(newStatus);
         if (newStatus == PaymentStatus.APPROVED) {
             payment.setPaidAt(LocalDateTime.now());
         }
         paymentRepository.save(payment);
+        log.info("processWebhook: payment updated — paymentId={}, newStatus={}", payment.getId(), newStatus);
 
         if (newStatus == PaymentStatus.APPROVED) {
             Order order = orderRepository.findByIdWithBranch(orderId)
                     .orElseThrow(() -> new OrderNotFoundException(orderId));
 
             if (order.getStatus() == OrderStatus.PENDING_PAYMENT) {
+                log.info("processWebhook: transitioning order to RECEIVED — orderId={}", orderId);
                 orderService.transitionStatus(orderId, OrderStatus.RECEIVED);
+                log.info("processWebhook: order transitioned to RECEIVED — orderId={}", orderId);
                 notificationService.sendNewOrderEvent(order.getBranch().getId(), orderId);
             }
         }

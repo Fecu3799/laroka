@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import com.laroka.backend.payment.dto.InitiatePaymentRequestDTO;
 import com.laroka.backend.payment.dto.InitiatePaymentResponseDTO;
@@ -43,9 +44,10 @@ public class PaymentController {
     public ResponseEntity<Void> handleWebhook(
             @RequestHeader(value = "x-signature", required = false) String xSignature,
             @RequestHeader(value = "x-request-id", required = false) String xRequestId,
+            @RequestParam(value = "data.id", required = false) String dataId,
             @RequestBody WebhookEventDTO event) {
 
-        paymentService.processWebhook(xSignature, xRequestId, event);
+        paymentService.processWebhook(xSignature, xRequestId, dataId, event);
         return ResponseEntity.ok().build();
     }
 }
