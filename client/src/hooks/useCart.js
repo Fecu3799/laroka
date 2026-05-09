@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react'
 
-export function useCart() {
-  const [items, setItems] = useState([])
+export function useCart(initialItems = []) {
+  const [items, setItems] = useState(initialItems)
 
   const addItem = useCallback((product, qty = 1) => {
     setItems(prev => {

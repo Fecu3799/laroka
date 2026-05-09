@@ -70,13 +70,13 @@ function MercadoPagoIcon() {
   )
 }
 
-export function CheckoutScreen({ onBack, onConfirm, items = [] }) {
+export function CheckoutScreen({ onBack, onConfirm, items = [], initialData = null }) {
   const { deliveryFee, serviceFee } = usePreferredBranch()
-  const [orderType, setOrderType] = useState('delivery')
-  const [nombre, setNombre] = useState('')
-  const [telefono, setTelefono] = useState('')
-  const [direccion, setDireccion] = useState('')
-  const [notas, setNotas] = useState('')
+  const [orderType, setOrderType] = useState(initialData?.orderType || 'delivery')
+  const [nombre, setNombre] = useState(initialData?.nombre || '')
+  const [telefono, setTelefono] = useState(initialData?.telefono || '')
+  const [direccion, setDireccion] = useState(initialData?.direccion || '')
+  const [notas, setNotas] = useState(initialData?.notas || '')
   const [paymentMethod, setPaymentMethod] = useState('efectivo')
   const [summaryOpen, setSummaryOpen] = useState(false)
   const [errors, setErrors] = useState({ nombre: '', telefono: '', direccion: '' })

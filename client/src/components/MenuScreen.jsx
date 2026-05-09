@@ -112,7 +112,7 @@ function ComingSoon() {
   )
 }
 
-export function MenuScreen({ branchId, branchName, onSwitchBranch }) {
+export function MenuScreen({ branchId, branchName, onSwitchBranch, paymentFailureRecovery = null, onPaymentFailureConsumed = () => {} }) {
   const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -120,17 +120,34 @@ export function MenuScreen({ branchId, branchName, onSwitchBranch }) {
   const [activeCategoryIndex, setActiveCategoryIndex] = useState(0)
   const [swipeDirection, setSwipeDirection] = useState('right')
   const [searchQuery, setSearchQuery] = useState('')
-  const [activeTab, setActiveTab] = useState('menu')
+  const [activeTab, setActiveTab] = useState(() => paymentFailureRecovery ? 'cart' : 'menu')
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [branches, setBranches] = useState([])
   const [selectedProduct, setSelectedProduct] = useState(null)
+  const [cartFailureData, setCartFailureData] = useState(() =>
+    paymentFailureRecovery
+      ? { orderId: paymentFailureRecovery.orderId, formData: paymentFailureRecovery.formData }
+      : null
+  )
   const retryRef = useRef(null)
   const prevCategoryIndexRef = useRef(0)
-  const { items, addItem, removeItem, updateQty, clearCart, count } = useCart()
+  const { items, addItem, removeItem, updateQty, clearCart, count } = useCart(
+    paymentFailureRecovery?.items?.map(i => ({ ...i })) || []
+  )
   const [activeBranchIds, setActiveBranchIds] = useState(() => readActiveBranchIds())
 
   const syncActiveBranchIds = useCallback(() => {
     setActiveBranchIds(readActiveBranchIds())
+  }, [])
+
+  useEffect(() => {
+    if (!paymentFailureRecovery) return
+    onPaymentFailureConsumed()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paymentFailureRecovery])
+
+  const handleCartFailureConsumed = useCallback(() => {
+    setCartFailureData(null)
   }, [])
 
   useEffect(() => {
@@ -318,6 +335,8 @@ export function MenuScreen({ branchId, branchName, onSwitchBranch }) {
             onUpdateQty={updateQty}
             onClear={clearCart}
             onAddExtra={addItem}
+            paymentFailure={cartFailureData}
+            onPaymentFailureConsumed={handleCartFailureConsumed}
           />
         ) : isProfileTab ? (
           <ComingSoon />
