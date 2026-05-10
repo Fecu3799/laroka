@@ -128,7 +128,7 @@ public class PaymentService {
                 log.info("processWebhook: transitioning order to RECEIVED — orderId={}", orderId);
                 orderService.transitionStatus(orderId, OrderStatus.RECEIVED);
                 log.info("processWebhook: order transitioned to RECEIVED — orderId={}", orderId);
-                notificationService.sendNewOrderEvent(order.getBranch().getId(), orderId);
+                notificationService.sendNewOrderEvent(order.getBranch().getId(), orderId, order.getCreatedAt());
             }
         }
     }

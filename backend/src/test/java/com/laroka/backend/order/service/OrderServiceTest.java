@@ -54,6 +54,7 @@ class OrderServiceTest {
     @Mock private BranchProductRepository branchProductRepository;
     @Mock private IdempotencyStore idempotencyStore;
     @Mock private PaymentRepository paymentRepository;
+    @Mock private com.laroka.backend.notification.service.NotificationService notificationService;
 
     @InjectMocks
     private OrderService service;

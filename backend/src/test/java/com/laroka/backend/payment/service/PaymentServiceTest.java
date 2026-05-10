@@ -134,7 +134,7 @@ class PaymentServiceTest {
         assertThat(pending.getStatus()).isEqualTo(PaymentStatus.APPROVED);
         assertThat(pending.getPaidAt()).isNotNull();
         verify(orderService).transitionStatus(orderId, OrderStatus.RECEIVED);
-        verify(notificationService).sendNewOrderEvent(1, orderId);
+        verify(notificationService).sendNewOrderEvent(eq(1), eq(orderId), any());
     }
 
     // --- processWebhook: rejected ---
@@ -156,7 +156,7 @@ class PaymentServiceTest {
 
         assertThat(pending.getStatus()).isEqualTo(PaymentStatus.REJECTED);
         verify(orderService, never()).transitionStatus(any(), any());
-        verify(notificationService, never()).sendNewOrderEvent(any(), any());
+        verify(notificationService, never()).sendNewOrderEvent(any(), any(), any());
     }
 
     // --- processWebhook: duplicate ---
@@ -171,7 +171,7 @@ class PaymentServiceTest {
 
         verify(paymentGateway, never()).fetchPayment(any());
         verify(orderService, never()).transitionStatus(any(), any());
-        verify(notificationService, never()).sendNewOrderEvent(any(), any());
+        verify(notificationService, never()).sendNewOrderEvent(any(), any(), any());
     }
 
     // --- processWebhook: invalid signature ---

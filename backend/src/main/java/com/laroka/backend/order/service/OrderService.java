@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import com.laroka.backend.notification.service.NotificationService;
 import com.laroka.backend.payment.entity.Payment;
 import com.laroka.backend.payment.entity.PaymentStatus;
 import com.laroka.backend.payment.repository.PaymentRepository;
@@ -52,6 +53,7 @@ public class OrderService {
     private final BranchProductRepository branchProductRepository;
     private final IdempotencyStore idempotencyStore;
     private final PaymentRepository paymentRepository;
+    private final NotificationService notificationService;
 
     @Transactional
     public OrderCreationResult createOrder(Order order, List<OrderItem> items,
@@ -255,6 +257,8 @@ public class OrderService {
         if (idempotencyKey != null && !idempotencyKey.isBlank()) {
             idempotencyStore.put(idempotencyKey, result);
         }
+
+        notificationService.sendNewOrderEvent(result.getBranch().getId(), result.getId(), result.getCreatedAt());
 
         return new OrderCreationResult(result, false);
     }
