@@ -143,6 +143,26 @@ public class OrderService {
     }
 
     @Transactional(readOnly = true)
+    public BackofficeOrderDetail getOrderDetailForBackoffice(UUID orderId, Integer branchId) {
+        Order order = orderRepository.findByIdWithDetails(orderId)
+                .orElseThrow(() -> {
+                    log.warn("Order not found | orderId={}", orderId);
+                    return new OrderNotFoundException(orderId);
+                });
+
+        if (!order.getBranch().getId().equals(branchId)) {
+            log.warn("Branch mismatch on order detail | orderId={} orderBranch={} userBranch={}",
+                    orderId, order.getBranch().getId(), branchId);
+            throw new AccessDeniedException("El pedido no pertenece a la sucursal del usuario");
+        }
+
+        List<OrderStatusHistory> history = historyRepository.findByOrderIdOrderByChangedAtAsc(orderId);
+        Payment payment = paymentRepository.findByOrderId(orderId).orElse(null);
+
+        return new BackofficeOrderDetail(order, payment, history);
+    }
+
+    @Transactional(readOnly = true)
     public List<BackofficeOrderRow> findActiveOrdersByBranch(Integer branchId, OrderFilterParams params) {
         List<OrderStatus> excluded = List.of(OrderStatus.DELIVERED, OrderStatus.CANCELLED);
         List<Order> orders = orderRepository.findActiveByBranchId(branchId, excluded);

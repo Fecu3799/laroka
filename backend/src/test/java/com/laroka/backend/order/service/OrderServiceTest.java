@@ -44,6 +44,8 @@ import com.laroka.backend.payment.repository.PaymentRepository;
 import com.laroka.backend.tenant.entity.Tenant;
 import com.laroka.backend.shared.exception.BusinessException;
 import com.laroka.backend.order.dto.OrderFilterParams;
+import com.laroka.backend.order.entity.OrderStatusHistory;
+import com.laroka.backend.order.service.BackofficeOrderDetail;
 import com.laroka.backend.order.service.BackofficeOrderRow;
 
 @ExtendWith(MockitoExtension.class)
@@ -573,5 +575,81 @@ class OrderServiceTest {
         assertThat(result).hasSize(3);
         assertThat(result.get(0).order().getCreatedAt()).isEqualTo(third.getCreatedAt());
         assertThat(result.get(2).order().getCreatedAt()).isEqualTo(first.getCreatedAt());
+    }
+
+    // --- getOrderDetailForBackoffice ---
+
+    @Test
+    void getOrderDetailForBackoffice_returnsCompleteDetail() {
+        UUID orderId = UUID.randomUUID();
+        Branch branch = branch(tenant());
+        Product product = product(new BigDecimal("1500.00"));
+
+        OrderItem item = OrderItem.builder()
+                .id(UUID.randomUUID())
+                .product(product)
+                .quantity(2)
+                .unitPrice(new BigDecimal("1500.00"))
+                .subtotal(new BigDecimal("3000.00"))
+                .build();
+
+        Order order = Order.builder()
+                .id(orderId)
+                .status(OrderStatus.RECEIVED)
+                .orderType(OrderType.TAKEAWAY)
+                .origin(OrderOrigin.CLIENT)
+                .subtotal(new BigDecimal("3000.00"))
+                .deliveryFee(BigDecimal.ZERO)
+                .serviceFee(new BigDecimal("200.00"))
+                .totalAmount(new BigDecimal("3200.00"))
+                .branch(branch)
+                .items(List.of(item))
+                .build();
+
+        OrderStatusHistory historyEntry = OrderStatusHistory.builder()
+                .id(UUID.randomUUID())
+                .order(order)
+                .fromStatus(null)
+                .toStatus(OrderStatus.RECEIVED)
+                .changedAt(LocalDateTime.now())
+                .build();
+
+        Payment payment = Payment.builder()
+                .id(UUID.randomUUID())
+                .order(order)
+                .status(PaymentStatus.APPROVED)
+                .method(PaymentMethod.MERCADOPAGO)
+                .build();
+
+        when(orderRepository.findByIdWithDetails(orderId)).thenReturn(Optional.of(order));
+        when(historyRepository.findByOrderIdOrderByChangedAtAsc(orderId)).thenReturn(List.of(historyEntry));
+        when(paymentRepository.findByOrderId(orderId)).thenReturn(Optional.of(payment));
+
+        BackofficeOrderDetail result = service.getOrderDetailForBackoffice(orderId, branch.getId());
+
+        assertThat(result.order().getId()).isEqualTo(orderId);
+        assertThat(result.order().getItems()).hasSize(1);
+        assertThat(result.history()).hasSize(1);
+        assertThat(result.payment()).isNotNull();
+        assertThat(result.payment().getStatus()).isEqualTo(PaymentStatus.APPROVED);
+    }
+
+    @Test
+    void getOrderDetailForBackoffice_wrongBranch_throwsAccessDeniedException() {
+        UUID orderId = UUID.randomUUID();
+        Branch orderBranch = branch(tenant());
+        Order order = Order.builder()
+                .id(orderId)
+                .status(OrderStatus.RECEIVED)
+                .orderType(OrderType.TAKEAWAY)
+                .branch(orderBranch)
+                .items(List.of())
+                .build();
+
+        when(orderRepository.findByIdWithDetails(orderId)).thenReturn(Optional.of(order));
+
+        assertThatThrownBy(() ->
+                service.getOrderDetailForBackoffice(orderId, 99))
+                .isInstanceOf(AccessDeniedException.class);
     }
 }

@@ -15,9 +15,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.laroka.backend.order.dto.BackofficeOrderDetailDTO;
 import com.laroka.backend.order.dto.BackofficeOrderResponseDTO;
 import com.laroka.backend.order.dto.OrderFilterParams;
 import com.laroka.backend.order.dto.UpdateOrderStatusRequestDTO;
+import com.laroka.backend.order.service.BackofficeOrderDetail;
 import com.laroka.backend.order.entity.OrderStatus;
 import com.laroka.backend.order.mapper.OrderMapper;
 import com.laroka.backend.order.service.BackofficeOrderRow;
@@ -55,6 +57,17 @@ public class BackofficeOrderController {
                 .map(row -> orderMapper.toBackofficeResponseDTO(row.order(), row.payment()))
                 .toList();
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/{id}")
+    @Operation(summary = "Get order detail",
+            description = "Returns full detail of an order including items, payment, and status history. Returns 403 if order belongs to a different branch, 404 if not found.")
+    public ResponseEntity<BackofficeOrderDetailDTO> getOrderDetail(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal CustomUserDetails principal) {
+
+        BackofficeOrderDetail detail = orderService.getOrderDetailForBackoffice(id, principal.getBranchId());
+        return ResponseEntity.ok(orderMapper.toBackofficeDetailDTO(detail));
     }
 
     @PatchMapping("/{id}/status")

@@ -6,6 +6,7 @@ import org.springframework.stereotype.Component;
 
 import com.laroka.backend.branch.entity.Branch;
 import com.laroka.backend.catalog.entity.Product;
+import com.laroka.backend.order.dto.BackofficeOrderDetailDTO;
 import com.laroka.backend.order.dto.BackofficeOrderItemDTO;
 import com.laroka.backend.order.dto.BackofficeOrderResponseDTO;
 import com.laroka.backend.order.dto.CreateOrderRequestDTO;
@@ -18,6 +19,7 @@ import com.laroka.backend.order.entity.Order;
 import com.laroka.backend.order.entity.OrderItem;
 import com.laroka.backend.order.entity.OrderOrigin;
 import com.laroka.backend.order.entity.OrderStatusHistory;
+import com.laroka.backend.order.service.BackofficeOrderDetail;
 import com.laroka.backend.payment.entity.Payment;
 
 @Component
@@ -91,6 +93,31 @@ public class OrderMapper {
                 .quantity(item.getQuantity())
                 .unitPrice(item.getUnitPrice())
                 .subtotal(item.getSubtotal())
+                .build();
+    }
+
+    public BackofficeOrderDetailDTO toBackofficeDetailDTO(BackofficeOrderDetail detail) {
+        Order order = detail.order();
+        Payment payment = detail.payment();
+        return BackofficeOrderDetailDTO.builder()
+                .id(order.getId())
+                .createdAt(order.getCreatedAt())
+                .updatedAt(order.getUpdatedAt())
+                .status(order.getStatus())
+                .orderType(order.getOrderType())
+                .origin(order.getOrigin())
+                .subtotal(order.getSubtotal())
+                .deliveryFee(order.getDeliveryFee())
+                .serviceFee(order.getServiceFee())
+                .totalAmount(order.getTotalAmount())
+                .deliveryAddress(order.getDeliveryAddress())
+                .notes(order.getNotes())
+                .branchName(order.getBranch().getName())
+                .items(order.getItems().stream().map(this::toItemResponseDTO).toList())
+                .paymentStatus(payment != null ? payment.getStatus() : null)
+                .paymentMethod(payment != null ? payment.getMethod() : null)
+                .paidAt(payment != null ? payment.getPaidAt() : null)
+                .statusHistory(detail.history().stream().map(this::toHistoryDTO).toList())
                 .build();
     }
 
