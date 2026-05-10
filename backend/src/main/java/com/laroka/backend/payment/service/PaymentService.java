@@ -11,6 +11,7 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -128,9 +129,42 @@ public class PaymentService {
                 log.info("processWebhook: transitioning order to RECEIVED — orderId={}", orderId);
                 orderService.transitionStatus(orderId, OrderStatus.RECEIVED);
                 log.info("processWebhook: order transitioned to RECEIVED — orderId={}", orderId);
-                notificationService.sendNewOrderEvent(order.getBranch().getId(), orderId);
+                notificationService.sendNewOrderEvent(order.getBranch().getId(), orderId, order.getCreatedAt());
             }
         }
+    }
+
+    @Transactional
+    public Payment confirmCashPayment(UUID orderId, Integer branchId) {
+        Order order = orderRepository.findByIdWithBranch(orderId)
+                .orElseThrow(() -> new OrderNotFoundException(orderId));
+
+        if (!order.getBranch().getId().equals(branchId)) {
+            log.warn("Branch mismatch on cash payment confirm | orderId={} orderBranch={} userBranch={}",
+                    orderId, order.getBranch().getId(), branchId);
+            throw new AccessDeniedException("El pedido no pertenece a la sucursal del usuario");
+        }
+
+        Payment payment = paymentRepository.findByOrderId(orderId)
+                .orElseThrow(() -> new PaymentNotFoundException(orderId));
+
+        if (payment.getMethod() != PaymentMethod.CASH) {
+            throw new BusinessException("La confirmación manual solo aplica a pedidos en efectivo");
+        }
+
+        if (payment.getStatus() == PaymentStatus.APPROVED) {
+            throw new BusinessException("El pago ya fue aprobado");
+        }
+
+        if (payment.getStatus() != PaymentStatus.PENDING) {
+            throw new BusinessException("El pago no está en estado PENDING");
+        }
+
+        payment.setStatus(PaymentStatus.APPROVED);
+        payment.setPaidAt(LocalDateTime.now());
+        Payment saved = paymentRepository.save(payment);
+        log.info("Cash payment confirmed | orderId={} paymentId={}", orderId, saved.getId());
+        return saved;
     }
 
     @Transactional(readOnly = true)

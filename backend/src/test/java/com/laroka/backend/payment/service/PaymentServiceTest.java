@@ -14,6 +14,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.security.access.AccessDeniedException;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -134,7 +136,7 @@ class PaymentServiceTest {
         assertThat(pending.getStatus()).isEqualTo(PaymentStatus.APPROVED);
         assertThat(pending.getPaidAt()).isNotNull();
         verify(orderService).transitionStatus(orderId, OrderStatus.RECEIVED);
-        verify(notificationService).sendNewOrderEvent(1, orderId);
+        verify(notificationService).sendNewOrderEvent(eq(1), eq(orderId), any());
     }
 
     // --- processWebhook: rejected ---
@@ -156,7 +158,7 @@ class PaymentServiceTest {
 
         assertThat(pending.getStatus()).isEqualTo(PaymentStatus.REJECTED);
         verify(orderService, never()).transitionStatus(any(), any());
-        verify(notificationService, never()).sendNewOrderEvent(any(), any());
+        verify(notificationService, never()).sendNewOrderEvent(any(), any(), any());
     }
 
     // --- processWebhook: duplicate ---
@@ -171,7 +173,7 @@ class PaymentServiceTest {
 
         verify(paymentGateway, never()).fetchPayment(any());
         verify(orderService, never()).transitionStatus(any(), any());
-        verify(notificationService, never()).sendNewOrderEvent(any(), any());
+        verify(notificationService, never()).sendNewOrderEvent(any(), any(), any());
     }
 
     // --- processWebhook: invalid signature ---
@@ -201,5 +203,81 @@ class PaymentServiceTest {
         assertThatThrownBy(() ->
                 service.processWebhook(null, null, paymentId, event("payment", paymentId)))
                 .isInstanceOf(EntityNotFoundException.class);
+    }
+
+    // --- confirmCashPayment ---
+
+    private Order orderWithBranch(UUID orderId, int branchId) {
+        Branch branch = Branch.builder().id(branchId).name("Test").build();
+        return Order.builder().id(orderId).status(OrderStatus.RECEIVED).branch(branch).build();
+    }
+
+    private Payment cashPayment(Order order, PaymentStatus status) {
+        return Payment.builder()
+                .id(UUID.randomUUID())
+                .order(order)
+                .status(status)
+                .method(PaymentMethod.CASH)
+                .build();
+    }
+
+    @Test
+    void confirmCashPayment_pendingCash_approvesPayment() {
+        UUID orderId = UUID.randomUUID();
+        Order order = orderWithBranch(orderId, 1);
+        Payment payment = cashPayment(order, PaymentStatus.PENDING);
+
+        when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
+        when(paymentRepository.findByOrderId(orderId)).thenReturn(Optional.of(payment));
+        when(paymentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        Payment result = service.confirmCashPayment(orderId, 1);
+
+        assertThat(result.getStatus()).isEqualTo(PaymentStatus.APPROVED);
+        assertThat(result.getPaidAt()).isNotNull();
+    }
+
+    @Test
+    void confirmCashPayment_wrongBranch_throwsAccessDeniedException() {
+        UUID orderId = UUID.randomUUID();
+        Order order = orderWithBranch(orderId, 1);
+
+        when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
+
+        assertThatThrownBy(() -> service.confirmCashPayment(orderId, 99))
+                .isInstanceOf(AccessDeniedException.class);
+    }
+
+    @Test
+    void confirmCashPayment_alreadyApproved_throwsBusinessException() {
+        UUID orderId = UUID.randomUUID();
+        Order order = orderWithBranch(orderId, 1);
+        Payment payment = cashPayment(order, PaymentStatus.APPROVED);
+
+        when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
+        when(paymentRepository.findByOrderId(orderId)).thenReturn(Optional.of(payment));
+
+        assertThatThrownBy(() -> service.confirmCashPayment(orderId, 1))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("aprobado");
+    }
+
+    @Test
+    void confirmCashPayment_notCashMethod_throwsBusinessException() {
+        UUID orderId = UUID.randomUUID();
+        Order order = orderWithBranch(orderId, 1);
+        Payment payment = Payment.builder()
+                .id(UUID.randomUUID())
+                .order(order)
+                .status(PaymentStatus.PENDING)
+                .method(PaymentMethod.MERCADOPAGO)
+                .build();
+
+        when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
+        when(paymentRepository.findByOrderId(orderId)).thenReturn(Optional.of(payment));
+
+        assertThatThrownBy(() -> service.confirmCashPayment(orderId, 1))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("efectivo");
     }
 }

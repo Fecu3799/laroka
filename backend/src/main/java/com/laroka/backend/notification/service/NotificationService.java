@@ -1,6 +1,8 @@
 package com.laroka.backend.notification.service;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -9,15 +11,23 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 @Service
 public class NotificationService {
+
+    private static final long SSE_TIMEOUT_MS = 3 * 60 * 1000L;
 
     private final CopyOnWriteArrayList<EmitterEntry> emitters = new CopyOnWriteArrayList<>();
 
     private record EmitterEntry(Integer branchId, SseEmitter emitter) {}
 
     public SseEmitter subscribe(Integer branchId) {
-        SseEmitter emitter = new SseEmitter(0L);
+        return register(branchId, new SseEmitter(SSE_TIMEOUT_MS));
+    }
+
+    SseEmitter register(Integer branchId, SseEmitter emitter) {
         EmitterEntry entry = new EmitterEntry(branchId, emitter);
         emitters.add(entry);
 
@@ -26,18 +36,23 @@ public class NotificationService {
         emitter.onTimeout(cleanup);
         emitter.onError(e -> emitters.remove(entry));
 
+        log.debug("SSE subscriber registered | branchId={}", branchId);
         return emitter;
     }
 
-    public void sendNewOrderEvent(Integer branchId, UUID orderId) {
+    public void sendNewOrderEvent(Integer branchId, UUID orderId, LocalDateTime createdAt) {
         List<EmitterEntry> dead = new ArrayList<>();
         for (EmitterEntry entry : emitters) {
             if (entry.branchId().equals(branchId)) {
                 try {
-                    entry.emitter().send(SseEmitter.event()
-                            .name("new-order")
-                            .data(Map.of("orderId", orderId.toString())));
+                    Map<String, Object> data = new LinkedHashMap<>();
+                    data.put("type", "NEW_ORDER");
+                    data.put("orderId", orderId.toString());
+                    data.put("branchId", branchId);
+                    data.put("createdAt", createdAt.toString());
+                    entry.emitter().send(SseEmitter.event().name("new-order").data(data));
                 } catch (Exception e) {
+                    log.warn("SSE send failed, removing dead emitter | branchId={}", branchId);
                     dead.add(entry);
                 }
             }

@@ -3,13 +3,26 @@ package com.laroka.backend.order.service;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
+
+import com.laroka.backend.notification.service.NotificationService;
+import com.laroka.backend.order.dto.OrderFilterParams;
+import com.laroka.backend.order.repository.OrderSpecification;
 import com.laroka.backend.payment.entity.Payment;
 import com.laroka.backend.payment.entity.PaymentStatus;
 import com.laroka.backend.payment.repository.PaymentRepository;
 
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -49,6 +62,7 @@ public class OrderService {
     private final BranchProductRepository branchProductRepository;
     private final IdempotencyStore idempotencyStore;
     private final PaymentRepository paymentRepository;
+    private final NotificationService notificationService;
 
     @Transactional
     public OrderCreationResult createOrder(Order order, List<OrderItem> items,
@@ -73,6 +87,37 @@ public class OrderService {
                     return new OrderNotFoundException(orderId);
                 });
         return doTransition(order, newStatus);
+    }
+
+    @Transactional
+    public Order transitionStatusForBackoffice(UUID orderId, OrderStatus newStatus,
+                                               Integer branchId, Integer staffUserId) {
+        Order order = orderRepository.findByIdWithBranch(orderId)
+                .orElseThrow(() -> {
+                    log.warn("Order not found | orderId={}", orderId);
+                    return new OrderNotFoundException(orderId);
+                });
+
+        if (!order.getBranch().getId().equals(branchId)) {
+            log.warn("Branch mismatch on status update | orderId={} orderBranch={} userBranch={}",
+                    orderId, order.getBranch().getId(), branchId);
+            throw new AccessDeniedException("El pedido no pertenece a la sucursal del usuario");
+        }
+
+        List<OrderStatus> validNext = OrderStateMachine.getNextValidStatuses(order);
+        if (!validNext.contains(newStatus)) {
+            throw new BusinessException(
+                    "Transición de estado inválida: " + order.getStatus() + " → " + newStatus
+                    + " para pedido de tipo " + order.getOrderType());
+        }
+
+        OrderStatus previous = order.getStatus();
+        order.setStatus(newStatus);
+        Order saved = orderRepository.save(order);
+        recordHistory(saved, previous, newStatus, staffUserId);
+        log.info("Backoffice status transition | orderId={} from={} to={} staffUserId={}",
+                saved.getId(), previous, newStatus, staffUserId);
+        return saved;
     }
 
     @Transactional(readOnly = true)
@@ -102,6 +147,104 @@ public class OrderService {
             throw new OrderNotFoundException(orderId);
         }
         return historyRepository.findByOrderIdOrderByChangedAtAsc(orderId);
+    }
+
+    @Transactional(readOnly = true)
+    public BackofficeOrderDetail getOrderDetailForBackoffice(UUID orderId, Integer branchId) {
+        Order order = orderRepository.findByIdWithDetails(orderId)
+                .orElseThrow(() -> {
+                    log.warn("Order not found | orderId={}", orderId);
+                    return new OrderNotFoundException(orderId);
+                });
+
+        if (!order.getBranch().getId().equals(branchId)) {
+            log.warn("Branch mismatch on order detail | orderId={} orderBranch={} userBranch={}",
+                    orderId, order.getBranch().getId(), branchId);
+            throw new AccessDeniedException("El pedido no pertenece a la sucursal del usuario");
+        }
+
+        List<OrderStatusHistory> history = historyRepository.findByOrderIdOrderByChangedAtAsc(orderId);
+        Payment payment = paymentRepository.findByOrderId(orderId).orElse(null);
+
+        return new BackofficeOrderDetail(order, payment, history);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<BackofficeOrderRow> findOrderHistoryByBranch(Integer branchId, OrderStatus statusFilter,
+                                                              LocalDateTime dateFrom, LocalDateTime dateTo,
+                                                              int page, int size) {
+        List<OrderStatus> terminalStatuses = List.of(OrderStatus.DELIVERED, OrderStatus.CANCELLED);
+
+        Specification<Order> spec = Specification
+                .where(OrderSpecification.branchIs(branchId))
+                .and(OrderSpecification.statusIn(terminalStatuses));
+
+        if (statusFilter != null && terminalStatuses.contains(statusFilter)) {
+            spec = spec.and(OrderSpecification.statusIs(statusFilter));
+        }
+        if (dateFrom != null) {
+            spec = spec.and(OrderSpecification.createdAtFrom(dateFrom));
+        }
+        if (dateTo != null) {
+            spec = spec.and(OrderSpecification.createdAtTo(dateTo));
+        }
+
+        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Page<Order> orderPage = orderRepository.findAll(spec, pageRequest);
+
+        if (orderPage.isEmpty()) {
+            return Page.empty(pageRequest);
+        }
+
+        List<UUID> ids = orderPage.getContent().stream().map(Order::getId).toList();
+
+        Map<UUID, Order> withItems = orderRepository.findByIdsWithItems(ids)
+                .stream().collect(Collectors.toMap(Order::getId, o -> o));
+
+        Map<UUID, Payment> paymentByOrderId = paymentRepository.findByOrderIdIn(ids)
+                .stream().collect(Collectors.toMap(p -> p.getOrder().getId(), p -> p, (a, b) -> a));
+
+        List<BackofficeOrderRow> rows = orderPage.getContent().stream()
+                .map(o -> new BackofficeOrderRow(
+                        withItems.getOrDefault(o.getId(), o),
+                        paymentByOrderId.get(o.getId())))
+                .toList();
+
+        return new PageImpl<>(rows, pageRequest, orderPage.getTotalElements());
+    }
+
+    @Transactional(readOnly = true)
+    public List<BackofficeOrderRow> findActiveOrdersByBranch(Integer branchId, OrderFilterParams params) {
+        List<OrderStatus> excluded = List.of(OrderStatus.DELIVERED, OrderStatus.CANCELLED);
+        List<Order> orders = orderRepository.findActiveByBranchId(branchId, excluded);
+
+        if (orders.isEmpty()) {
+            return List.of();
+        }
+
+        Comparator<Order> comparator = params.ascending()
+                ? Comparator.comparing(Order::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder()))
+                : Comparator.comparing(Order::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder()));
+
+        List<Order> filtered = orders.stream()
+                .filter(o -> params.status() == null || o.getStatus() == params.status())
+                .filter(o -> params.dateFrom() == null || !o.getCreatedAt().isBefore(params.dateFrom()))
+                .filter(o -> params.dateTo() == null || !o.getCreatedAt().isAfter(params.dateTo()))
+                .sorted(comparator)
+                .toList();
+
+        if (filtered.isEmpty()) {
+            return List.of();
+        }
+
+        List<UUID> orderIds = filtered.stream().map(Order::getId).toList();
+        Map<UUID, Payment> paymentByOrderId = paymentRepository.findByOrderIdIn(orderIds)
+                .stream()
+                .collect(Collectors.toMap(p -> p.getOrder().getId(), p -> p, (a, b) -> a));
+
+        return filtered.stream()
+                .map(o -> new BackofficeOrderRow(o, paymentByOrderId.get(o.getId())))
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -203,6 +346,8 @@ public class OrderService {
             idempotencyStore.put(idempotencyKey, result);
         }
 
+        notificationService.sendNewOrderEvent(result.getBranch().getId(), result.getId(), result.getCreatedAt());
+
         return new OrderCreationResult(result, false);
     }
 
@@ -223,12 +368,17 @@ public class OrderService {
     }
 
     private void recordHistory(Order order, OrderStatus fromStatus, OrderStatus toStatus) {
+        recordHistory(order, fromStatus, toStatus, null);
+    }
+
+    private void recordHistory(Order order, OrderStatus fromStatus, OrderStatus toStatus, Integer staffUserId) {
         historyRepository.save(OrderStatusHistory.builder()
                 .id(UUID.randomUUID())
                 .order(order)
                 .fromStatus(fromStatus)
                 .toStatus(toStatus)
                 .changedAt(LocalDateTime.now())
+                .staffUserId(staffUserId)
                 .build());
     }
 }

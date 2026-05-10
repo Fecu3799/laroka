@@ -1,0 +1,143 @@
+package com.laroka.backend.order.controller;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+import org.springframework.data.domain.Page;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.laroka.backend.order.dto.BackofficeOrderDetailDTO;
+import com.laroka.backend.order.dto.BackofficeOrderPageDTO;
+import com.laroka.backend.order.dto.BackofficeOrderResponseDTO;
+import com.laroka.backend.order.dto.OrderFilterParams;
+import com.laroka.backend.order.dto.UpdateOrderStatusRequestDTO;
+import com.laroka.backend.order.entity.OrderStatus;
+import com.laroka.backend.order.mapper.OrderMapper;
+import com.laroka.backend.order.service.BackofficeOrderDetail;
+import com.laroka.backend.order.service.BackofficeOrderRow;
+import com.laroka.backend.order.service.OrderService;
+import com.laroka.backend.payment.dto.PaymentStatusResponseDTO;
+import com.laroka.backend.payment.entity.Payment;
+import com.laroka.backend.payment.service.PaymentService;
+import com.laroka.backend.shared.exception.BusinessException;
+import com.laroka.backend.shared.security.CustomUserDetails;
+
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+
+@RestController
+@RequestMapping("/backoffice/orders")
+@RequiredArgsConstructor
+@Tag(name = "Backoffice Orders", description = "Backoffice API for order management")
+public class BackofficeOrderController {
+
+    private final OrderService orderService;
+    private final OrderMapper orderMapper;
+    private final PaymentService paymentService;
+
+    @GetMapping
+    @Operation(summary = "Get active orders",
+            description = "Returns active orders for the authenticated user's branch. " +
+                    "Supports optional filters: status, dateFrom, dateTo, orderBy (createdAt_asc | createdAt_desc, default: createdAt_desc).")
+    public ResponseEntity<List<BackofficeOrderResponseDTO>> getActiveOrders(
+            @RequestParam(required = false) OrderStatus status,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime dateFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime dateTo,
+            @RequestParam(required = false, defaultValue = "createdAt_desc") String orderBy,
+            @AuthenticationPrincipal CustomUserDetails principal) {
+
+        OrderFilterParams params = new OrderFilterParams(status, dateFrom, dateTo, orderBy);
+        List<BackofficeOrderRow> rows = orderService.findActiveOrdersByBranch(principal.getBranchId(), params);
+        List<BackofficeOrderResponseDTO> response = rows.stream()
+                .map(row -> orderMapper.toBackofficeResponseDTO(row.order(), row.payment()))
+                .toList();
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/history")
+    @Operation(summary = "Get order history",
+            description = "Returns paginated DELIVERED and CANCELLED orders for the authenticated user's branch. " +
+                    "Optional filters: status (DELIVERED|CANCELLED), dateFrom, dateTo (ISO 8601). " +
+                    "Default: page=0, size=20, sorted by createdAt DESC.")
+    public ResponseEntity<BackofficeOrderPageDTO> getOrderHistory(
+            @RequestParam(required = false) OrderStatus status,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime dateFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime dateTo,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @AuthenticationPrincipal CustomUserDetails principal) {
+
+        Page<BackofficeOrderRow> orderPage = orderService.findOrderHistoryByBranch(
+                principal.getBranchId(), status, dateFrom, dateTo, page, size);
+
+        List<BackofficeOrderResponseDTO> content = orderPage.getContent().stream()
+                .map(row -> orderMapper.toBackofficeResponseDTO(row.order(), row.payment()))
+                .toList();
+
+        return ResponseEntity.ok(BackofficeOrderPageDTO.builder()
+                .content(content)
+                .totalElements(orderPage.getTotalElements())
+                .totalPages(orderPage.getTotalPages())
+                .build());
+    }
+
+    @GetMapping("/{id}")
+    @Operation(summary = "Get order detail",
+            description = "Returns full detail of an order including items, payment, and status history. " +
+                    "Returns 403 if order belongs to a different branch, 404 if not found.")
+    public ResponseEntity<BackofficeOrderDetailDTO> getOrderDetail(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal CustomUserDetails principal) {
+
+        BackofficeOrderDetail detail = orderService.getOrderDetailForBackoffice(id, principal.getBranchId());
+        return ResponseEntity.ok(orderMapper.toBackofficeDetailDTO(detail));
+    }
+
+    @PatchMapping("/{id}/status")
+    @Operation(summary = "Update order status",
+            description = "Transitions an order to the next status. Validates via OrderStateMachine. " +
+                    "Returns 422 on invalid transition, 403 if order belongs to a different branch.")
+    public ResponseEntity<Void> updateStatus(
+            @PathVariable UUID id,
+            @Valid @RequestBody UpdateOrderStatusRequestDTO dto,
+            @AuthenticationPrincipal CustomUserDetails principal) {
+
+        orderService.transitionStatusForBackoffice(id, dto.getNextStatus(),
+                principal.getBranchId(), principal.getUserId());
+        return ResponseEntity.noContent().build();
+    }
+
+    @PatchMapping("/{id}/payment")
+    @Operation(summary = "Confirm cash payment",
+            description = "Marks a CASH payment as APPROVED. Only valid when method=CASH and status=PENDING. " +
+                    "Body: { \"action\": \"CONFIRM\" }. Returns 422 if already approved or not a cash payment, 403 if wrong branch.")
+    public ResponseEntity<PaymentStatusResponseDTO> confirmCashPayment(
+            @PathVariable UUID id,
+            @RequestBody Map<String, String> body,
+            @AuthenticationPrincipal CustomUserDetails principal) {
+
+        if (!"CONFIRM".equals(body.get("action"))) {
+            throw new BusinessException("action debe ser CONFIRM");
+        }
+
+        Payment payment = paymentService.confirmCashPayment(id, principal.getBranchId());
+        return ResponseEntity.ok(PaymentStatusResponseDTO.builder()
+                .status(payment.getStatus())
+                .method(payment.getMethod())
+                .paidAt(payment.getPaidAt())
+                .build());
+    }
+}

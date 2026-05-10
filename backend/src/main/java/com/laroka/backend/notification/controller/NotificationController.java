@@ -1,11 +1,12 @@
 package com.laroka.backend.notification.controller;
 
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import com.laroka.backend.notification.service.NotificationService;
-import com.laroka.backend.shared.security.SecurityUtils;
+import com.laroka.backend.shared.security.CustomUserDetails;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -17,13 +18,11 @@ import lombok.RequiredArgsConstructor;
 public class NotificationController {
 
     private final NotificationService notificationService;
-    private final SecurityUtils securityUtils;
 
     @GetMapping("/backoffice/events")
     @Operation(summary = "Subscribe to SSE events",
             description = "Streams real-time order events for the authenticated staff's branch. (US-05-03)")
-    public SseEmitter subscribe() {
-        Integer branchId = securityUtils.getAuthenticatedUserBranchId();
-        return notificationService.subscribe(branchId);
+    public SseEmitter subscribe(@AuthenticationPrincipal CustomUserDetails principal) {
+        return notificationService.subscribe(principal.getBranchId());
     }
 }
