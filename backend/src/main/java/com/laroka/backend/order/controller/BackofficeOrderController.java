@@ -2,8 +2,10 @@ package com.laroka.backend.order.controller;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
+import org.springframework.data.domain.Page;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -15,18 +17,20 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import org.springframework.data.domain.Page;
-
 import com.laroka.backend.order.dto.BackofficeOrderDetailDTO;
 import com.laroka.backend.order.dto.BackofficeOrderPageDTO;
 import com.laroka.backend.order.dto.BackofficeOrderResponseDTO;
 import com.laroka.backend.order.dto.OrderFilterParams;
 import com.laroka.backend.order.dto.UpdateOrderStatusRequestDTO;
-import com.laroka.backend.order.service.BackofficeOrderDetail;
 import com.laroka.backend.order.entity.OrderStatus;
 import com.laroka.backend.order.mapper.OrderMapper;
+import com.laroka.backend.order.service.BackofficeOrderDetail;
 import com.laroka.backend.order.service.BackofficeOrderRow;
 import com.laroka.backend.order.service.OrderService;
+import com.laroka.backend.payment.dto.PaymentStatusResponseDTO;
+import com.laroka.backend.payment.entity.Payment;
+import com.laroka.backend.payment.service.PaymentService;
+import com.laroka.backend.shared.exception.BusinessException;
 import com.laroka.backend.shared.security.CustomUserDetails;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -42,6 +46,7 @@ public class BackofficeOrderController {
 
     private final OrderService orderService;
     private final OrderMapper orderMapper;
+    private final PaymentService paymentService;
 
     @GetMapping
     @Operation(summary = "Get active orders",
@@ -91,7 +96,8 @@ public class BackofficeOrderController {
 
     @GetMapping("/{id}")
     @Operation(summary = "Get order detail",
-            description = "Returns full detail of an order including items, payment, and status history. Returns 403 if order belongs to a different branch, 404 if not found.")
+            description = "Returns full detail of an order including items, payment, and status history. " +
+                    "Returns 403 if order belongs to a different branch, 404 if not found.")
     public ResponseEntity<BackofficeOrderDetailDTO> getOrderDetail(
             @PathVariable UUID id,
             @AuthenticationPrincipal CustomUserDetails principal) {
@@ -112,5 +118,26 @@ public class BackofficeOrderController {
         orderService.transitionStatusForBackoffice(id, dto.getNextStatus(),
                 principal.getBranchId(), principal.getUserId());
         return ResponseEntity.noContent().build();
+    }
+
+    @PatchMapping("/{id}/payment")
+    @Operation(summary = "Confirm cash payment",
+            description = "Marks a CASH payment as APPROVED. Only valid when method=CASH and status=PENDING. " +
+                    "Body: { \"action\": \"CONFIRM\" }. Returns 422 if already approved or not a cash payment, 403 if wrong branch.")
+    public ResponseEntity<PaymentStatusResponseDTO> confirmCashPayment(
+            @PathVariable UUID id,
+            @RequestBody Map<String, String> body,
+            @AuthenticationPrincipal CustomUserDetails principal) {
+
+        if (!"CONFIRM".equals(body.get("action"))) {
+            throw new BusinessException("action debe ser CONFIRM");
+        }
+
+        Payment payment = paymentService.confirmCashPayment(id, principal.getBranchId());
+        return ResponseEntity.ok(PaymentStatusResponseDTO.builder()
+                .status(payment.getStatus())
+                .method(payment.getMethod())
+                .paidAt(payment.getPaidAt())
+                .build());
     }
 }
