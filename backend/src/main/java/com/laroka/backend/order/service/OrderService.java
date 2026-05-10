@@ -9,8 +9,15 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
+
 import com.laroka.backend.notification.service.NotificationService;
 import com.laroka.backend.order.dto.OrderFilterParams;
+import com.laroka.backend.order.repository.OrderSpecification;
 import com.laroka.backend.payment.entity.Payment;
 import com.laroka.backend.payment.entity.PaymentStatus;
 import com.laroka.backend.payment.repository.PaymentRepository;
@@ -160,6 +167,50 @@ public class OrderService {
         Payment payment = paymentRepository.findByOrderId(orderId).orElse(null);
 
         return new BackofficeOrderDetail(order, payment, history);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<BackofficeOrderRow> findOrderHistoryByBranch(Integer branchId, OrderStatus statusFilter,
+                                                              LocalDateTime dateFrom, LocalDateTime dateTo,
+                                                              int page, int size) {
+        List<OrderStatus> terminalStatuses = List.of(OrderStatus.DELIVERED, OrderStatus.CANCELLED);
+
+        Specification<Order> spec = Specification
+                .where(OrderSpecification.branchIs(branchId))
+                .and(OrderSpecification.statusIn(terminalStatuses));
+
+        if (statusFilter != null && terminalStatuses.contains(statusFilter)) {
+            spec = spec.and(OrderSpecification.statusIs(statusFilter));
+        }
+        if (dateFrom != null) {
+            spec = spec.and(OrderSpecification.createdAtFrom(dateFrom));
+        }
+        if (dateTo != null) {
+            spec = spec.and(OrderSpecification.createdAtTo(dateTo));
+        }
+
+        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Page<Order> orderPage = orderRepository.findAll(spec, pageRequest);
+
+        if (orderPage.isEmpty()) {
+            return Page.empty(pageRequest);
+        }
+
+        List<UUID> ids = orderPage.getContent().stream().map(Order::getId).toList();
+
+        Map<UUID, Order> withItems = orderRepository.findByIdsWithItems(ids)
+                .stream().collect(Collectors.toMap(Order::getId, o -> o));
+
+        Map<UUID, Payment> paymentByOrderId = paymentRepository.findByOrderIdIn(ids)
+                .stream().collect(Collectors.toMap(p -> p.getOrder().getId(), p -> p, (a, b) -> a));
+
+        List<BackofficeOrderRow> rows = orderPage.getContent().stream()
+                .map(o -> new BackofficeOrderRow(
+                        withItems.getOrDefault(o.getId(), o),
+                        paymentByOrderId.get(o.getId())))
+                .toList();
+
+        return new PageImpl<>(rows, pageRequest, orderPage.getTotalElements());
     }
 
     @Transactional(readOnly = true)

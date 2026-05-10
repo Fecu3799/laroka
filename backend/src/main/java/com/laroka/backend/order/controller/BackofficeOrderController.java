@@ -15,7 +15,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import org.springframework.data.domain.Page;
+
 import com.laroka.backend.order.dto.BackofficeOrderDetailDTO;
+import com.laroka.backend.order.dto.BackofficeOrderPageDTO;
 import com.laroka.backend.order.dto.BackofficeOrderResponseDTO;
 import com.laroka.backend.order.dto.OrderFilterParams;
 import com.laroka.backend.order.dto.UpdateOrderStatusRequestDTO;
@@ -57,6 +60,33 @@ public class BackofficeOrderController {
                 .map(row -> orderMapper.toBackofficeResponseDTO(row.order(), row.payment()))
                 .toList();
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/history")
+    @Operation(summary = "Get order history",
+            description = "Returns paginated DELIVERED and CANCELLED orders for the authenticated user's branch. " +
+                    "Optional filters: status (DELIVERED|CANCELLED), dateFrom, dateTo (ISO 8601). " +
+                    "Default: page=0, size=20, sorted by createdAt DESC.")
+    public ResponseEntity<BackofficeOrderPageDTO> getOrderHistory(
+            @RequestParam(required = false) OrderStatus status,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime dateFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime dateTo,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @AuthenticationPrincipal CustomUserDetails principal) {
+
+        Page<BackofficeOrderRow> orderPage = orderService.findOrderHistoryByBranch(
+                principal.getBranchId(), status, dateFrom, dateTo, page, size);
+
+        List<BackofficeOrderResponseDTO> content = orderPage.getContent().stream()
+                .map(row -> orderMapper.toBackofficeResponseDTO(row.order(), row.payment()))
+                .toList();
+
+        return ResponseEntity.ok(BackofficeOrderPageDTO.builder()
+                .content(content)
+                .totalElements(orderPage.getTotalElements())
+                .totalPages(orderPage.getTotalPages())
+                .build());
     }
 
     @GetMapping("/{id}")

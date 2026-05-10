@@ -13,6 +13,11 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+
 import org.springframework.security.access.AccessDeniedException;
 
 import org.junit.jupiter.api.Test;
@@ -632,6 +637,43 @@ class OrderServiceTest {
         assertThat(result.history()).hasSize(1);
         assertThat(result.payment()).isNotNull();
         assertThat(result.payment().getStatus()).isEqualTo(PaymentStatus.APPROVED);
+    }
+
+    // --- findOrderHistoryByBranch ---
+
+    @Test
+    void findOrderHistoryByBranch_returnsOnlyTerminalOrdersPaginated() {
+        LocalDateTime now = LocalDateTime.now();
+        Order delivered = orderWithStatus(OrderStatus.DELIVERED, now.minusHours(2));
+        Order cancelled = orderWithStatus(OrderStatus.CANCELLED, now.minusHours(1));
+
+        PageImpl<Order> pageResult = new PageImpl<>(List.of(cancelled, delivered));
+
+        when(orderRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(pageResult);
+        when(orderRepository.findByIdsWithItems(any(Collection.class)))
+                .thenReturn(List.of(cancelled, delivered));
+        when(paymentRepository.findByOrderIdIn(any(Collection.class)))
+                .thenReturn(List.of());
+
+        Page<BackofficeOrderRow> result = service.findOrderHistoryByBranch(1, null, null, null, 0, 20);
+
+        assertThat(result.getTotalElements()).isEqualTo(2);
+        assertThat(result.getContent()).hasSize(2);
+        assertThat(result.getContent()).allMatch(row ->
+                row.order().getStatus() == OrderStatus.DELIVERED ||
+                row.order().getStatus() == OrderStatus.CANCELLED);
+    }
+
+    @Test
+    void findOrderHistoryByBranch_emptyResult_returnsEmptyPage() {
+        when(orderRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(Page.empty());
+
+        Page<BackofficeOrderRow> result = service.findOrderHistoryByBranch(1, null, null, null, 0, 20);
+
+        assertThat(result.isEmpty()).isTrue();
+        assertThat(result.getTotalElements()).isEqualTo(0);
     }
 
     @Test
