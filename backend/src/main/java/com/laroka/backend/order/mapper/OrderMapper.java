@@ -6,6 +6,8 @@ import org.springframework.stereotype.Component;
 
 import com.laroka.backend.branch.entity.Branch;
 import com.laroka.backend.catalog.entity.Product;
+import com.laroka.backend.order.dto.BackofficeOrderItemDTO;
+import com.laroka.backend.order.dto.BackofficeOrderResponseDTO;
 import com.laroka.backend.order.dto.CreateOrderRequestDTO;
 import com.laroka.backend.order.dto.CreateOrderResponseDTO;
 import com.laroka.backend.order.dto.OrderItemResponseDTO;
@@ -16,6 +18,7 @@ import com.laroka.backend.order.entity.Order;
 import com.laroka.backend.order.entity.OrderItem;
 import com.laroka.backend.order.entity.OrderOrigin;
 import com.laroka.backend.order.entity.OrderStatusHistory;
+import com.laroka.backend.payment.entity.Payment;
 
 @Component
 public class OrderMapper {
@@ -85,6 +88,30 @@ public class OrderMapper {
     private OrderItemStatusDTO toItemStatusDTO(OrderItem item) {
         return OrderItemStatusDTO.builder()
                 .name(item.getProduct().getName())
+                .quantity(item.getQuantity())
+                .unitPrice(item.getUnitPrice())
+                .subtotal(item.getSubtotal())
+                .build();
+    }
+
+    public BackofficeOrderResponseDTO toBackofficeResponseDTO(Order order, Payment payment) {
+        return BackofficeOrderResponseDTO.builder()
+                .id(order.getId())
+                .createdAt(order.getCreatedAt())
+                .status(order.getStatus())
+                .totalAmount(order.getTotalAmount())
+                .paymentStatus(payment != null ? payment.getStatus() : null)
+                .paymentMethod(payment != null ? payment.getMethod() : null)
+                .orderType(order.getOrderType())
+                .origin(order.getOrigin())
+                .notes(order.getNotes())
+                .items(order.getItems().stream().map(this::toBackofficeItemDTO).toList())
+                .build();
+    }
+
+    private BackofficeOrderItemDTO toBackofficeItemDTO(OrderItem item) {
+        return BackofficeOrderItemDTO.builder()
+                .productName(item.getProduct().getName())
                 .quantity(item.getQuantity())
                 .unitPrice(item.getUnitPrice())
                 .subtotal(item.getSubtotal())

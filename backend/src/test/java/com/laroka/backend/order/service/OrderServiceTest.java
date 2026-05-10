@@ -7,6 +7,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -34,8 +35,12 @@ import com.laroka.backend.order.entity.PaymentMethod;
 import com.laroka.backend.order.exception.OrderNotFoundException;
 import com.laroka.backend.order.repository.OrderRepository;
 import com.laroka.backend.order.repository.OrderStatusHistoryRepository;
+import com.laroka.backend.payment.entity.Payment;
+import com.laroka.backend.payment.entity.PaymentStatus;
+import com.laroka.backend.payment.repository.PaymentRepository;
 import com.laroka.backend.tenant.entity.Tenant;
 import com.laroka.backend.shared.exception.BusinessException;
+import com.laroka.backend.order.service.BackofficeOrderRow;
 
 @ExtendWith(MockitoExtension.class)
 class OrderServiceTest {
@@ -46,6 +51,7 @@ class OrderServiceTest {
     @Mock private ProductRepository productRepository;
     @Mock private BranchProductRepository branchProductRepository;
     @Mock private IdempotencyStore idempotencyStore;
+    @Mock private PaymentRepository paymentRepository;
 
     @InjectMocks
     private OrderService service;
@@ -314,5 +320,57 @@ class OrderServiceTest {
 
         assertThatThrownBy(() -> service.transitionStatus(orderId, OrderStatus.IN_PREPARATION))
                 .isInstanceOf(OrderNotFoundException.class);
+    }
+
+    // --- findActiveOrdersByBranch ---
+
+    @Test
+    void findActiveOrdersByBranch_returnsOnlyActiveOrdersForBranch() {
+        int branchId = 1;
+        Order received = minimalSavedOrder(OrderStatus.RECEIVED);
+        Order inPreparation = minimalSavedOrder(OrderStatus.IN_PREPARATION);
+
+        when(orderRepository.findActiveByBranchId(any(Integer.class), any(Collection.class)))
+                .thenReturn(List.of(received, inPreparation));
+        when(paymentRepository.findByOrderIdIn(any(Collection.class))).thenReturn(List.of());
+
+        List<BackofficeOrderRow> result = service.findActiveOrdersByBranch(branchId);
+
+        assertThat(result).hasSize(2);
+        assertThat(result).noneMatch(row ->
+                row.order().getStatus() == OrderStatus.DELIVERED ||
+                row.order().getStatus() == OrderStatus.CANCELLED);
+    }
+
+    @Test
+    void findActiveOrdersByBranch_noOrders_returnsEmptyList() {
+        when(orderRepository.findActiveByBranchId(any(Integer.class), any(Collection.class)))
+                .thenReturn(List.of());
+
+        List<BackofficeOrderRow> result = service.findActiveOrdersByBranch(99);
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void findActiveOrdersByBranch_attachesPaymentToMatchingOrder() {
+        int branchId = 1;
+        Order order = minimalSavedOrder(OrderStatus.RECEIVED);
+        Payment payment = Payment.builder()
+                .id(UUID.randomUUID())
+                .order(order)
+                .status(PaymentStatus.APPROVED)
+                .method(PaymentMethod.MERCADOPAGO)
+                .build();
+
+        when(orderRepository.findActiveByBranchId(any(Integer.class), any(Collection.class)))
+                .thenReturn(List.of(order));
+        when(paymentRepository.findByOrderIdIn(any(Collection.class))).thenReturn(List.of(payment));
+
+        List<BackofficeOrderRow> result = service.findActiveOrdersByBranch(branchId);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).payment()).isNotNull();
+        assertThat(result.get(0).payment().getStatus()).isEqualTo(PaymentStatus.APPROVED);
     }
 }

@@ -4,7 +4,9 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import com.laroka.backend.payment.entity.Payment;
 import com.laroka.backend.payment.entity.PaymentStatus;
@@ -102,6 +104,25 @@ public class OrderService {
             throw new OrderNotFoundException(orderId);
         }
         return historyRepository.findByOrderIdOrderByChangedAtAsc(orderId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<BackofficeOrderRow> findActiveOrdersByBranch(Integer branchId) {
+        List<OrderStatus> excluded = List.of(OrderStatus.DELIVERED, OrderStatus.CANCELLED);
+        List<Order> orders = orderRepository.findActiveByBranchId(branchId, excluded);
+
+        if (orders.isEmpty()) {
+            return List.of();
+        }
+
+        List<UUID> orderIds = orders.stream().map(Order::getId).toList();
+        Map<UUID, Payment> paymentByOrderId = paymentRepository.findByOrderIdIn(orderIds)
+                .stream()
+                .collect(Collectors.toMap(p -> p.getOrder().getId(), p -> p, (a, b) -> a));
+
+        return orders.stream()
+                .map(o -> new BackofficeOrderRow(o, paymentByOrderId.get(o.getId())))
+                .toList();
     }
 
     @Transactional(readOnly = true)

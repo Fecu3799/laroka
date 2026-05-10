@@ -1,6 +1,7 @@
 package com.laroka.backend.order.repository;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -18,6 +19,11 @@ import com.laroka.backend.order.entity.OrderStatus;
 public interface OrderRepository extends JpaRepository<Order, UUID> {
 
     List<Order> findByStatusAndCreatedAtBefore(OrderStatus status, LocalDateTime threshold);
+
+    @EntityGraph(attributePaths = {"items", "items.product"})
+    @Query("SELECT o FROM Order o WHERE o.branch.id = :branchId AND o.status NOT IN :excluded")
+    List<Order> findActiveByBranchId(@Param("branchId") Integer branchId,
+                                     @Param("excluded") Collection<OrderStatus> excluded);
 
     @EntityGraph(attributePaths = {"branch"})
     @Query("SELECT o FROM Order o WHERE o.id = :id")
