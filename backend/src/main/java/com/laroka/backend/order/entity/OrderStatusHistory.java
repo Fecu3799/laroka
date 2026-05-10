@@ -42,4 +42,7 @@ public class OrderStatusHistory {
 
     @Column(name = "changed_at", nullable = false)
     private LocalDateTime changedAt;
+
+    @Column(name = "staff_user_id")
+    private Integer staffUserId;
 }

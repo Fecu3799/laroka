@@ -12,6 +12,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.security.access.AccessDeniedException;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -350,6 +352,86 @@ class OrderServiceTest {
         List<BackofficeOrderRow> result = service.findActiveOrdersByBranch(99);
 
         assertThat(result).isEmpty();
+    }
+
+    // --- transitionStatusForBackoffice ---
+
+    @Test
+    void transitionStatusForBackoffice_validDelivery_updatesStatus() {
+        UUID orderId = UUID.randomUUID();
+        Branch branch = branch(tenant());
+        Order order = Order.builder()
+                .id(orderId)
+                .status(OrderStatus.RECEIVED)
+                .orderType(OrderType.DELIVERY)
+                .branch(branch)
+                .build();
+
+        when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Order result = service.transitionStatusForBackoffice(orderId, OrderStatus.IN_PREPARATION, branch.getId(), 42);
+
+        assertThat(result.getStatus()).isEqualTo(OrderStatus.IN_PREPARATION);
+        verify(historyRepository).save(any());
+    }
+
+    @Test
+    void transitionStatusForBackoffice_validTakeaway_updatesStatus() {
+        UUID orderId = UUID.randomUUID();
+        Branch branch = branch(tenant());
+        Order order = Order.builder()
+                .id(orderId)
+                .status(OrderStatus.IN_PREPARATION)
+                .orderType(OrderType.TAKEAWAY)
+                .branch(branch)
+                .build();
+
+        when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Order result = service.transitionStatusForBackoffice(orderId, OrderStatus.READY_FOR_PICKUP, branch.getId(), 7);
+
+        assertThat(result.getStatus()).isEqualTo(OrderStatus.READY_FOR_PICKUP);
+        verify(historyRepository).save(any());
+    }
+
+    @Test
+    void transitionStatusForBackoffice_invalidTransition_throwsBusinessException() {
+        UUID orderId = UUID.randomUUID();
+        Branch branch = branch(tenant());
+        Order order = Order.builder()
+                .id(orderId)
+                .status(OrderStatus.RECEIVED)
+                .orderType(OrderType.TAKEAWAY)
+                .branch(branch)
+                .build();
+
+        when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
+
+        assertThatThrownBy(() ->
+                service.transitionStatusForBackoffice(orderId, OrderStatus.DELIVERED, branch.getId(), 5))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("inválida");
+    }
+
+    @Test
+    void transitionStatusForBackoffice_wrongBranch_throwsAccessDeniedException() {
+        UUID orderId = UUID.randomUUID();
+        Branch orderBranch = branch(tenant());
+        Order order = Order.builder()
+                .id(orderId)
+                .status(OrderStatus.RECEIVED)
+                .orderType(OrderType.DELIVERY)
+                .branch(orderBranch)
+                .build();
+
+        when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
+
+        int differentBranchId = 99;
+        assertThatThrownBy(() ->
+                service.transitionStatusForBackoffice(orderId, OrderStatus.IN_PREPARATION, differentBranchId, 5))
+                .isInstanceOf(AccessDeniedException.class);
     }
 
     @Test

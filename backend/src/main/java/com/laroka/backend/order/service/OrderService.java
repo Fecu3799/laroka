@@ -12,6 +12,7 @@ import com.laroka.backend.payment.entity.Payment;
 import com.laroka.backend.payment.entity.PaymentStatus;
 import com.laroka.backend.payment.repository.PaymentRepository;
 
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -75,6 +76,37 @@ public class OrderService {
                     return new OrderNotFoundException(orderId);
                 });
         return doTransition(order, newStatus);
+    }
+
+    @Transactional
+    public Order transitionStatusForBackoffice(UUID orderId, OrderStatus newStatus,
+                                               Integer branchId, Integer staffUserId) {
+        Order order = orderRepository.findByIdWithBranch(orderId)
+                .orElseThrow(() -> {
+                    log.warn("Order not found | orderId={}", orderId);
+                    return new OrderNotFoundException(orderId);
+                });
+
+        if (!order.getBranch().getId().equals(branchId)) {
+            log.warn("Branch mismatch on status update | orderId={} orderBranch={} userBranch={}",
+                    orderId, order.getBranch().getId(), branchId);
+            throw new AccessDeniedException("El pedido no pertenece a la sucursal del usuario");
+        }
+
+        List<OrderStatus> validNext = OrderStateMachine.getNextValidStatuses(order);
+        if (!validNext.contains(newStatus)) {
+            throw new BusinessException(
+                    "Transición de estado inválida: " + order.getStatus() + " → " + newStatus
+                    + " para pedido de tipo " + order.getOrderType());
+        }
+
+        OrderStatus previous = order.getStatus();
+        order.setStatus(newStatus);
+        Order saved = orderRepository.save(order);
+        recordHistory(saved, previous, newStatus, staffUserId);
+        log.info("Backoffice status transition | orderId={} from={} to={} staffUserId={}",
+                saved.getId(), previous, newStatus, staffUserId);
+        return saved;
     }
 
     @Transactional(readOnly = true)
@@ -244,12 +276,17 @@ public class OrderService {
     }
 
     private void recordHistory(Order order, OrderStatus fromStatus, OrderStatus toStatus) {
+        recordHistory(order, fromStatus, toStatus, null);
+    }
+
+    private void recordHistory(Order order, OrderStatus fromStatus, OrderStatus toStatus, Integer staffUserId) {
         historyRepository.save(OrderStatusHistory.builder()
                 .id(UUID.randomUUID())
                 .order(order)
                 .fromStatus(fromStatus)
                 .toStatus(toStatus)
                 .changedAt(LocalDateTime.now())
+                .staffUserId(staffUserId)
                 .build());
     }
 }
