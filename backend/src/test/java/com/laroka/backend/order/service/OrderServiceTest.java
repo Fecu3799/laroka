@@ -7,6 +7,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -42,6 +43,7 @@ import com.laroka.backend.payment.entity.PaymentStatus;
 import com.laroka.backend.payment.repository.PaymentRepository;
 import com.laroka.backend.tenant.entity.Tenant;
 import com.laroka.backend.shared.exception.BusinessException;
+import com.laroka.backend.order.dto.OrderFilterParams;
 import com.laroka.backend.order.service.BackofficeOrderRow;
 
 @ExtendWith(MockitoExtension.class)
@@ -337,7 +339,7 @@ class OrderServiceTest {
                 .thenReturn(List.of(received, inPreparation));
         when(paymentRepository.findByOrderIdIn(any(Collection.class))).thenReturn(List.of());
 
-        List<BackofficeOrderRow> result = service.findActiveOrdersByBranch(branchId);
+        List<BackofficeOrderRow> result = service.findActiveOrdersByBranch(branchId, OrderFilterParams.defaults());
 
         assertThat(result).hasSize(2);
         assertThat(result).noneMatch(row ->
@@ -350,7 +352,7 @@ class OrderServiceTest {
         when(orderRepository.findActiveByBranchId(any(Integer.class), any(Collection.class)))
                 .thenReturn(List.of());
 
-        List<BackofficeOrderRow> result = service.findActiveOrdersByBranch(99);
+        List<BackofficeOrderRow> result = service.findActiveOrdersByBranch(99, OrderFilterParams.defaults());
 
         assertThat(result).isEmpty();
     }
@@ -450,10 +452,126 @@ class OrderServiceTest {
                 .thenReturn(List.of(order));
         when(paymentRepository.findByOrderIdIn(any(Collection.class))).thenReturn(List.of(payment));
 
-        List<BackofficeOrderRow> result = service.findActiveOrdersByBranch(branchId);
+        List<BackofficeOrderRow> result = service.findActiveOrdersByBranch(branchId, OrderFilterParams.defaults());
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).payment()).isNotNull();
         assertThat(result.get(0).payment().getStatus()).isEqualTo(PaymentStatus.APPROVED);
+    }
+
+    // --- findActiveOrdersByBranch con filtros ---
+
+    private Order orderWithStatus(OrderStatus status, LocalDateTime createdAt) {
+        return Order.builder()
+                .id(UUID.randomUUID())
+                .status(status)
+                .orderType(OrderType.TAKEAWAY)
+                .totalAmount(BigDecimal.TEN)
+                .branch(branch(tenant()))
+                .items(List.of())
+                .createdAt(createdAt)
+                .build();
+    }
+
+    private void stubRepoAndPayments(int branchId, List<Order> orders) {
+        when(orderRepository.findActiveByBranchId(any(Integer.class), any(Collection.class)))
+                .thenReturn(orders);
+        when(paymentRepository.findByOrderIdIn(any(Collection.class))).thenReturn(List.of());
+    }
+
+    @Test
+    void findActiveOrdersByBranch_statusFilter_returnsOnlyMatchingStatus() {
+        LocalDateTime now = LocalDateTime.now();
+        Order received = orderWithStatus(OrderStatus.RECEIVED, now);
+        Order inPrep = orderWithStatus(OrderStatus.IN_PREPARATION, now);
+        stubRepoAndPayments(1, List.of(received, inPrep));
+
+        OrderFilterParams params = new OrderFilterParams(OrderStatus.RECEIVED, null, null, null);
+        List<BackofficeOrderRow> result = service.findActiveOrdersByBranch(1, params);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).order().getStatus()).isEqualTo(OrderStatus.RECEIVED);
+    }
+
+    @Test
+    void findActiveOrdersByBranch_dateFromFilter_excludesOrdersBefore() {
+        LocalDateTime base = LocalDateTime.of(2024, 6, 1, 12, 0);
+        Order old = orderWithStatus(OrderStatus.RECEIVED, base.minusDays(1));
+        Order recent = orderWithStatus(OrderStatus.RECEIVED, base.plusDays(1));
+        stubRepoAndPayments(1, List.of(old, recent));
+
+        OrderFilterParams params = new OrderFilterParams(null, base, null, null);
+        List<BackofficeOrderRow> result = service.findActiveOrdersByBranch(1, params);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).order().getCreatedAt()).isEqualTo(recent.getCreatedAt());
+    }
+
+    @Test
+    void findActiveOrdersByBranch_dateToFilter_excludesOrdersAfter() {
+        LocalDateTime base = LocalDateTime.of(2024, 6, 1, 12, 0);
+        Order old = orderWithStatus(OrderStatus.RECEIVED, base.minusDays(1));
+        Order future = orderWithStatus(OrderStatus.RECEIVED, base.plusDays(1));
+        stubRepoAndPayments(1, List.of(old, future));
+
+        OrderFilterParams params = new OrderFilterParams(null, null, base, null);
+        List<BackofficeOrderRow> result = service.findActiveOrdersByBranch(1, params);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).order().getCreatedAt()).isEqualTo(old.getCreatedAt());
+    }
+
+    @Test
+    void findActiveOrdersByBranch_combinedFilters_returnsOnlyCorrect() {
+        LocalDateTime base = LocalDateTime.of(2024, 6, 1, 12, 0);
+        Order match = orderWithStatus(OrderStatus.RECEIVED, base);
+        Order wrongStatus = orderWithStatus(OrderStatus.IN_PREPARATION, base);
+        Order tooOld = orderWithStatus(OrderStatus.RECEIVED, base.minusDays(2));
+        Order tooNew = orderWithStatus(OrderStatus.RECEIVED, base.plusDays(2));
+        stubRepoAndPayments(1, List.of(match, wrongStatus, tooOld, tooNew));
+
+        OrderFilterParams params = new OrderFilterParams(
+                OrderStatus.RECEIVED,
+                base.minusDays(1),
+                base.plusDays(1),
+                null
+        );
+        List<BackofficeOrderRow> result = service.findActiveOrdersByBranch(1, params);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).order().getStatus()).isEqualTo(OrderStatus.RECEIVED);
+        assertThat(result.get(0).order().getCreatedAt()).isEqualTo(match.getCreatedAt());
+    }
+
+    @Test
+    void findActiveOrdersByBranch_orderByAsc_returnsSortedAscending() {
+        LocalDateTime base = LocalDateTime.of(2024, 6, 1, 12, 0);
+        Order first = orderWithStatus(OrderStatus.RECEIVED, base);
+        Order second = orderWithStatus(OrderStatus.RECEIVED, base.plusHours(1));
+        Order third = orderWithStatus(OrderStatus.RECEIVED, base.plusHours(2));
+        stubRepoAndPayments(1, List.of(third, first, second));
+
+        OrderFilterParams params = new OrderFilterParams(null, null, null, OrderFilterParams.ORDER_ASC);
+        List<BackofficeOrderRow> result = service.findActiveOrdersByBranch(1, params);
+
+        assertThat(result).hasSize(3);
+        assertThat(result.get(0).order().getCreatedAt()).isEqualTo(first.getCreatedAt());
+        assertThat(result.get(1).order().getCreatedAt()).isEqualTo(second.getCreatedAt());
+        assertThat(result.get(2).order().getCreatedAt()).isEqualTo(third.getCreatedAt());
+    }
+
+    @Test
+    void findActiveOrdersByBranch_defaultOrder_returnsSortedDescending() {
+        LocalDateTime base = LocalDateTime.of(2024, 6, 1, 12, 0);
+        Order first = orderWithStatus(OrderStatus.RECEIVED, base);
+        Order second = orderWithStatus(OrderStatus.RECEIVED, base.plusHours(1));
+        Order third = orderWithStatus(OrderStatus.RECEIVED, base.plusHours(2));
+        stubRepoAndPayments(1, List.of(first, second, third));
+
+        List<BackofficeOrderRow> result = service.findActiveOrdersByBranch(1, OrderFilterParams.defaults());
+
+        assertThat(result).hasSize(3);
+        assertThat(result.get(0).order().getCreatedAt()).isEqualTo(third.getCreatedAt());
+        assertThat(result.get(2).order().getCreatedAt()).isEqualTo(first.getCreatedAt());
     }
 }

@@ -3,12 +3,14 @@ package com.laroka.backend.order.service;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
 import com.laroka.backend.notification.service.NotificationService;
+import com.laroka.backend.order.dto.OrderFilterParams;
 import com.laroka.backend.payment.entity.Payment;
 import com.laroka.backend.payment.entity.PaymentStatus;
 import com.laroka.backend.payment.repository.PaymentRepository;
@@ -141,7 +143,7 @@ public class OrderService {
     }
 
     @Transactional(readOnly = true)
-    public List<BackofficeOrderRow> findActiveOrdersByBranch(Integer branchId) {
+    public List<BackofficeOrderRow> findActiveOrdersByBranch(Integer branchId, OrderFilterParams params) {
         List<OrderStatus> excluded = List.of(OrderStatus.DELIVERED, OrderStatus.CANCELLED);
         List<Order> orders = orderRepository.findActiveByBranchId(branchId, excluded);
 
@@ -149,12 +151,27 @@ public class OrderService {
             return List.of();
         }
 
-        List<UUID> orderIds = orders.stream().map(Order::getId).toList();
+        Comparator<Order> comparator = params.ascending()
+                ? Comparator.comparing(Order::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder()))
+                : Comparator.comparing(Order::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder()));
+
+        List<Order> filtered = orders.stream()
+                .filter(o -> params.status() == null || o.getStatus() == params.status())
+                .filter(o -> params.dateFrom() == null || !o.getCreatedAt().isBefore(params.dateFrom()))
+                .filter(o -> params.dateTo() == null || !o.getCreatedAt().isAfter(params.dateTo()))
+                .sorted(comparator)
+                .toList();
+
+        if (filtered.isEmpty()) {
+            return List.of();
+        }
+
+        List<UUID> orderIds = filtered.stream().map(Order::getId).toList();
         Map<UUID, Payment> paymentByOrderId = paymentRepository.findByOrderIdIn(orderIds)
                 .stream()
                 .collect(Collectors.toMap(p -> p.getOrder().getId(), p -> p, (a, b) -> a));
 
-        return orders.stream()
+        return filtered.stream()
                 .map(o -> new BackofficeOrderRow(o, paymentByOrderId.get(o.getId())))
                 .toList();
     }
