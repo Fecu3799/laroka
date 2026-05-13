@@ -25,6 +25,9 @@ public class BackofficeOrderResponseDTO {
     private UUID id;
     private LocalDateTime createdAt;
     private OrderStatus status;
+    private BigDecimal subtotal;
+    private BigDecimal deliveryFee;
+    private BigDecimal serviceFee;
     private BigDecimal totalAmount;
     private PaymentStatus paymentStatus;
     private PaymentMethod paymentMethod;

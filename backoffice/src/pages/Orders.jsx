@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import useAuth from '../hooks/useAuth'
 import useOrders from '../hooks/useOrders'
@@ -35,10 +35,16 @@ const PAYMENT_STATUS_COLOR = {
   CANCELLED: '#f87171',
 }
 
-// eslint-disable-next-line no-unused-vars
 const PAYMENT_METHOD_LABEL = {
   MERCADOPAGO: 'MercadoPago',
   CASH:        'Efectivo',
+}
+
+const PAYMENT_BADGE_CONFIG = {
+  PENDING:   { bg: '#2d1400', color: '#fb923c', border: '#5c2a00' },
+  APPROVED:  { bg: '#0a2e14', color: '#4ade80', border: '#1a5c2c' },
+  REJECTED:  { bg: '#2e0f0f', color: '#f87171', border: '#5c1f1f' },
+  CANCELLED: { bg: '#2e0f0f', color: '#f87171', border: '#5c1f1f' },
 }
 
 const TABS = [
@@ -57,6 +63,9 @@ const STATUS_CHIPS = [
   { key: 'DELIVERED',      label: 'Entregados', bg: '#0a2e14', color: '#4ade80', border: '#1a5c2c' },
 ]
 
+const SEQUENCE_DELIVERY = ['RECEIVED', 'IN_PREPARATION', 'ON_THE_WAY',       'DELIVERED']
+const SEQUENCE_TAKEAWAY = ['RECEIVED', 'IN_PREPARATION', 'READY_FOR_PICKUP', 'DELIVERED']
+
 // ── Helpers ───────────────────────────────────────────────────
 
 function shortId(id) {
@@ -66,10 +75,23 @@ function shortId(id) {
 function formatTime(createdAt) {
   if (!createdAt) return '—'
   const date = new Date(createdAt)
-  const now = new Date()
+  const now  = new Date()
   const timeStr = date.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false })
   if (date.toDateString() === now.toDateString()) return `Hoy · ${timeStr}`
   return date.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' }) + ` · ${timeStr}`
+}
+
+function formatDateTime(ts) {
+  if (!ts) return '—'
+  const date = new Date(ts)
+  const day  = date.toLocaleDateString('es-AR', { weekday: 'short' })
+  const time = date.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false })
+  return `${day} ${time}`
+}
+
+function formatPrice(n) {
+  if (n == null) return '—'
+  return '$' + Number(n).toLocaleString('es-AR', { maximumFractionDigits: 0 })
 }
 
 function getInitials(name) {
@@ -78,7 +100,7 @@ function getInitials(name) {
 }
 
 function getNextStatus(status, orderType) {
-  if (status === 'RECEIVED') return 'IN_PREPARATION'
+  if (status === 'RECEIVED')       return 'IN_PREPARATION'
   if (status === 'IN_PREPARATION') return orderType === 'DELIVERY' ? 'ON_THE_WAY' : 'READY_FOR_PICKUP'
   if (status === 'ON_THE_WAY' || status === 'READY_FOR_PICKUP') return 'DELIVERED'
   return null
@@ -118,7 +140,7 @@ function tabCount(orders, key) {
   return orders.filter(o => o.status === key).length
 }
 
-// ── Inline icons ──────────────────────────────────────────────
+// ── Icons ─────────────────────────────────────────────────────
 
 function SearchIcon() {
   return (
@@ -138,26 +160,26 @@ function RefreshIcon() {
   )
 }
 
-function PhoneIcon() {
+function PhoneIcon({ size = 11 }) {
   return (
-    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 1.27h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L7.91 8.91a16 16 0 0 0 6 6l.91-.91a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" stroke="#4a6b50" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )
 }
 
-function PinIcon() {
+function PinIcon({ size = 11 }) {
   return (
-    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" stroke="#4a6b50" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
       <circle cx="12" cy="10" r="3" stroke="#4a6b50" strokeWidth="2" />
     </svg>
   )
 }
 
-function ScooterIcon() {
+function ScooterIcon({ size = 11 }) {
   return (
-    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path d="M3 11l1-4h8l2 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
       <circle cx="5.5" cy="15.5" r="2.5" stroke="currentColor" strokeWidth="1.8" />
       <circle cx="18.5" cy="15.5" r="2.5" stroke="currentColor" strokeWidth="1.8" />
@@ -166,9 +188,9 @@ function ScooterIcon() {
   )
 }
 
-function StoreIcon() {
+function StoreIcon({ size = 11 }) {
   return (
-    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
       <polyline points="9 22 9 12 15 12 15 22" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
@@ -183,17 +205,50 @@ function TrashIcon() {
   )
 }
 
+function CloseIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M18 6 6 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M6 6l12 12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function ArrowLeftIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M19 12H5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M12 5l-7 7 7 7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function XCancelIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M18 6 6 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M6 6l12 12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  )
+}
+
 // ── Main component ────────────────────────────────────────────
 
 export default function Orders() {
-  const navigate = useNavigate()
+  const navigate  = useNavigate()
   const { token } = useAuth()
   const { orders, loading, error, newOrderCount, refresh, incrementNewOrders, dismissOrder, updateOrderInList } =
     useOrders(token)
+
   const [activeTab,   setActiveTab]   = useState('ALL')
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedId,  setSelectedId]  = useState(null)
   const [advancing,   setAdvancing]   = useState(null)
+  const [listWidth,   setListWidth]   = useState(
+    () => Number(localStorage.getItem('laroka_orders_list_width')) || 0
+  )
+  const [isDragging,  setIsDragging]  = useState(false)
+  const layoutRef = useRef(null)
 
   // ── SSE ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -241,6 +296,13 @@ export default function Orders() {
     return () => { active = false; controller?.abort(); reader?.cancel() }
   }, [token, incrementNewOrders])
 
+  // ── Auto-clear selected if order leaves visible list ─────────
+  useEffect(() => {
+    if (selectedId && !orders.find(o => o.id === selectedId)) {
+      setSelectedId(null)
+    }
+  }, [selectedId, orders])
+
   // ── handleAdvance ────────────────────────────────────────────
   const handleAdvance = useCallback(async (e, order) => {
     e.stopPropagation()
@@ -254,15 +316,48 @@ export default function Orders() {
     finally { setAdvancing(null) }
   }, [token, updateOrderInList])
 
-  // ── Derived values ───────────────────────────────────────────
+  // ── Resizer ──────────────────────────────────────────────────
+  const handleResizerMouseDown = (e) => {
+    const startX     = e.clientX
+    const startWidth = listWidth || (layoutRef.current?.offsetWidth * 0.55 ?? 600)
+
+    setIsDragging(true)
+
+    const onMouseMove = (ev) => {
+      const containerWidth = layoutRef.current?.offsetWidth ?? 800
+      const clamped = Math.max(380, Math.min(containerWidth - 380, startWidth + (ev.clientX - startX)))
+      setListWidth(clamped)
+    }
+
+    const onMouseUp = (ev) => {
+      document.removeEventListener('mousemove', onMouseMove)
+      document.removeEventListener('mouseup',   onMouseUp)
+      document.body.style.userSelect = ''
+      document.body.style.cursor     = ''
+      setIsDragging(false)
+      const containerWidth = layoutRef.current?.offsetWidth ?? 800
+      const finalWidth = Math.max(380, Math.min(containerWidth - 380, startWidth + (ev.clientX - startX)))
+      localStorage.setItem('laroka_orders_list_width', String(finalWidth))
+    }
+
+    document.addEventListener('mousemove', onMouseMove)
+    document.addEventListener('mouseup',   onMouseUp)
+    document.body.style.userSelect = 'none'
+    document.body.style.cursor     = 'col-resize'
+  }
+
+  // ── Derived ──────────────────────────────────────────────────
   const chipCounts = {
     RECEIVED:       orders.filter(o => o.status === 'RECEIVED').length,
     IN_PREPARATION: orders.filter(o => o.status === 'IN_PREPARATION').length,
     ON_THE_WAY:     orders.filter(o => o.status === 'ON_THE_WAY' || o.status === 'READY_FOR_PICKUP').length,
     DELIVERED:      orders.filter(o => o.status === 'DELIVERED').length,
   }
-  const activeCount    = orders.filter(o => !TERMINAL.has(o.status)).length
-  const visibleOrders  = sortOrders(filterOrders(orders, activeTab, searchQuery))
+  const activeCount   = orders.filter(o => !TERMINAL.has(o.status)).length
+  const visibleOrders = sortOrders(filterOrders(orders, activeTab, searchQuery))
+  const selectedOrder = orders.find(o => o.id === selectedId) ?? null
+  const panelOpen     = selectedId !== null
+  const contracted    = panelOpen
 
   // ── Render ───────────────────────────────────────────────────
   return (
@@ -334,48 +429,73 @@ export default function Orders() {
       </div>
 
       {/* ── Main area ────────────────────────────────────────── */}
-      <div className="orders-layout">
+      <div className="orders-layout" ref={layoutRef}>
         {loading ? (
-          <div className="orders-state-center">
-            <div className="orders-spinner" />
-          </div>
+          <div className="orders-state-center"><div className="orders-spinner" /></div>
         ) : error ? (
-          <div className="orders-state-center orders-state-error">
-            {error}
-          </div>
+          <div className="orders-state-center orders-state-error">{error}</div>
         ) : (
-          <div className="orders-list-col">
+          <>
+            <div
+              className="orders-list-col"
+              style={panelOpen ? { width: listWidth || '55%', flexShrink: 0 } : undefined}
+            >
+              <div className={`orders-table-head${contracted ? ' orders-table-head--contracted' : ''}`}>
+                {contracted ? (
+                  <>
+                    <div className="col-head col-head--order">Pedido</div>
+                    <div className="col-head col-head--customer">Cliente</div>
+                    <div className="col-head col-head--status">Estado</div>
+                  </>
+                ) : (
+                  <>
+                    <div className="col-head col-head--order">Pedido</div>
+                    <div className="col-head col-head--customer">Cliente</div>
+                    <div className="col-head col-head--items">Productos</div>
+                    <div className="col-head col-head--notes">Notas</div>
+                    <div className="col-head col-head--status">Estado</div>
+                    <div className="col-head col-head--action">Acción</div>
+                  </>
+                )}
+              </div>
 
-            <div className="orders-table-head">
-              <div className="col-head col-head--order">Pedido</div>
-              <div className="col-head col-head--customer">Cliente</div>
-              <div className="col-head col-head--items">Productos</div>
-              <div className="col-head col-head--notes">Notas</div>
-              <div className="col-head col-head--status">Estado</div>
-              <div className="col-head col-head--action">Acción</div>
+              <div className="orders-rows">
+                {visibleOrders.length === 0 ? (
+                  <div className="orders-empty">No hay pedidos en esta categoría</div>
+                ) : (
+                  visibleOrders.map(order => (
+                    <OrderRow
+                      key={order.id}
+                      order={order}
+                      isSelected={order.id === selectedId}
+                      advancing={advancing}
+                      contracted={contracted}
+                      onSelect={() => setSelectedId(order.id === selectedId ? null : order.id)}
+                      onAdvance={e => handleAdvance(e, order)}
+                      onDismiss={e => { e.stopPropagation(); dismissOrder(order.id) }}
+                    />
+                  ))
+                )}
+              </div>
             </div>
 
-            <div className="orders-rows">
-              {visibleOrders.length === 0 ? (
-                <div className="orders-empty">
-                  No hay pedidos en esta categoría
-                </div>
-              ) : (
-                visibleOrders.map(order => (
-                  <OrderRow
-                    key={order.id}
-                    order={order}
-                    isSelected={order.id === selectedId}
+            {panelOpen && (
+              <>
+                <div
+                  className={`orders-resizer${isDragging ? ' orders-resizer--dragging' : ''}`}
+                  onMouseDown={handleResizerMouseDown}
+                />
+                {selectedOrder && (
+                  <OrderDetail
+                    order={selectedOrder}
+                    onClose={() => setSelectedId(null)}
+                    onAdvance={handleAdvance}
                     advancing={advancing}
-                    onSelect={() => setSelectedId(order.id)}
-                    onAdvance={e => handleAdvance(e, order)}
-                    onDismiss={e => { e.stopPropagation(); dismissOrder(order.id) }}
                   />
-                ))
-              )}
-            </div>
-
-          </div>
+                )}
+              </>
+            )}
+          </>
         )}
       </div>
 
@@ -385,7 +505,7 @@ export default function Orders() {
 
 // ── OrderRow ──────────────────────────────────────────────────
 
-function OrderRow({ order, isSelected, advancing, onSelect, onAdvance, onDismiss }) {
+function OrderRow({ order, isSelected, advancing, contracted, onSelect, onAdvance, onDismiss }) {
   const cfg        = STATUS_CONFIG[order.status] ?? {}
   const next       = getNextStatus(order.status, order.orderType)
   const isCancelled = order.status === 'CANCELLED'
@@ -394,8 +514,9 @@ function OrderRow({ order, isSelected, advancing, onSelect, onAdvance, onDismiss
     <div
       className={[
         'orders-row',
-        isSelected  ? 'orders-row--selected'  : '',
-        isCancelled ? 'orders-row--cancelled' : '',
+        isSelected  ? 'orders-row--selected'   : '',
+        isCancelled ? 'orders-row--cancelled'  : '',
+        contracted  ? 'orders-row--contracted' : '',
       ].filter(Boolean).join(' ')}
       onClick={onSelect}
     >
@@ -404,58 +525,61 @@ function OrderRow({ order, isSelected, advancing, onSelect, onAdvance, onDismiss
       <div className="col-order">
         <span className="order-id">{shortId(order.id)}</span>
         <span className="order-time">{formatTime(order.createdAt)}</span>
-        {order.paymentStatus && (
+        {!contracted && order.paymentStatus && (
           <span
             className="order-payment-status"
             style={{ color: PAYMENT_STATUS_COLOR[order.paymentStatus] }}
           >
-            <span className="order-payment-label">Pago: </span>{PAYMENT_STATUS_LABEL[order.paymentStatus] ?? order.paymentStatus}
+            <span className="order-payment-label">Pago: </span>
+            {PAYMENT_STATUS_LABEL[order.paymentStatus] ?? order.paymentStatus}
           </span>
         )}
       </div>
 
       {/* CLIENTE */}
       <div className="col-customer">
-        <div className="customer-avatar" aria-hidden="true">
+        <div
+          className="customer-avatar"
+          style={contracted ? { width: 28, height: 28, minWidth: 28, fontSize: 10 } : undefined}
+          aria-hidden="true"
+        >
           {getInitials(order.customerName)}
         </div>
         <div className="customer-info">
           <span className="customer-name">{order.customerName ?? '—'}</span>
           {order.customerPhone && (
-            <span className="customer-phone">
-              <PhoneIcon />
-              {order.customerPhone}
-            </span>
+            <span className="customer-phone"><PhoneIcon />{order.customerPhone}</span>
           )}
-          {order.orderType === 'DELIVERY' && order.deliveryAddress && (
-            <span className="customer-address">
-              <PinIcon />
-              {order.deliveryAddress}
-            </span>
+          {!contracted && order.orderType === 'DELIVERY' && order.deliveryAddress && (
+            <span className="customer-address"><PinIcon />{order.deliveryAddress}</span>
           )}
         </div>
       </div>
 
-      {/* PRODUCTOS */}
-      <div className="col-items">
-        {order.items?.slice(0, 2).map((item, i) => (
-          <span key={i} className="item-line">
-            <span className="item-qty">{item.quantity}×</span>
-            {' '}{item.productName}
-          </span>
-        ))}
-        {order.items?.length > 2 && (
-          <span className="item-more">+{order.items.length - 2} más</span>
-        )}
-      </div>
+      {/* PRODUCTOS — hidden when contracted */}
+      {!contracted && (
+        <div className="col-items">
+          {order.items?.slice(0, 2).map((item, i) => (
+            <span key={i} className="item-line">
+              <span className="item-qty">{item.quantity}×</span>
+              {' '}{item.productName}
+            </span>
+          ))}
+          {order.items?.length > 2 && (
+            <span className="item-more">+{order.items.length - 2} más</span>
+          )}
+        </div>
+      )}
 
-      {/* NOTAS */}
-      <div className="col-notes">
-        {order.notes
-          ? <span className="notes-text">"{order.notes}"</span>
-          : <span className="notes-empty">—</span>
-        }
-      </div>
+      {/* NOTAS — hidden when contracted */}
+      {!contracted && (
+        <div className="col-notes">
+          {order.notes
+            ? <span className="notes-text">"{order.notes}"</span>
+            : <span className="notes-empty">—</span>
+          }
+        </div>
+      )}
 
       {/* ESTADO */}
       <div className="col-status">
@@ -466,34 +590,258 @@ function OrderRow({ order, isSelected, advancing, onSelect, onAdvance, onDismiss
           <span className="status-dot" style={{ backgroundColor: cfg.color }} />
           {cfg.label ?? order.status}
         </span>
-        <span className="order-type-label">
-          {order.orderType === 'DELIVERY'
-            ? <><ScooterIcon /> Delivery</>
-            : <><StoreIcon /> Retiro en local</>}
-        </span>
+        {!contracted && (
+          <span className="order-type-label">
+            {order.orderType === 'DELIVERY'
+              ? <><ScooterIcon /> Delivery</>
+              : <><StoreIcon /> Retiro en local</>}
+          </span>
+        )}
       </div>
 
-      {/* ACCIÓN */}
-      <div className="col-action">
-        {isCancelled ? (
+      {/* ACCIÓN — hidden when contracted */}
+      {!contracted && (
+        <div className="col-action">
+          {isCancelled ? (
+            <button
+              className="action-dismiss-btn"
+              type="button"
+              onClick={onDismiss}
+              aria-label="Descartar pedido cancelado"
+            >
+              <TrashIcon />
+            </button>
+          ) : next ? (
+            <button className="action-advance-btn" type="button" onClick={onAdvance}>
+              {advancing === order.id ? '···' : 'Avanzar →'}
+            </button>
+          ) : (
+            <span className="action-none">—</span>
+          )}
+        </div>
+      )}
+
+    </div>
+  )
+}
+
+// ── OrderDetail ───────────────────────────────────────────────
+
+function OrderDetail({ order, onClose, onAdvance, advancing }) {
+  const cfg    = STATUS_CONFIG[order.status] ?? {}
+  const payCfg = PAYMENT_BADGE_CONFIG[order.paymentStatus] ?? {}
+  const next   = getNextStatus(order.status, order.orderType)
+  const isFinal = TERMINAL.has(order.status)
+
+  const sequence   = order.orderType === 'DELIVERY' ? SEQUENCE_DELIVERY : SEQUENCE_TAKEAWAY
+  const historyMap = {}
+  if (order.statusHistory) {
+    order.statusHistory.forEach(h => { historyMap[h.status] = h.changedAt })
+  }
+
+  return (
+    <div className="orders-detail-col">
+
+      {/* ── Header ──────────────────────────────────────────── */}
+      <div className="orders-detail-header">
+        <span className="detail-order-id">{shortId(order.id)}</span>
+        <span className="detail-order-time">{formatTime(order.createdAt)}</span>
+        <div style={{ flex: 1 }} />
+        <button className="detail-close-btn" type="button" onClick={onClose} aria-label="Cerrar">
+          <CloseIcon />
+        </button>
+      </div>
+
+      {/* ── Body ─────────────────────────────────────────────── */}
+      <div className="orders-detail-body">
+
+        <div className="detail-meta-row">
+          {/* Estado */}
+          <div className="detail-block">
+            <div className="detail-overline">ESTADO DEL PEDIDO</div>
+            <span
+              className="status-badge"
+              style={{ backgroundColor: cfg.bg, color: cfg.color, borderColor: cfg.border }}
+            >
+              <span className="status-dot" style={{ backgroundColor: cfg.color }} />
+              {cfg.label ?? order.status}
+            </span>
+            <div className="detail-type-label">
+              {order.orderType === 'DELIVERY'
+                ? <><ScooterIcon size={11} /> Delivery</>
+                : <><StoreIcon  size={11} /> Retiro en local</>}
+            </div>
+          </div>
+
+          {/* Origen */}
+          <div className="detail-block">
+            <div className="detail-overline">ORIGEN</div>
+            <div className="detail-origin-name">
+              {order.origin === 'CLIENT' ? 'App Roka' : 'Manual'}
+            </div>
+            <div className="detail-origin-time">{formatDateTime(order.createdAt)}</div>
+          </div>
+        </div>
+
+        {/* Cliente */}
+        <div className="detail-block detail-block--full">
+          <div className="detail-overline">CLIENTE</div>
+          <div className="detail-customer-row">
+            <div className="detail-customer-avatar">{getInitials(order.customerName)}</div>
+            <div className="detail-customer-info">
+              <div className="detail-customer-name">{order.customerName ?? '—'}</div>
+              {order.customerPhone && (
+                <div className="detail-customer-sub">
+                  <PhoneIcon size={12} />{order.customerPhone}
+                </div>
+              )}
+              {order.orderType === 'DELIVERY' && order.deliveryAddress && (
+                <div className="detail-customer-sub">
+                  <PinIcon size={12} />{order.deliveryAddress}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Pago */}
+        <div className="detail-block">
+          <div className="detail-overline">PAGO</div>
+          <div className="detail-payment-inner">
+            <div>
+              <span
+                className="status-badge"
+                style={{ backgroundColor: payCfg.bg, color: payCfg.color, borderColor: payCfg.border }}
+              >
+                <span className="status-dot" style={{ backgroundColor: payCfg.color }} />
+                {PAYMENT_STATUS_LABEL[order.paymentStatus] ?? order.paymentStatus ?? '—'}
+              </span>
+              <div className="detail-payment-method">
+                {PAYMENT_METHOD_LABEL[order.paymentMethod] ?? order.paymentMethod ?? '—'}
+              </div>
+            </div>
+            <div className="detail-payment-date">
+              <div className="detail-payment-date-label">PAGADO EL</div>
+              <div className="detail-payment-date-value">
+                {order.paidAt ? formatDateTime(order.paidAt) : <span style={{ color: '#4a6b50' }}>—</span>}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Productos */}
+        <div className="detail-block detail-block--full detail-products-block">
+          <div className="detail-products-head">
+            <span>CANT</span>
+            <span>PRODUCTO</span>
+            <span style={{ textAlign: 'right' }}>P.UNIT</span>
+            <span style={{ textAlign: 'right' }}>SUBTOTAL</span>
+          </div>
+          {order.items?.map((item, i) => (
+            <div
+              key={i}
+              className={`detail-product-row${i % 2 === 1 ? ' detail-product-row--odd' : ''}`}
+            >
+              <span className="detail-prod-qty">x{item.quantity}</span>
+              <span className="detail-prod-name">{item.productName}</span>
+              <span className="detail-prod-price">{formatPrice(item.unitPrice)}</span>
+              <span className="detail-prod-subtotal">{formatPrice(item.quantity * item.unitPrice)}</span>
+            </div>
+          ))}
+          {order.subtotal != null && order.subtotal !== order.totalAmount && (
+            <div className="detail-subtotal-row">
+              <span>Subtotal</span><span>{formatPrice(order.subtotal)}</span>
+            </div>
+          )}
+          {order.deliveryFee > 0 && (
+            <div className="detail-subtotal-row">
+              <span>Envío</span><span>{formatPrice(order.deliveryFee)}</span>
+            </div>
+          )}
+          {order.serviceFee > 0 && (
+            <div className="detail-subtotal-row">
+              <span>Servicio</span><span>{formatPrice(order.serviceFee)}</span>
+            </div>
+          )}
+          <div className="detail-total-row">
+            <span className="detail-total-label">TOTAL</span>
+            <span className="detail-total-amount">{formatPrice(order.totalAmount)}</span>
+          </div>
+        </div>
+
+        {/* Notas */}
+        {order.notes && (
+          <div className="detail-notes-block detail-block--full">
+            <p className="detail-notes-text">"{order.notes}"</p>
+          </div>
+        )}
+
+        {/* Historial */}
+        <div className="detail-block detail-block--full">
+          <div className="detail-overline">HISTORIAL</div>
+          <div className="detail-timeline">
+            {sequence.map((step, i) => {
+              const isLast       = i === sequence.length - 1
+              const isCurrent    = step === order.status
+              const isCompleted  = historyMap[step] !== undefined && !isCurrent
+              const isFutureStep = !historyMap[step] && !isCurrent
+              return (
+                <div key={step} className="detail-timeline-row">
+                  <div className="detail-timeline-step">
+                    <div className="detail-timeline-left">
+                      <div className={
+                        'detail-timeline-dot' +
+                        (isCurrent   ? ' detail-timeline-dot--current'   :
+                         isCompleted ? ' detail-timeline-dot--completed' :
+                                       ' detail-timeline-dot--future')
+                      } />
+                      {!isLast && <div className="detail-timeline-line" />}
+                    </div>
+                    <span className={
+                      'detail-timeline-label' +
+                      (isCurrent    ? ' detail-timeline-label--current' :
+                       isFutureStep ? ' detail-timeline-label--future'  : '')
+                    }>
+                      {STATUS_CONFIG[step]?.label ?? step}
+                    </span>
+                  </div>
+                  {isCompleted && historyMap[step] && (
+                    <span className="detail-timeline-time">{formatDateTime(historyMap[step])}</span>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+      </div>
+
+      {/* ── Footer ──────────────────────────────────────────── */}
+      <div className="orders-detail-footer">
+        <button
+          className="detail-back-btn"
+          type="button"
+        >
+          <ArrowLeftIcon /> Atrás
+        </button>
+
+        {next ? (
           <button
-            className="action-dismiss-btn"
+            className="detail-advance-btn"
             type="button"
-            onClick={onDismiss}
-            aria-label="Descartar pedido cancelado"
+            onClick={e => onAdvance(e, order)}
+            disabled={advancing === order.id}
           >
-            <TrashIcon />
-          </button>
-        ) : next ? (
-          <button
-            className="action-advance-btn"
-            type="button"
-            onClick={onAdvance}
-          >
-            {advancing === order.id ? '···' : 'Avanzar →'}
+            {advancing === order.id ? '···' : `Avanzar a ${STATUS_CONFIG[next]?.label} →`}
           </button>
         ) : (
-          <span className="action-none">—</span>
+          <div className="detail-advance-done">Pedido finalizado</div>
+        )}
+
+        {!isFinal && (
+          <button className="detail-cancel-btn" type="button">
+            <XCancelIcon /> Cancelar
+          </button>
         )}
       </div>
 
