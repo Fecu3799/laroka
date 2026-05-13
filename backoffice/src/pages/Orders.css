@@ -448,7 +448,7 @@
   align-items: center;
 }
 
-.status-badge {
+.col-status .status-badge {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -461,7 +461,7 @@
   width: fit-content;
 }
 
-.status-dot {
+.col-status .status-dot {
   width: 5px;
   height: 5px;
   border-radius: 50%;
@@ -753,9 +753,10 @@
 
 /* ── Meta row (Estado + Origen side-by-side) ─────────────────── */
 
-.detail-meta-row {
+.detail-four-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
+  grid-template-rows: auto auto;
   gap: 10px;
   flex-shrink: 0;
 }
@@ -773,12 +774,6 @@
   flex-shrink: 0;
 }
 
-/* Estado + Origen: centered content */
-.detail-meta-row .detail-block {
-  align-items: center;
-  text-align: center;
-}
-
 .detail-overline {
   display: block;
   font-family: 'Inter', sans-serif;
@@ -792,34 +787,6 @@
 
 .detail-overline--padded {
   padding: 14px 16px 0;
-}
-
-/* ── Estado block ────────────────────────────────────────────── */
-
-.detail-type-label {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  font-family: 'Inter', sans-serif;
-  font-size: 12px;
-  color: #4a6b50;
-  margin-top: 6px;
-}
-
-/* ── Origen block ────────────────────────────────────────────── */
-
-.detail-origin-name {
-  font-family: 'Inter', sans-serif;
-  font-size: 14px;
-  font-weight: 700;
-  color: #e8f0ea;
-}
-
-.detail-origin-time {
-  font-family: 'Inter', sans-serif;
-  font-size: 11px;
-  color: #7a9b80;
 }
 
 /* ── Cliente block ───────────────────────────────────────────── */
@@ -850,7 +817,7 @@
 .detail-customer-info {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 5px;
   min-width: 0;
 }
 
@@ -870,43 +837,57 @@
   color: #7a9b80;
 }
 
+/* ── Estado block ────────────────────────────────────────────── */
+
+.detail-block .status-badge {
+  display: inline-flex;
+  margin: 0 auto;
+  gap: 6px;
+  padding: 4px 11px;
+  border-radius: 20px;
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  border: 1px solid;
+  width: fit-content;
+}
+
+.detail-type-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  color: #4a6b50;
+  margin-top: 6px;
+}
+
+/* ── Origen block ────────────────────────────────────────────── */
+
+.detail-origin-name {
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  color: #e8f0ea;
+  margin: 0 auto 6px;
+}
+
+.detail-origin-time {
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  color: #7a9b80;
+  margin: 0 auto;
+}
+
 /* ── Pago block ──────────────────────────────────────────────── */
 
-.detail-payment-inner {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  align-items: start;
-}
 
 .detail-payment-method {
   font-family: 'Inter', sans-serif;
   font-size: 12px;
   color: #7a9b80;
-  margin-top: 4px;
-}
-
-.detail-payment-date {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  text-align: right;
-}
-
-.detail-payment-date-label {
-  font-family: 'Inter', sans-serif;
-  font-size: 10px;
-  font-weight: 700;
-  color: #4a6b50;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-}
-
-.detail-payment-date-value {
-  font-family: 'Inter', sans-serif;
-  font-size: 13px;
-  font-weight: 600;
-  color: #e8f0ea;
+  margin: 6px auto 0;
 }
 
 /* ── Productos block ─────────────────────────────────────────── */

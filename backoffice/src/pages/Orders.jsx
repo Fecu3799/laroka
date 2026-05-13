@@ -655,8 +655,30 @@ function OrderDetail({ order, onClose, onAdvance, advancing }) {
       {/* ── Body ─────────────────────────────────────────────── */}
       <div className="orders-detail-body">
 
-        <div className="detail-meta-row">
-          {/* Estado */}
+        <div className="detail-four-grid">
+
+          {/* Cliente — top left */}
+          <div className="detail-block">
+            <div className="detail-overline">CLIENTE</div>
+            <div className="detail-customer-row">
+              <div className="detail-customer-avatar">{getInitials(order.customerName)}</div>
+              <div className="detail-customer-info">
+                <div className="detail-customer-name">{order.customerName ?? '—'}</div>
+                {order.customerPhone && (
+                  <div className="detail-customer-sub">
+                    <PhoneIcon size={12} />{order.customerPhone}
+                  </div>
+                )}
+                {order.orderType === 'DELIVERY' && order.deliveryAddress && (
+                  <div className="detail-customer-sub">
+                    <PinIcon size={12} />{order.deliveryAddress}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Estado — top right */}
           <div className="detail-block">
             <div className="detail-overline">ESTADO DEL PEDIDO</div>
             <span
@@ -673,60 +695,30 @@ function OrderDetail({ order, onClose, onAdvance, advancing }) {
             </div>
           </div>
 
-          {/* Origen */}
-          <div className="detail-block">
+          {/* Origen — bottom left */}
+          <div className="detail-block detail-block--origin">
             <div className="detail-overline">ORIGEN</div>
             <div className="detail-origin-name">
               {order.origin === 'CLIENT' ? 'App Roka' : 'Manual'}
             </div>
             <div className="detail-origin-time">{formatDateTime(order.createdAt)}</div>
           </div>
-        </div>
 
-        {/* Cliente */}
-        <div className="detail-block detail-block--full">
-          <div className="detail-overline">CLIENTE</div>
-          <div className="detail-customer-row">
-            <div className="detail-customer-avatar">{getInitials(order.customerName)}</div>
-            <div className="detail-customer-info">
-              <div className="detail-customer-name">{order.customerName ?? '—'}</div>
-              {order.customerPhone && (
-                <div className="detail-customer-sub">
-                  <PhoneIcon size={12} />{order.customerPhone}
-                </div>
-              )}
-              {order.orderType === 'DELIVERY' && order.deliveryAddress && (
-                <div className="detail-customer-sub">
-                  <PinIcon size={12} />{order.deliveryAddress}
-                </div>
-              )}
+          {/* Pago — bottom right */}
+          <div className="detail-block">
+            <div className="detail-overline">PAGO</div>
+            <span
+              className="status-badge"
+              style={{ backgroundColor: payCfg.bg, color: payCfg.color, borderColor: payCfg.border }}
+            >
+              <span className="status-dot" style={{ backgroundColor: payCfg.color }} />
+              {PAYMENT_STATUS_LABEL[order.paymentStatus] ?? order.paymentStatus ?? '—'}
+            </span>
+            <div className="detail-payment-method">
+              {PAYMENT_METHOD_LABEL[order.paymentMethod] ?? order.paymentMethod ?? '—'}
             </div>
           </div>
-        </div>
 
-        {/* Pago */}
-        <div className="detail-block">
-          <div className="detail-overline">PAGO</div>
-          <div className="detail-payment-inner">
-            <div>
-              <span
-                className="status-badge"
-                style={{ backgroundColor: payCfg.bg, color: payCfg.color, borderColor: payCfg.border }}
-              >
-                <span className="status-dot" style={{ backgroundColor: payCfg.color }} />
-                {PAYMENT_STATUS_LABEL[order.paymentStatus] ?? order.paymentStatus ?? '—'}
-              </span>
-              <div className="detail-payment-method">
-                {PAYMENT_METHOD_LABEL[order.paymentMethod] ?? order.paymentMethod ?? '—'}
-              </div>
-            </div>
-            <div className="detail-payment-date">
-              <div className="detail-payment-date-label">PAGADO EL</div>
-              <div className="detail-payment-date-value">
-                {order.paidAt ? formatDateTime(order.paidAt) : <span style={{ color: '#4a6b50' }}>—</span>}
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* Productos */}
