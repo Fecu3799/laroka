@@ -1,0 +1,196 @@
+/* ── Page container ──────────────────────────────────────────── */
+
+.orders-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* ── Top bar ─────────────────────────────────────────────────── */
+
+.orders-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 24px 14px;
+  background: #071209;
+  border-bottom: 1px solid rgba(101, 163, 105, 0.15);
+  flex-shrink: 0;
+}
+
+.orders-header-title-block {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.orders-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700;
+  font-size: 30px;
+  color: #e8f0ea;
+  line-height: 1;
+  margin: 0;
+}
+
+.orders-subtitle {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  color: #7a9b80;
+}
+
+.orders-header-spacer {
+  flex: 1;
+}
+
+/* ── Count chips ─────────────────────────────────────────────── */
+
+.orders-chips {
+  display: flex;
+  gap: 8px;
+}
+
+.orders-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 7px 13px;
+  border-radius: 10px;
+  min-width: 64px;
+  border: 1px solid;
+}
+
+.orders-chip-count {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 800;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.orders-chip-label {
+  font-family: 'Inter', sans-serif;
+  font-size: 9.5px;
+  margin-top: 2px;
+  white-space: nowrap;
+}
+
+/* ── Search ──────────────────────────────────────────────────── */
+
+.orders-search {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 220px;
+  background: #0f2318;
+  border: 1px solid rgba(101, 163, 105, 0.15);
+  border-radius: 10px;
+  padding: 7px 12px;
+  flex-shrink: 0;
+}
+
+.orders-search-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-family: 'Inter', sans-serif;
+  font-size: 12.5px;
+  color: #e8f0ea;
+  min-width: 0;
+}
+
+.orders-search-input::placeholder {
+  color: #4a6b50;
+}
+
+/* ── Refresh button ──────────────────────────────────────────── */
+
+.orders-refresh-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 14px;
+  border-radius: 10px;
+  background: transparent;
+  border: 1px solid rgba(254, 205, 24, 0.27);
+  color: #fecd18;
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: border-color 0.15s;
+}
+
+.orders-refresh-btn:hover {
+  border-color: rgba(254, 205, 24, 0.5);
+}
+
+/* ── Tabs ────────────────────────────────────────────────────── */
+
+.orders-tabs {
+  display: flex;
+  gap: 0;
+  padding: 0 24px;
+  background: #071209;
+  border-bottom: 1px solid rgba(101, 163, 105, 0.15);
+  flex-shrink: 0;
+}
+
+.orders-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 11px 16px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: #7a9b80;
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 12.5px;
+  cursor: pointer;
+  margin-bottom: -1px;
+  white-space: nowrap;
+  transition: color 0.15s;
+}
+
+.orders-tab--active {
+  border-bottom-color: #fecd18;
+  color: #fecd18;
+}
+
+.orders-tab-pill {
+  font-size: 10.5px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: rgba(122, 155, 128, 0.12);
+  color: #4a6b50;
+}
+
+.orders-tab-pill--active {
+  background: rgba(254, 205, 24, 0.1);
+  color: #fecd18;
+}
+
+/* ── Main area ───────────────────────────────────────────────── */
+
+.orders-layout {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.orders-layout-placeholder {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  color: #1e3320;
+}
