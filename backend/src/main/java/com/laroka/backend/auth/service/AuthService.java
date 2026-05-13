@@ -18,7 +18,7 @@ public class AuthService {
 	private final JwtService jwtService;
 
 	public String login(String email, String password) {
-		var user = staffUserRepository.findByEmail(email)
+		var user = staffUserRepository.findByEmailWithBranchAndTenant(email)
 			.orElseThrow(InvalidCredentialsException::new);
 
 		if (!passwordEncoder.matches(password, user.getPasswordHash())) {

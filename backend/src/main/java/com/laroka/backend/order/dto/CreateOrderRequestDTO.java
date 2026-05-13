@@ -21,6 +21,10 @@ public class CreateOrderRequestDTO {
 
     private String deliveryAddress;
 
+    private String customerName;
+
+    private String customerPhone;
+
     @NotNull
     @NotEmpty
     @Valid

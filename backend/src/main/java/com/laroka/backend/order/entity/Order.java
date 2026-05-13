@@ -64,6 +64,12 @@ public class Order {
     @Column(name = "notes")
     private String notes;
 
+    @Column(name = "customer_name", length = 100)
+    private String customerName;
+
+    @Column(name = "customer_phone", length = 30)
+    private String customerPhone;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "origin", nullable = false, length = 20)
     private OrderOrigin origin;

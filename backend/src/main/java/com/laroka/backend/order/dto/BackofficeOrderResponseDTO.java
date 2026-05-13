@@ -31,5 +31,7 @@ public class BackofficeOrderResponseDTO {
     private OrderType orderType;
     private OrderOrigin origin;
     private String notes;
+    private String customerName;
+    private String customerPhone;
     private List<BackofficeOrderItemDTO> items;
 }

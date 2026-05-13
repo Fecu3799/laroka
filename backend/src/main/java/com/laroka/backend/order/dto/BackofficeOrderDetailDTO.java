@@ -34,6 +34,8 @@ public class BackofficeOrderDetailDTO {
     private BigDecimal totalAmount;
     private String deliveryAddress;
     private String notes;
+    private String customerName;
+    private String customerPhone;
     private String branchName;
     private List<OrderItemResponseDTO> items;
     private PaymentStatus paymentStatus;
