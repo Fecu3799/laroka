@@ -4,6 +4,8 @@ CREATE TABLE orders (
     id UUID PRIMARY KEY,
     branch_id INTEGER NOT NULL,
     tenant_id INTEGER NOT NULL,
+    customer_name  VARCHAR(100),
+    customer_phone VARCHAR(30),
     status VARCHAR(30) NOT NULL,
     order_type VARCHAR(20) NOT NULL,
     origin VARCHAR(20) NOT NULL,

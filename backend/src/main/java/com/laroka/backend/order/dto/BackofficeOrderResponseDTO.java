@@ -30,6 +30,7 @@ public class BackofficeOrderResponseDTO {
     private PaymentMethod paymentMethod;
     private OrderType orderType;
     private OrderOrigin origin;
+    private String deliveryAddress;
     private String notes;
     private String customerName;
     private String customerPhone;

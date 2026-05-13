@@ -135,6 +135,7 @@ public class OrderMapper {
                 .paymentMethod(payment != null ? payment.getMethod() : null)
                 .orderType(order.getOrderType())
                 .origin(order.getOrigin())
+                .deliveryAddress(order.getDeliveryAddress())
                 .notes(order.getNotes())
                 .customerName(order.getCustomerName())
                 .customerPhone(order.getCustomerPhone())
