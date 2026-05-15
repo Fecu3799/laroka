@@ -248,7 +248,7 @@
 .orders-table-head,
 .orders-row {
   display: grid;
-  grid-template-columns: 160px 1.1fr 1.1fr 0.9fr 280px 220px;
+  grid-template-columns: 160px 1.1fr 1.1fr 130px 0.9fr 280px 220px;
   column-gap: 20px;
   align-items: center;
 }
@@ -417,9 +417,36 @@
   color: #4a6b50;
 }
 
+/* ── Col: PAGO ───────────────────────────────────────────────── */
+
+.col-pago { display: flex; align-items: center; }
+
+.pago-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.pago-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
 /* ── Col: NOTAS ──────────────────────────────────────────────── */
 
 .col-notes { min-width: 0; }
+
+.col-notes--contracted .notes-text {
+  display: block;
+  white-space: nowrap;
+  -webkit-line-clamp: unset;
+  line-clamp: unset;
+}
 
 .notes-text {
   font-family: 'Inter', sans-serif;
@@ -551,6 +578,9 @@
 /* Header of the PRODUCTOS column — item list */
 .col-head--items { /* override here */ }
 
+/* Header of the PAGO column — payment status */
+.col-head--pago { /* override here */ }
+
 /* Header of the NOTAS column — customer notes */
 .col-head--notes { /* override here */ }
 
@@ -590,8 +620,8 @@
 
 /* ============================================================
    GRID COLUMN WIDTHS
-   This single line controls the width of all 6 columns.
-   Order: PEDIDO · CLIENTE · PRODUCTOS · NOTAS · ESTADO · ACCIÓN
+   This single line controls the width of all 7 columns.
+   Order: PEDIDO · CLIENTE · PRODUCTOS · PAGO · NOTAS · ESTADO · ACCIÓN
    Modify individual values to resize specific columns.
    ============================================================ */
 
@@ -600,44 +630,48 @@
 
 /* ============================================================
    FULL-COLUMN OVERRIDES  (header + data cells together)
-   Use nth-child to target the same column in both the header
-   row and all data rows at once. Header-only or row-only
-   overrides go in col-head--* or col-* classes instead.
+   :not() scoping prevents these from affecting contracted rows.
    ============================================================ */
 
 /* Column 1 — PEDIDO */
-.orders-table-head > :nth-child(1),
-.orders-row        > :nth-child(1) { /* override here */ 
+.orders-table-head:not(.orders-table-head--contracted) > :nth-child(1),
+.orders-row:not(.orders-row--contracted)               > :nth-child(1) { /* override here */
   width: 160px;
 }
 
 /* Column 2 — CLIENTE */
-.orders-table-head > :nth-child(2),
-.orders-row        > :nth-child(2) { /* override here */ 
+.orders-table-head:not(.orders-table-head--contracted) > :nth-child(2),
+.orders-row:not(.orders-row--contracted)               > :nth-child(2) { /* override here */
   width: 160px;
 }
 
 /* Column 3 — PRODUCTOS */
-.orders-table-head > :nth-child(3),
-.orders-row        > :nth-child(3) { /* override here */ 
+.orders-table-head:not(.orders-table-head--contracted) > :nth-child(3),
+.orders-row:not(.orders-row--contracted)               > :nth-child(3) { /* override here */
   width: auto;
 }
 
-/* Column 4 — NOTAS */
-.orders-table-head > :nth-child(4),
-.orders-row        > :nth-child(4) { /* override here */ 
+/* Column 4 — PAGO */
+.orders-table-head:not(.orders-table-head--contracted) > :nth-child(4),
+.orders-row:not(.orders-row--contracted)               > :nth-child(4) { /* override here */
+  width: 130px;
+}
+
+/* Column 5 — NOTAS */
+.orders-table-head:not(.orders-table-head--contracted) > :nth-child(5),
+.orders-row:not(.orders-row--contracted)               > :nth-child(5) { /* override here */
   width: 160px;
 }
 
-/* Column 5 — ESTADO */
-.orders-table-head > :nth-child(5),
-.orders-row        > :nth-child(5) { /* override here */ 
+/* Column 6 — ESTADO */
+.orders-table-head:not(.orders-table-head--contracted) > :nth-child(6),
+.orders-row:not(.orders-row--contracted)               > :nth-child(6) { /* override here */
   width: 150px;
 }
 
-/* Column 6 — ACCIÓN */
-.orders-table-head > :nth-child(6),
-.orders-row        > :nth-child(6) { /* override here */
+/* Column 7 — ACCIÓN */
+.orders-table-head:not(.orders-table-head--contracted) > :nth-child(7),
+.orders-row:not(.orders-row--contracted)               > :nth-child(7) { /* override here */
   width: 150px;
 }
 
@@ -649,26 +683,28 @@
 
 .orders-table-head--contracted,
 .orders-row--contracted {
-  grid-template-columns: 140px 1fr 150px;
-  column-gap: 16px;
+  grid-template-columns: 1fr 1fr 1fr 1fr 1fr;
+  column-gap: 12px;
+  align-items: center;
+  min-height: 0;
 }
 
-.orders-table-head--contracted { padding: 12px 18px; }
-.orders-row--contracted         { padding: 12px 18px; }
+.orders-table-head--contracted { padding: 10px 18px; }
 
-/* ── Resizer ─────────────────────────────────────────────────── */
-
-.orders-resizer {
-  width: 5px;
-  flex-shrink: 0;
-  background: rgba(101, 163, 105, 0.15);
-  cursor: col-resize;
-  transition: background 0.15s;
+.orders-row--contracted {
+  padding: 10px 18px;
+  font-size: 13px;
 }
 
-.orders-resizer:hover,
-.orders-resizer--dragging {
-  background: rgba(254, 205, 24, 0.35);
+.orders-row--contracted .order-id   { font-size: 15px; }
+.orders-row--contracted .customer-name { font-size: 13px; }
+.orders-row--contracted .pago-status   { font-size: 13px; }
+.orders-row--contracted .notes-text,
+.orders-row--contracted .notes-empty   { font-size: 13px; }
+
+.orders-row--contracted .status-badge {
+  white-space: nowrap;
+  font-size: 12px;
 }
 
 /* ── Detail panel ────────────────────────────────────────────── */

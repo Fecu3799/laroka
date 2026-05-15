@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import useAuth from '../hooks/useAuth'
 import useOrders from '../hooks/useOrders'
@@ -244,12 +244,6 @@ export default function Orders() {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedId,  setSelectedId]  = useState(null)
   const [advancing,   setAdvancing]   = useState(null)
-  const [listWidth,   setListWidth]   = useState(
-    () => Number(localStorage.getItem('laroka_orders_list_width')) || 0
-  )
-  const [isDragging,  setIsDragging]  = useState(false)
-  const layoutRef = useRef(null)
-
   // ── SSE ─────────────────────────────────────────────────────
   useEffect(() => {
     if (!token) return
@@ -315,36 +309,6 @@ export default function Orders() {
     } catch { /* silent */ }
     finally { setAdvancing(null) }
   }, [token, updateOrderInList])
-
-  // ── Resizer ──────────────────────────────────────────────────
-  const handleResizerMouseDown = (e) => {
-    const startX     = e.clientX
-    const startWidth = listWidth || (layoutRef.current?.offsetWidth * 0.55 ?? 600)
-
-    setIsDragging(true)
-
-    const onMouseMove = (ev) => {
-      const containerWidth = layoutRef.current?.offsetWidth ?? 800
-      const clamped = Math.max(380, Math.min(containerWidth - 380, startWidth + (ev.clientX - startX)))
-      setListWidth(clamped)
-    }
-
-    const onMouseUp = (ev) => {
-      document.removeEventListener('mousemove', onMouseMove)
-      document.removeEventListener('mouseup',   onMouseUp)
-      document.body.style.userSelect = ''
-      document.body.style.cursor     = ''
-      setIsDragging(false)
-      const containerWidth = layoutRef.current?.offsetWidth ?? 800
-      const finalWidth = Math.max(380, Math.min(containerWidth - 380, startWidth + (ev.clientX - startX)))
-      localStorage.setItem('laroka_orders_list_width', String(finalWidth))
-    }
-
-    document.addEventListener('mousemove', onMouseMove)
-    document.addEventListener('mouseup',   onMouseUp)
-    document.body.style.userSelect = 'none'
-    document.body.style.cursor     = 'col-resize'
-  }
 
   // ── Derived ──────────────────────────────────────────────────
   const chipCounts = {
@@ -429,7 +393,7 @@ export default function Orders() {
       </div>
 
       {/* ── Main area ────────────────────────────────────────── */}
-      <div className="orders-layout" ref={layoutRef}>
+      <div className="orders-layout">
         {loading ? (
           <div className="orders-state-center"><div className="orders-spinner" /></div>
         ) : error ? (
@@ -438,13 +402,15 @@ export default function Orders() {
           <>
             <div
               className="orders-list-col"
-              style={panelOpen ? { width: listWidth || '55%', flexShrink: 0 } : undefined}
+              style={panelOpen ? { width: '55%', flexShrink: 0 } : undefined}
             >
               <div className={`orders-table-head${contracted ? ' orders-table-head--contracted' : ''}`}>
                 {contracted ? (
                   <>
                     <div className="col-head col-head--order">Pedido</div>
                     <div className="col-head col-head--customer">Cliente</div>
+                    <div className="col-head col-head--pago">Pago</div>
+                    <div className="col-head col-head--notes">Notas</div>
                     <div className="col-head col-head--status">Estado</div>
                   </>
                 ) : (
@@ -452,6 +418,7 @@ export default function Orders() {
                     <div className="col-head col-head--order">Pedido</div>
                     <div className="col-head col-head--customer">Cliente</div>
                     <div className="col-head col-head--items">Productos</div>
+                    <div className="col-head col-head--pago">Pago</div>
                     <div className="col-head col-head--notes">Notas</div>
                     <div className="col-head col-head--status">Estado</div>
                     <div className="col-head col-head--action">Acción</div>
@@ -479,21 +446,13 @@ export default function Orders() {
               </div>
             </div>
 
-            {panelOpen && (
-              <>
-                <div
-                  className={`orders-resizer${isDragging ? ' orders-resizer--dragging' : ''}`}
-                  onMouseDown={handleResizerMouseDown}
-                />
-                {selectedOrder && (
-                  <OrderDetail
-                    order={selectedOrder}
-                    onClose={() => setSelectedId(null)}
-                    onAdvance={handleAdvance}
-                    advancing={advancing}
-                  />
-                )}
-              </>
+            {panelOpen && selectedOrder && (
+              <OrderDetail
+                order={selectedOrder}
+                onClose={() => setSelectedId(null)}
+                onAdvance={handleAdvance}
+                advancing={advancing}
+              />
             )}
           </>
         )}
@@ -524,16 +483,7 @@ function OrderRow({ order, isSelected, advancing, contracted, onSelect, onAdvanc
       {/* PEDIDO */}
       <div className="col-order">
         <span className="order-id">{shortId(order.id)}</span>
-        <span className="order-time">{formatTime(order.createdAt)}</span>
-        {!contracted && order.paymentStatus && (
-          <span
-            className="order-payment-status"
-            style={{ color: PAYMENT_STATUS_COLOR[order.paymentStatus] }}
-          >
-            <span className="order-payment-label">Pago: </span>
-            {PAYMENT_STATUS_LABEL[order.paymentStatus] ?? order.paymentStatus}
-          </span>
-        )}
+        {!contracted && <span className="order-time">{formatTime(order.createdAt)}</span>}
       </div>
 
       {/* CLIENTE */}
@@ -547,7 +497,7 @@ function OrderRow({ order, isSelected, advancing, contracted, onSelect, onAdvanc
         </div>
         <div className="customer-info">
           <span className="customer-name">{order.customerName ?? '—'}</span>
-          {order.customerPhone && (
+          {!contracted && order.customerPhone && (
             <span className="customer-phone"><PhoneIcon />{order.customerPhone}</span>
           )}
           {!contracted && order.orderType === 'DELIVERY' && order.deliveryAddress && (
@@ -571,15 +521,23 @@ function OrderRow({ order, isSelected, advancing, contracted, onSelect, onAdvanc
         </div>
       )}
 
-      {/* NOTAS — hidden when contracted */}
-      {!contracted && (
-        <div className="col-notes">
-          {order.notes
-            ? <span className="notes-text">"{order.notes}"</span>
-            : <span className="notes-empty">—</span>
-          }
-        </div>
-      )}
+      {/* PAGO */}
+      <div className="col-pago">
+        {order.paymentStatus && (
+          <span className="pago-status" style={{ color: PAYMENT_STATUS_COLOR[order.paymentStatus] }}>
+            <span className="pago-dot" style={{ backgroundColor: PAYMENT_STATUS_COLOR[order.paymentStatus] }} />
+            {PAYMENT_STATUS_LABEL[order.paymentStatus] ?? order.paymentStatus}
+          </span>
+        )}
+      </div>
+
+      {/* NOTAS */}
+      <div className={`col-notes${contracted ? ' col-notes--contracted' : ''}`}>
+        {order.notes
+          ? <span className="notes-text">"{order.notes}"</span>
+          : <span className="notes-empty">—</span>
+        }
+      </div>
 
       {/* ESTADO */}
       <div className="col-status">
@@ -636,7 +594,7 @@ function OrderDetail({ order, onClose, onAdvance, advancing }) {
   const sequence   = order.orderType === 'DELIVERY' ? SEQUENCE_DELIVERY : SEQUENCE_TAKEAWAY
   const historyMap = {}
   if (order.statusHistory) {
-    order.statusHistory.forEach(h => { historyMap[h.status] = h.changedAt })
+    order.statusHistory.forEach(h => { historyMap[h.toStatus] = h.changedAt })
   }
 
   return (
@@ -775,8 +733,9 @@ function OrderDetail({ order, onClose, onAdvance, advancing }) {
             {sequence.map((step, i) => {
               const isLast       = i === sequence.length - 1
               const isCurrent    = step === order.status
-              const isCompleted  = historyMap[step] !== undefined && !isCurrent
-              const isFutureStep = !historyMap[step] && !isCurrent
+              const hasHistory   = historyMap[step] !== undefined
+              const isCompleted  = hasHistory && !isCurrent
+              const isFutureStep = !hasHistory && !isCurrent
               return (
                 <div key={step} className="detail-timeline-row">
                   <div className="detail-timeline-step">
@@ -797,7 +756,7 @@ function OrderDetail({ order, onClose, onAdvance, advancing }) {
                       {STATUS_CONFIG[step]?.label ?? step}
                     </span>
                   </div>
-                  {isCompleted && historyMap[step] && (
+                  {hasHistory && (
                     <span className="detail-timeline-time">{formatDateTime(historyMap[step])}</span>
                   )}
                 </div>
