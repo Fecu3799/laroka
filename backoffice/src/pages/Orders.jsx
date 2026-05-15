@@ -458,6 +458,7 @@ export default function Orders() {
                 advancing={advancing}
                 token={token}
                 onRefetch={refetchDetail}
+                onRefresh={refresh}
                 onPaymentConfirmed={updatePaymentInList}
               />
             )}
@@ -592,13 +593,16 @@ function OrderRow({ order, isSelected, advancing, contracted, onSelect, onAdvanc
 
 // ── OrderDetail ───────────────────────────────────────────────
 
-function OrderDetail({ order, onClose, onAdvance, advancing, token, onRefetch, onPaymentConfirmed }) {
+function OrderDetail({ order, onClose, onAdvance, advancing, token, onRefetch, onRefresh, onPaymentConfirmed }) {
   const cfg    = STATUS_CONFIG[order.status] ?? {}
   const payCfg = PAYMENT_BADGE_CONFIG[order.paymentStatus] ?? {}
   const next   = getNextStatus(order.status, order.orderType)
-  const isFinal = TERMINAL.has(order.status)
 
-  const [paying, setPaying] = useState(false)
+  const [paying,        setPaying]        = useState(false)
+  const [actionLoading, setActionLoading] = useState(null)
+
+  const canGoBack = ['IN_PREPARATION', 'ON_THE_WAY', 'READY_FOR_PICKUP'].includes(order.status)
+  const canCancel = order.status === 'RECEIVED'
 
   const confirmPayment = async (e) => {
     e.stopPropagation()
@@ -619,7 +623,43 @@ function OrderDetail({ order, onClose, onAdvance, advancing, token, onRefetch, o
     finally { setPaying(false) }
   }
 
+  const goBack = async (e) => {
+    e.stopPropagation()
+    setActionLoading('back')
+    try {
+      const res = await fetch(`${API_URL}/backoffice/orders/${order.id}/status/previous`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      onRefetch()
+      onRefresh()
+    } catch { /* silent */ }
+    finally { setActionLoading(null) }
+  }
+
+  const cancelOrder = async (e) => {
+    e.stopPropagation()
+    if (!window.confirm('¿Cancelar este pedido? Esta acción no se puede deshacer.')) return
+    setActionLoading('cancel')
+    try {
+      const res = await fetch(`${API_URL}/backoffice/orders/${order.id}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ nextStatus: 'CANCELLED' }),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      onRefetch()
+      onRefresh()
+    } catch { /* silent */ }
+    finally { setActionLoading(null) }
+  }
+
   const sequence   = order.orderType === 'DELIVERY' ? SEQUENCE_DELIVERY : SEQUENCE_TAKEAWAY
+  const currentIdx = sequence.indexOf(order.status)
   const historyMap = {}
   if (order.statusHistory) {
     order.statusHistory.forEach(h => { historyMap[h.toStatus] = h.changedAt })
@@ -763,11 +803,11 @@ function OrderDetail({ order, onClose, onAdvance, advancing, token, onRefetch, o
               <div className="detail-overline">HISTORIAL</div>
               <div className="detail-timeline">
                 {sequence.map((step, i) => {
-                  const isLast       = i === sequence.length - 1
-                  const isCurrent    = step === order.status
-                  const hasHistory   = historyMap[step] !== undefined
-                  const isCompleted  = hasHistory && !isCurrent
-                  const isFutureStep = !hasHistory && !isCurrent
+                  const isLast      = i === sequence.length - 1
+                  const isCurrent   = i === currentIdx
+                  const isCompleted = i < currentIdx
+                  const isFuture    = i > currentIdx
+                  const timestamp   = historyMap[step]
                   return (
                     <div key={step} className="detail-timeline-row">
                       <div className="detail-timeline-step">
@@ -782,14 +822,14 @@ function OrderDetail({ order, onClose, onAdvance, advancing, token, onRefetch, o
                         </div>
                         <span className={
                           'detail-timeline-label' +
-                          (isCurrent    ? ' detail-timeline-label--current' :
-                           isFutureStep ? ' detail-timeline-label--future'  : '')
+                          (isCurrent ? ' detail-timeline-label--current' :
+                           isFuture  ? ' detail-timeline-label--future'  : '')
                         }>
                           {STATUS_CONFIG[step]?.label ?? step}
                         </span>
                       </div>
-                      {hasHistory && (
-                        <span className="detail-timeline-time">{formatDateTime(historyMap[step])}</span>
+                      {timestamp && (
+                        <span className="detail-timeline-time">{formatDateTime(timestamp)}</span>
                       )}
                     </div>
                   )
@@ -827,20 +867,25 @@ function OrderDetail({ order, onClose, onAdvance, advancing, token, onRefetch, o
               </button>
             )}
 
-            <button
-              className="detail-action-btn detail-action-back"
-              type="button"
-              disabled
-            >
-              <ArrowLeftIcon /> Atrás
-            </button>
+            {canGoBack && (
+              <button
+                className="detail-action-btn detail-action-back"
+                type="button"
+                onClick={goBack}
+                disabled={actionLoading === 'back'}
+              >
+                {actionLoading === 'back' ? '···' : <><ArrowLeftIcon /> Atrás</>}
+              </button>
+            )}
 
-            {!isFinal && (
+            {canCancel && (
               <button
                 className="detail-action-btn detail-action-cancel"
                 type="button"
+                onClick={cancelOrder}
+                disabled={actionLoading === 'cancel'}
               >
-                <XCancelIcon /> Cancelar
+                {actionLoading === 'cancel' ? '···' : <><XCancelIcon /> Cancelar</>}
               </button>
             )}
 

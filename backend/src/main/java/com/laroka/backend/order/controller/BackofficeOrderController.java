@@ -120,6 +120,19 @@ public class BackofficeOrderController {
         return ResponseEntity.noContent().build();
     }
 
+    @PatchMapping("/{id}/status/previous")
+    @Operation(summary = "Revert order to previous status",
+            description = "Moves an order back one step. Only allowed from IN_PREPARATION, ON_THE_WAY, and READY_FOR_PICKUP. " +
+                    "Returns 422 if the current status cannot be reverted, 403 if order belongs to a different branch.")
+    public ResponseEntity<Void> revertStatus(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal CustomUserDetails principal) {
+
+        orderService.transitionToPreviousStatusForBackoffice(id,
+                principal.getBranchId(), principal.getUserId());
+        return ResponseEntity.noContent().build();
+    }
+
     @PatchMapping("/{id}/payment")
     @Operation(summary = "Confirm cash payment",
             description = "Marks a CASH payment as APPROVED. Only valid when method=CASH and status=PENDING. " +

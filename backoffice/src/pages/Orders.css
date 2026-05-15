@@ -1142,8 +1142,11 @@
   background: transparent;
   border: 1px solid rgba(101, 163, 105, 0.2);
   color: #4a6b50;
-  opacity: 0.5;
-  cursor: not-allowed;
+  transition: border-color 0.15s;
+}
+
+.detail-action-back:hover:not(:disabled) {
+  border-color: rgba(101, 163, 105, 0.5);
 }
 
 .detail-action-cancel {

@@ -120,6 +120,34 @@ public class OrderService {
         return saved;
     }
 
+    @Transactional
+    public Order transitionToPreviousStatusForBackoffice(UUID orderId, Integer branchId, Integer staffUserId) {
+        Order order = orderRepository.findByIdWithBranch(orderId)
+                .orElseThrow(() -> {
+                    log.warn("Order not found | orderId={}", orderId);
+                    return new OrderNotFoundException(orderId);
+                });
+
+        if (!order.getBranch().getId().equals(branchId)) {
+            log.warn("Branch mismatch on previous status | orderId={} orderBranch={} userBranch={}",
+                    orderId, order.getBranch().getId(), branchId);
+            throw new AccessDeniedException("El pedido no pertenece a la sucursal del usuario");
+        }
+
+        OrderStatus previousStatus = OrderStateMachine.getPreviousStatus(order.getStatus(), order.getOrderType());
+        if (previousStatus == null) {
+            throw new BusinessException("No se puede retroceder este estado: " + order.getStatus());
+        }
+
+        OrderStatus current = order.getStatus();
+        order.setStatus(previousStatus);
+        Order saved = orderRepository.save(order);
+        recordHistory(saved, current, previousStatus, staffUserId);
+        log.info("Backoffice previous status transition | orderId={} from={} to={} staffUserId={}",
+                saved.getId(), current, previousStatus, staffUserId);
+        return saved;
+    }
+
     @Transactional(readOnly = true)
     public Order findById(UUID id) {
         return orderRepository.findByIdWithBranch(id)

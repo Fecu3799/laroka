@@ -26,4 +26,13 @@ public class OrderStateMachine {
             case DELIVERED, CANCELLED -> List.of();
         };
     }
+
+    public static OrderStatus getPreviousStatus(OrderStatus current, OrderType orderType) {
+        return switch (current) {
+            case IN_PREPARATION -> OrderStatus.RECEIVED;
+            case ON_THE_WAY -> OrderStatus.IN_PREPARATION;
+            case READY_FOR_PICKUP -> OrderStatus.IN_PREPARATION;
+            default -> null;
+        };
+    }
 }

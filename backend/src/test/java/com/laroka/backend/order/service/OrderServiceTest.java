@@ -676,6 +676,86 @@ class OrderServiceTest {
         assertThat(result.getTotalElements()).isEqualTo(0);
     }
 
+    // --- transitionToPreviousStatusForBackoffice ---
+
+    @Test
+    void transitionToPreviousStatus_deliveryOnTheWay_revertsToInPreparation() {
+        UUID orderId = UUID.randomUUID();
+        Branch branch = branch(tenant());
+        Order order = Order.builder()
+                .id(orderId)
+                .status(OrderStatus.ON_THE_WAY)
+                .orderType(OrderType.DELIVERY)
+                .branch(branch)
+                .build();
+
+        when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Order result = service.transitionToPreviousStatusForBackoffice(orderId, branch.getId(), 10);
+
+        assertThat(result.getStatus()).isEqualTo(OrderStatus.IN_PREPARATION);
+        verify(historyRepository).save(any());
+    }
+
+    @Test
+    void transitionToPreviousStatus_takeawayReadyForPickup_revertsToInPreparation() {
+        UUID orderId = UUID.randomUUID();
+        Branch branch = branch(tenant());
+        Order order = Order.builder()
+                .id(orderId)
+                .status(OrderStatus.READY_FOR_PICKUP)
+                .orderType(OrderType.TAKEAWAY)
+                .branch(branch)
+                .build();
+
+        when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Order result = service.transitionToPreviousStatusForBackoffice(orderId, branch.getId(), 11);
+
+        assertThat(result.getStatus()).isEqualTo(OrderStatus.IN_PREPARATION);
+        verify(historyRepository).save(any());
+    }
+
+    @Test
+    void transitionToPreviousStatus_fromReceived_throwsBusinessException() {
+        UUID orderId = UUID.randomUUID();
+        Branch branch = branch(tenant());
+        Order order = Order.builder()
+                .id(orderId)
+                .status(OrderStatus.RECEIVED)
+                .orderType(OrderType.DELIVERY)
+                .branch(branch)
+                .build();
+
+        when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
+
+        assertThatThrownBy(() ->
+                service.transitionToPreviousStatusForBackoffice(orderId, branch.getId(), 12))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("RECEIVED");
+    }
+
+    @Test
+    void transitionToPreviousStatus_fromDelivered_throwsBusinessException() {
+        UUID orderId = UUID.randomUUID();
+        Branch branch = branch(tenant());
+        Order order = Order.builder()
+                .id(orderId)
+                .status(OrderStatus.DELIVERED)
+                .orderType(OrderType.DELIVERY)
+                .branch(branch)
+                .build();
+
+        when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
+
+        assertThatThrownBy(() ->
+                service.transitionToPreviousStatusForBackoffice(orderId, branch.getId(), 13))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("DELIVERED");
+    }
+
     @Test
     void getOrderDetailForBackoffice_wrongBranch_throwsAccessDeniedException() {
         UUID orderId = UUID.randomUUID();
