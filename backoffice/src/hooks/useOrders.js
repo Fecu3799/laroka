@@ -42,5 +42,9 @@ export default function useOrders(token) {
     setOrders(prev => prev.map(o => o.id === id ? { ...o, status: newStatus } : o))
   }, [])
 
-  return { orders, loading, error, newOrderCount, refresh, incrementNewOrders, dismissOrder, updateOrderInList }
+  const updatePaymentInList = useCallback((id, paymentStatus) => {
+    setOrders(prev => prev.map(o => o.id === id ? { ...o, paymentStatus } : o))
+  }, [])
+
+  return { orders, loading, error, newOrderCount, refresh, incrementNewOrders, dismissOrder, updateOrderInList, updatePaymentInList }
 }

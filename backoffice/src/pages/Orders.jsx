@@ -238,7 +238,7 @@ function XCancelIcon() {
 export default function Orders() {
   const navigate  = useNavigate()
   const { token } = useAuth()
-  const { orders, loading, error, newOrderCount, refresh, incrementNewOrders, dismissOrder, updateOrderInList } =
+  const { orders, loading, error, newOrderCount, refresh, incrementNewOrders, dismissOrder, updateOrderInList, updatePaymentInList } =
     useOrders(token)
 
   const [activeTab,   setActiveTab]   = useState('ALL')
@@ -456,6 +456,9 @@ export default function Orders() {
                 onClose={() => setSelectedId(null)}
                 onAdvance={handleAdvance}
                 advancing={advancing}
+                token={token}
+                onRefetch={refetchDetail}
+                onPaymentConfirmed={updatePaymentInList}
               />
             )}
           </>
@@ -589,11 +592,32 @@ function OrderRow({ order, isSelected, advancing, contracted, onSelect, onAdvanc
 
 // ── OrderDetail ───────────────────────────────────────────────
 
-function OrderDetail({ order, onClose, onAdvance, advancing }) {
+function OrderDetail({ order, onClose, onAdvance, advancing, token, onRefetch, onPaymentConfirmed }) {
   const cfg    = STATUS_CONFIG[order.status] ?? {}
   const payCfg = PAYMENT_BADGE_CONFIG[order.paymentStatus] ?? {}
   const next   = getNextStatus(order.status, order.orderType)
   const isFinal = TERMINAL.has(order.status)
+
+  const [paying, setPaying] = useState(false)
+
+  const confirmPayment = async (e) => {
+    e.stopPropagation()
+    setPaying(true)
+    try {
+      const res = await fetch(`${API_URL}/backoffice/orders/${order.id}/payment`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ action: 'CONFIRM' }),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      onPaymentConfirmed(order.id, 'APPROVED')
+      onRefetch()
+    } catch { /* silent */ }
+    finally { setPaying(false) }
+  }
 
   const sequence   = order.orderType === 'DELIVERY' ? SEQUENCE_DELIVERY : SEQUENCE_TAKEAWAY
   const historyMap = {}
@@ -730,74 +754,100 @@ function OrderDetail({ order, onClose, onAdvance, advancing }) {
           </div>
         )}
 
-        {/* Historial */}
-        <div className="detail-block detail-block--full">
-          <div className="detail-overline">HISTORIAL</div>
-          <div className="detail-timeline">
-            {sequence.map((step, i) => {
-              const isLast       = i === sequence.length - 1
-              const isCurrent    = step === order.status
-              const hasHistory   = historyMap[step] !== undefined
-              const isCompleted  = hasHistory && !isCurrent
-              const isFutureStep = !hasHistory && !isCurrent
-              return (
-                <div key={step} className="detail-timeline-row">
-                  <div className="detail-timeline-step">
-                    <div className="detail-timeline-left">
-                      <div className={
-                        'detail-timeline-dot' +
-                        (isCurrent   ? ' detail-timeline-dot--current'   :
-                         isCompleted ? ' detail-timeline-dot--completed' :
-                                       ' detail-timeline-dot--future')
-                      } />
-                      {!isLast && <div className="detail-timeline-line" />}
+        {/* Bottom row: Historial + Actions */}
+        <div className="detail-bottom-row">
+
+          {/* Left: Historial */}
+          <div className="detail-bottom-left">
+            <div className="detail-block">
+              <div className="detail-overline">HISTORIAL</div>
+              <div className="detail-timeline">
+                {sequence.map((step, i) => {
+                  const isLast       = i === sequence.length - 1
+                  const isCurrent    = step === order.status
+                  const hasHistory   = historyMap[step] !== undefined
+                  const isCompleted  = hasHistory && !isCurrent
+                  const isFutureStep = !hasHistory && !isCurrent
+                  return (
+                    <div key={step} className="detail-timeline-row">
+                      <div className="detail-timeline-step">
+                        <div className="detail-timeline-left">
+                          <div className={
+                            'detail-timeline-dot' +
+                            (isCurrent   ? ' detail-timeline-dot--current'   :
+                             isCompleted ? ' detail-timeline-dot--completed' :
+                                           ' detail-timeline-dot--future')
+                          } />
+                          {!isLast && <div className="detail-timeline-line" />}
+                        </div>
+                        <span className={
+                          'detail-timeline-label' +
+                          (isCurrent    ? ' detail-timeline-label--current' :
+                           isFutureStep ? ' detail-timeline-label--future'  : '')
+                        }>
+                          {STATUS_CONFIG[step]?.label ?? step}
+                        </span>
+                      </div>
+                      {hasHistory && (
+                        <span className="detail-timeline-time">{formatDateTime(historyMap[step])}</span>
+                      )}
                     </div>
-                    <span className={
-                      'detail-timeline-label' +
-                      (isCurrent    ? ' detail-timeline-label--current' :
-                       isFutureStep ? ' detail-timeline-label--future'  : '')
-                    }>
-                      {STATUS_CONFIG[step]?.label ?? step}
-                    </span>
-                  </div>
-                  {hasHistory && (
-                    <span className="detail-timeline-time">{formatDateTime(historyMap[step])}</span>
-                  )}
-                </div>
-              )
-            })}
+                  )
+                })}
+              </div>
+            </div>
           </div>
+
+          {/* Right: Action buttons */}
+          <div className="detail-bottom-right">
+
+            {next ? (
+              <button
+                className="detail-action-btn detail-action-advance"
+                type="button"
+                onClick={e => onAdvance(e, order)}
+                disabled={advancing === order.id}
+              >
+                {advancing === order.id ? '···' : `Avanzar a ${STATUS_CONFIG[next]?.label} →`}
+              </button>
+            ) : (
+              <div className="detail-action-btn detail-action-advance--done">
+                Pedido finalizado
+              </div>
+            )}
+
+            {order.paymentMethod === 'CASH' && order.paymentStatus !== 'APPROVED' && (
+              <button
+                className="detail-action-btn detail-action-pay"
+                type="button"
+                onClick={confirmPayment}
+                disabled={paying}
+              >
+                {paying ? '···' : 'Marcar como pagado'}
+              </button>
+            )}
+
+            <button
+              className="detail-action-btn detail-action-back"
+              type="button"
+              disabled
+            >
+              <ArrowLeftIcon /> Atrás
+            </button>
+
+            {!isFinal && (
+              <button
+                className="detail-action-btn detail-action-cancel"
+                type="button"
+              >
+                <XCancelIcon /> Cancelar
+              </button>
+            )}
+
+          </div>
+
         </div>
 
-      </div>
-
-      {/* ── Footer ──────────────────────────────────────────── */}
-      <div className="orders-detail-footer">
-        <button
-          className="detail-back-btn"
-          type="button"
-        >
-          <ArrowLeftIcon /> Atrás
-        </button>
-
-        {next ? (
-          <button
-            className="detail-advance-btn"
-            type="button"
-            onClick={e => onAdvance(e, order)}
-            disabled={advancing === order.id}
-          >
-            {advancing === order.id ? '···' : `Avanzar a ${STATUS_CONFIG[next]?.label} →`}
-          </button>
-        ) : (
-          <div className="detail-advance-done">Pedido finalizado</div>
-        )}
-
-        {!isFinal && (
-          <button className="detail-cancel-btn" type="button">
-            <XCancelIcon /> Cancelar
-          </button>
-        )}
       </div>
 
     </div>
