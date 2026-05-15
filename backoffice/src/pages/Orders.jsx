@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import useAuth from '../hooks/useAuth'
 import useOrders from '../hooks/useOrders'
+import useOrderDetail from '../hooks/useOrderDetail'
 import { advanceOrderStatus } from '../services/ordersService'
 import './Orders.css'
 
@@ -244,6 +245,7 @@ export default function Orders() {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedId,  setSelectedId]  = useState(null)
   const [advancing,   setAdvancing]   = useState(null)
+  const { detail, refetchDetail } = useOrderDetail(selectedId, token)
   // ── SSE ─────────────────────────────────────────────────────
   useEffect(() => {
     if (!token) return
@@ -306,9 +308,10 @@ export default function Orders() {
     try {
       await advanceOrderStatus(order.id, next, token)
       updateOrderInList(order.id, next)
+      refetchDetail()
     } catch { /* silent */ }
     finally { setAdvancing(null) }
-  }, [token, updateOrderInList])
+  }, [token, updateOrderInList, refetchDetail])
 
   // ── Derived ──────────────────────────────────────────────────
   const chipCounts = {
@@ -320,6 +323,7 @@ export default function Orders() {
   const activeCount   = orders.filter(o => !TERMINAL.has(o.status)).length
   const visibleOrders = sortOrders(filterOrders(orders, activeTab, searchQuery))
   const selectedOrder = orders.find(o => o.id === selectedId) ?? null
+  const panelOrder    = (detail?.id === selectedId ? detail : null) ?? selectedOrder
   const panelOpen     = selectedId !== null
   const contracted    = panelOpen
 
@@ -448,7 +452,7 @@ export default function Orders() {
 
             {panelOpen && selectedOrder && (
               <OrderDetail
-                order={selectedOrder}
+                order={panelOrder}
                 onClose={() => setSelectedId(null)}
                 onAdvance={handleAdvance}
                 advancing={advancing}

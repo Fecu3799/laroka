@@ -248,7 +248,7 @@
 .orders-table-head,
 .orders-row {
   display: grid;
-  grid-template-columns: 160px 1.1fr 1.1fr 130px 0.9fr 280px 220px;
+  grid-template-columns: 0.8fr 1.1fr 1.1fr 1fr 0.8fr 1.1fr 1.2fr;
   column-gap: 20px;
   align-items: center;
 }
@@ -569,21 +569,6 @@
   letter-spacing: 1px;
 }
 
-/* Header of the PEDIDO column — order ID, time, payment status */
-.col-head--order { /* override here */ }
-
-/* Header of the CLIENTE column — avatar, name, phone, address */
-.col-head--customer { /* override here */}
-
-/* Header of the PRODUCTOS column — item list */
-.col-head--items { /* override here */ }
-
-/* Header of the PAGO column — payment status */
-.col-head--pago { /* override here */ }
-
-/* Header of the NOTAS column — customer notes */
-.col-head--notes { /* override here */ }
-
 /* Header of the ESTADO column — status badge and order type */
 .col-head--status { 
   text-align: center;
@@ -633,47 +618,7 @@
    :not() scoping prevents these from affecting contracted rows.
    ============================================================ */
 
-/* Column 1 — PEDIDO */
-.orders-table-head:not(.orders-table-head--contracted) > :nth-child(1),
-.orders-row:not(.orders-row--contracted)               > :nth-child(1) { /* override here */
-  width: 160px;
-}
 
-/* Column 2 — CLIENTE */
-.orders-table-head:not(.orders-table-head--contracted) > :nth-child(2),
-.orders-row:not(.orders-row--contracted)               > :nth-child(2) { /* override here */
-  width: 160px;
-}
-
-/* Column 3 — PRODUCTOS */
-.orders-table-head:not(.orders-table-head--contracted) > :nth-child(3),
-.orders-row:not(.orders-row--contracted)               > :nth-child(3) { /* override here */
-  width: auto;
-}
-
-/* Column 4 — PAGO */
-.orders-table-head:not(.orders-table-head--contracted) > :nth-child(4),
-.orders-row:not(.orders-row--contracted)               > :nth-child(4) { /* override here */
-  width: 130px;
-}
-
-/* Column 5 — NOTAS */
-.orders-table-head:not(.orders-table-head--contracted) > :nth-child(5),
-.orders-row:not(.orders-row--contracted)               > :nth-child(5) { /* override here */
-  width: 160px;
-}
-
-/* Column 6 — ESTADO */
-.orders-table-head:not(.orders-table-head--contracted) > :nth-child(6),
-.orders-row:not(.orders-row--contracted)               > :nth-child(6) { /* override here */
-  width: 150px;
-}
-
-/* Column 7 — ACCIÓN */
-.orders-table-head:not(.orders-table-head--contracted) > :nth-child(7),
-.orders-row:not(.orders-row--contracted)               > :nth-child(7) { /* override here */
-  width: 150px;
-}
 
 /* ============================================================
    STEP 3 — MASTER-DETAIL PANEL
