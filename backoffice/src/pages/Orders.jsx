@@ -17,7 +17,7 @@ const STATUS_CONFIG = {
   RECEIVED:         { label: 'Recibido',       bg: '#1d3557', color: '#90bdf9', border: '#2a4a80' },
   IN_PREPARATION:   { label: 'En preparación', bg: '#2d1f00', color: '#fbbf24', border: '#5c3d00' },
   ON_THE_WAY:       { label: 'En camino',      bg: '#2d1047', color: '#c084fc', border: '#5a1f8a' },
-  READY_FOR_PICKUP: { label: 'Para retirar',   bg: '#0a2e14', color: '#4ade80', border: '#1a5c2c' },
+  READY_FOR_PICKUP: { label: 'Para retirar',   bg: '#1e0a3a', color: '#a78bfa', border: '#4c1d95' },
   DELIVERED:        { label: 'Entregado',      bg: '#0a2e14', color: '#4ade80', border: '#1a5c2c' },
   CANCELLED:        { label: 'Cancelado',      bg: '#2e0f0f', color: '#f87171', border: '#5c1f1f' },
 }
@@ -126,12 +126,23 @@ function filterOrders(orders, activeTab, searchQuery) {
   return list
 }
 
+const STATUS_PRIORITY = {
+  CANCELLATION_REQUESTED: 0,
+  RECEIVED:               1,
+  IN_PREPARATION:         2,
+  ON_THE_WAY:             3,
+  READY_FOR_PICKUP:       3,
+  DELIVERED:              4,
+  CANCELLED:              4,
+  PENDING_PAYMENT:        5,
+}
+
 function sortOrders(orders) {
   return [...orders].sort((a, b) => {
-    const aT = TERMINAL.has(a.status)
-    const bT = TERMINAL.has(b.status)
-    if (aT !== bT) return aT ? 1 : -1
-    return new Date(b.createdAt) - new Date(a.createdAt)
+    const pa = STATUS_PRIORITY[a.status] ?? 99
+    const pb = STATUS_PRIORITY[b.status] ?? 99
+    if (pa !== pb) return pa - pb
+    return new Date(a.createdAt) - new Date(b.createdAt)
   })
 }
 
@@ -229,6 +240,26 @@ function XCancelIcon() {
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path d="M18 6 6 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
       <path d="M6 6l12 12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function PaymentStatusIcon({ status }) {
+  if (status === 'APPROVED') return (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <polyline points="20 6 9 17 4 12" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+  if (status === 'REJECTED' || status === 'CANCELLED') return (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M18 6 6 18" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+      <path d="M6 6l12 12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+    </svg>
+  )
+  return (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
+      <polyline points="12 6 12 12 16 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )
 }
@@ -475,15 +506,15 @@ export default function Orders() {
 function OrderRow({ order, isSelected, advancing, contracted, onSelect, onAdvance, onDismiss }) {
   const cfg        = STATUS_CONFIG[order.status] ?? {}
   const next       = getNextStatus(order.status, order.orderType)
-  const isCancelled = order.status === 'CANCELLED'
+  const isTerminal = TERMINAL.has(order.status)
 
   return (
     <div
       className={[
         'orders-row',
-        isSelected  ? 'orders-row--selected'   : '',
-        isCancelled ? 'orders-row--cancelled'  : '',
-        contracted  ? 'orders-row--contracted' : '',
+        isSelected ? 'orders-row--selected'  : '',
+        isTerminal ? 'orders-row--cancelled' : '',
+        contracted ? 'orders-row--contracted': '',
       ].filter(Boolean).join(' ')}
       onClick={onSelect}
     >
@@ -533,7 +564,7 @@ function OrderRow({ order, isSelected, advancing, contracted, onSelect, onAdvanc
       <div className="col-pago">
         {order.paymentStatus && (
           <span className="pago-status" style={{ color: PAYMENT_STATUS_COLOR[order.paymentStatus] }}>
-            <span className="pago-dot" style={{ backgroundColor: PAYMENT_STATUS_COLOR[order.paymentStatus] }} />
+            <PaymentStatusIcon status={order.paymentStatus} />
             {PAYMENT_STATUS_LABEL[order.paymentStatus] ?? order.paymentStatus}
           </span>
         )}
@@ -568,12 +599,12 @@ function OrderRow({ order, isSelected, advancing, contracted, onSelect, onAdvanc
       {/* ACCIÓN — hidden when contracted */}
       {!contracted && (
         <div className="col-action">
-          {isCancelled ? (
+          {isTerminal ? (
             <button
               className="action-dismiss-btn"
               type="button"
               onClick={onDismiss}
-              aria-label="Descartar pedido cancelado"
+              aria-label="Descartar pedido"
             >
               <TrashIcon />
             </button>

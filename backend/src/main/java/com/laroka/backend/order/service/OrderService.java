@@ -243,8 +243,7 @@ public class OrderService {
 
     @Transactional(readOnly = true)
     public List<BackofficeOrderRow> findActiveOrdersByBranch(Integer branchId, OrderFilterParams params) {
-        List<OrderStatus> excluded = List.of(OrderStatus.DELIVERED, OrderStatus.CANCELLED);
-        List<Order> orders = orderRepository.findActiveByBranchId(branchId, excluded);
+        List<Order> orders = orderRepository.findActiveByBranchId(branchId, List.of());
 
         if (orders.isEmpty()) {
             return List.of();
