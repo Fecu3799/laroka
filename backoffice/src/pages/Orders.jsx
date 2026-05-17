@@ -142,7 +142,7 @@ function sortOrders(orders) {
     const pa = STATUS_PRIORITY[a.status] ?? 99
     const pb = STATUS_PRIORITY[b.status] ?? 99
     if (pa !== pb) return pa - pb
-    return new Date(a.createdAt) - new Date(b.createdAt)
+    return new Date(b.createdAt) - new Date(a.createdAt)
   })
 }
 
@@ -277,6 +277,13 @@ export default function Orders() {
   const [selectedId,  setSelectedId]  = useState(null)
   const [advancing,   setAdvancing]   = useState(null)
   const { detail, refetchDetail } = useOrderDetail(selectedId, token)
+  // ── Refresh when a new order is created via the modal ────────
+  useEffect(() => {
+    function handleOrderCreated() { refresh() }
+    window.addEventListener('laroka:order-created', handleOrderCreated)
+    return () => window.removeEventListener('laroka:order-created', handleOrderCreated)
+  }, [refresh])
+
   // ── Auto-clear selected if order leaves visible list ─────────
   useEffect(() => {
     if (selectedId && !orders.find(o => o.id === selectedId)) {

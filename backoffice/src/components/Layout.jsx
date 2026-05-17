@@ -3,13 +3,14 @@ import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import logo from '../assets/logo.png'
 import useAuth from '../hooks/useAuth'
 import { logout } from '../services/authService'
+import NewOrderModal from './NewOrderModal'
 import './Layout.css'
 
 const API_URL = import.meta.env.VITE_API_URL ?? ''
 
 const NAV = [
   {
-    to: '/orders/new',
+    action: 'new-order',
     label: 'NUEVA ORDEN',
     icon: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -59,6 +60,7 @@ export default function Layout() {
   const [time, setTime] = useState(new Date())
   const [connectionStatus, setConnectionStatus] = useState('disconnected')
   const [newOrderCount, setNewOrderCount] = useState(0)
+  const [newOrderModalOpen, setNewOrderModalOpen] = useState(false)
 
   function handleLogout() {
     logout()
@@ -152,28 +154,40 @@ export default function Layout() {
         </div>
 
         <nav className="layout-sidebar-nav" aria-label="Navegación principal">
-          {NAV.map(({ to, label, icon, end }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={end}
-              className={({ isActive }) =>
-                `layout-nav-item${isActive ? ' layout-nav-item--active' : ''}`
-              }
-            >
-              <span className="layout-nav-icon">
-                {to === '/orders' ? (
-                  <div style={{ position: 'relative' }}>
-                    {icon}
-                    {newOrderCount > 0 && location.pathname !== '/orders' && (
-                      <span className="layout-nav-badge">{newOrderCount}</span>
-                    )}
-                  </div>
-                ) : icon}
-              </span>
-              <span className="layout-nav-label">{label}</span>
-            </NavLink>
-          ))}
+          {NAV.map(({ to, label, icon, end, action }) =>
+            action === 'new-order' ? (
+              <button
+                key="new-order"
+                type="button"
+                className="layout-nav-item layout-nav-btn"
+                onClick={() => setNewOrderModalOpen(true)}
+              >
+                <span className="layout-nav-icon">{icon}</span>
+                <span className="layout-nav-label">{label}</span>
+              </button>
+            ) : (
+              <NavLink
+                key={to}
+                to={to}
+                end={end}
+                className={({ isActive }) =>
+                  `layout-nav-item${isActive ? ' layout-nav-item--active' : ''}`
+                }
+              >
+                <span className="layout-nav-icon">
+                  {to === '/orders' ? (
+                    <div style={{ position: 'relative' }}>
+                      {icon}
+                      {newOrderCount > 0 && location.pathname !== '/orders' && (
+                        <span className="layout-nav-badge">{newOrderCount}</span>
+                      )}
+                    </div>
+                  ) : icon}
+                </span>
+                <span className="layout-nav-label">{label}</span>
+              </NavLink>
+            )
+          )}
         </nav>
 
         <div className="layout-sidebar-branch" aria-label="Sucursal activa">
@@ -232,6 +246,11 @@ export default function Layout() {
           <Outlet />
         </main>
       </div>
+
+      <NewOrderModal
+        open={newOrderModalOpen}
+        onClose={() => setNewOrderModalOpen(false)}
+      />
     </div>
   )
 }

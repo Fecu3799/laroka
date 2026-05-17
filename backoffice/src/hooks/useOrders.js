@@ -41,7 +41,6 @@ export default function useOrders(token) {
 
   const refresh = useCallback(() => {
     setNewOrderCount(0)
-    setDismissedIds(new Set())
     fetchOrders()
   }, [fetchOrders])
 
