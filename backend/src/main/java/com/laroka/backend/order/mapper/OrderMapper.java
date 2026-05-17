@@ -31,6 +31,8 @@ public class OrderMapper {
                 .orderType(dto.getOrderType())
                 .deliveryAddress(dto.getDeliveryAddress())
                 .notes(dto.getNotes())
+                .customerName(dto.getCustomerName())
+                .customerPhone(dto.getCustomerPhone())
                 .origin(OrderOrigin.CLIENT)
                 .build();
     }
@@ -112,6 +114,8 @@ public class OrderMapper {
                 .totalAmount(order.getTotalAmount())
                 .deliveryAddress(order.getDeliveryAddress())
                 .notes(order.getNotes())
+                .customerName(order.getCustomerName())
+                .customerPhone(order.getCustomerPhone())
                 .branchName(order.getBranch().getName())
                 .items(order.getItems().stream().map(this::toItemResponseDTO).toList())
                 .paymentStatus(payment != null ? payment.getStatus() : null)
@@ -126,12 +130,18 @@ public class OrderMapper {
                 .id(order.getId())
                 .createdAt(order.getCreatedAt())
                 .status(order.getStatus())
+                .subtotal(order.getSubtotal())
+                .deliveryFee(order.getDeliveryFee())
+                .serviceFee(order.getServiceFee())
                 .totalAmount(order.getTotalAmount())
                 .paymentStatus(payment != null ? payment.getStatus() : null)
                 .paymentMethod(payment != null ? payment.getMethod() : null)
                 .orderType(order.getOrderType())
                 .origin(order.getOrigin())
+                .deliveryAddress(order.getDeliveryAddress())
                 .notes(order.getNotes())
+                .customerName(order.getCustomerName())
+                .customerPhone(order.getCustomerPhone())
                 .items(order.getItems().stream().map(this::toBackofficeItemDTO).toList())
                 .build();
     }

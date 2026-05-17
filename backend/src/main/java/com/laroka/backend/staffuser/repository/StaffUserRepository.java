@@ -3,11 +3,17 @@ package com.laroka.backend.staffuser.repository;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import com.laroka.backend.staffuser.entity.StaffUser;
 
 @Repository
 public interface StaffUserRepository extends JpaRepository<StaffUser, Integer> {
+
 	Optional<StaffUser> findByEmail(String email);
+
+	@Query("SELECT u FROM StaffUser u JOIN FETCH u.branch b JOIN FETCH b.tenant WHERE u.email = :email")
+	Optional<StaffUser> findByEmailWithBranchAndTenant(@Param("email") String email);
 }

@@ -161,6 +161,8 @@ export function CartScreen({ items, extras = [], onBack, onRemove, onUpdateQty, 
       orderType: formData.orderType === 'delivery' ? 'DELIVERY' : 'TAKEAWAY',
       deliveryAddress: formData.direccion || null,
       notes: formData.notas || null,
+      customerName: formData.nombre || null,
+      customerPhone: formData.telefono || null,
       paymentMethod: formData.paymentMethod,
       items: items.map(i => ({ productId: i.id, quantity: i.qty })),
     }

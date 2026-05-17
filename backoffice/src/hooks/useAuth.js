@@ -12,6 +12,7 @@ function decodeToken(token) {
 }
 
 export default function useAuth() {
+  const [rawToken, setRawToken] = useState(() => localStorage.getItem('laroka_token'))
   const [auth, setAuth] = useState(() => {
     const token = localStorage.getItem('laroka_token')
     return token ? decodeToken(token) : null
@@ -20,8 +21,8 @@ export default function useAuth() {
   useEffect(() => {
     function handleStorage(e) {
       if (e.key === 'laroka_token') {
-        const token = e.newValue
-        setAuth(token ? decodeToken(token) : null)
+        setRawToken(e.newValue)
+        setAuth(e.newValue ? decodeToken(e.newValue) : null)
       }
     }
     window.addEventListener('storage', handleStorage)
@@ -32,6 +33,7 @@ export default function useAuth() {
   const payload = auth !== null && auth !== 'expired' ? auth : null
 
   return {
+    token: rawToken,
     userId: payload?.sub ?? payload?.userId ?? null,
     role: payload?.role ?? null,
     branchId: payload?.branchId ?? null,

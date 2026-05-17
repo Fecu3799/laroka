@@ -1,13 +1,16 @@
 import { useState, useEffect } from 'react'
-import { Outlet, NavLink, useNavigate } from 'react-router-dom'
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import logo from '../assets/logo.png'
 import useAuth from '../hooks/useAuth'
 import { logout } from '../services/authService'
+import NewOrderModal from './NewOrderModal'
 import './Layout.css'
+
+const API_URL = import.meta.env.VITE_API_URL ?? ''
 
 const NAV = [
   {
-    to: '/orders/new',
+    action: 'new-order',
     label: 'NUEVA ORDEN',
     icon: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -52,8 +55,12 @@ const NAV = [
 
 export default function Layout() {
   const navigate = useNavigate()
-  const { branchName, tenantName } = useAuth()
+  const location = useLocation()
+  const { token, branchName, tenantName } = useAuth()
   const [time, setTime] = useState(new Date())
+  const [connectionStatus, setConnectionStatus] = useState('disconnected')
+  const [newOrderCount, setNewOrderCount] = useState(0)
+  const [newOrderModalOpen, setNewOrderModalOpen] = useState(false)
 
   function handleLogout() {
     logout()
@@ -64,6 +71,73 @@ export default function Layout() {
     const timer = setInterval(() => setTime(new Date()), 1000)
     return () => clearInterval(timer)
   }, [])
+
+  useEffect(() => {
+    if (!token) return
+    let active = true
+    let controller = null
+    let reader = null
+
+    async function connect() {
+      while (active) {
+        try {
+          controller = new AbortController()
+          const res = await fetch(`${API_URL}/backoffice/events`, {
+            headers: { Authorization: `Bearer ${token}` },
+            signal: controller.signal,
+          })
+          if (!res.ok) {
+            if (res.status === 401 || res.status === 403) {
+              active = false
+              return
+            }
+            throw new Error(`HTTP ${res.status}`)
+          }
+          reader = res.body.getReader()
+          const decoder = new TextDecoder()
+          let buffer = ''
+          while (active) {
+            const { done, value } = await reader.read()
+            if (done) break
+            buffer += decoder.decode(value, { stream: true })
+            const lines = buffer.split('\n')
+            buffer = lines.pop()
+            for (const line of lines) {
+              if (line.startsWith('data:')) {
+                try {
+                  const json = JSON.parse(line.slice(5).trim())
+                  if (json.type === 'NEW_ORDER') setNewOrderCount(prev => prev + 1)
+                } catch { /* noop */ }
+              }
+            }
+          }
+        } catch { /* noop */ }
+        if (active) await new Promise(r => setTimeout(r, 2000))
+      }
+    }
+
+    connect()
+    return () => { active = false; controller?.abort(); reader?.cancel() }
+  }, [token])
+
+  useEffect(() => {
+    async function check() {
+      setConnectionStatus(prev => prev !== 'connected' ? 'reconnecting' : prev)
+      try {
+        const res = await fetch(`${API_URL}/actuator/health`)
+        setConnectionStatus(res.ok ? 'connected' : 'disconnected')
+      } catch {
+        setConnectionStatus('disconnected')
+      }
+    }
+    check()
+    const id = setInterval(check, 30_000)
+    return () => clearInterval(id)
+  }, [])
+
+  useEffect(() => {
+    if (location.pathname === '/orders') setNewOrderCount(0)
+  }, [location.pathname])
 
   const formattedTime = time.toLocaleTimeString('es-AR', {
     hour: '2-digit',
@@ -80,19 +154,40 @@ export default function Layout() {
         </div>
 
         <nav className="layout-sidebar-nav" aria-label="Navegación principal">
-          {NAV.map(({ to, label, icon, end }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={end}
-              className={({ isActive }) =>
-                `layout-nav-item${isActive ? ' layout-nav-item--active' : ''}`
-              }
-            >
-              <span className="layout-nav-icon">{icon}</span>
-              <span className="layout-nav-label">{label}</span>
-            </NavLink>
-          ))}
+          {NAV.map(({ to, label, icon, end, action }) =>
+            action === 'new-order' ? (
+              <button
+                key="new-order"
+                type="button"
+                className="layout-nav-item layout-nav-btn"
+                onClick={() => setNewOrderModalOpen(true)}
+              >
+                <span className="layout-nav-icon">{icon}</span>
+                <span className="layout-nav-label">{label}</span>
+              </button>
+            ) : (
+              <NavLink
+                key={to}
+                to={to}
+                end={end}
+                className={({ isActive }) =>
+                  `layout-nav-item${isActive ? ' layout-nav-item--active' : ''}`
+                }
+              >
+                <span className="layout-nav-icon">
+                  {to === '/orders' ? (
+                    <div style={{ position: 'relative' }}>
+                      {icon}
+                      {newOrderCount > 0 && location.pathname !== '/orders' && (
+                        <span className="layout-nav-badge">{newOrderCount}</span>
+                      )}
+                    </div>
+                  ) : icon}
+                </span>
+                <span className="layout-nav-label">{label}</span>
+              </NavLink>
+            )
+          )}
         </nav>
 
         <div className="layout-sidebar-branch" aria-label="Sucursal activa">
@@ -128,6 +223,20 @@ export default function Layout() {
             <span className="layout-header-tenant">{tenantName ?? '—'}</span>
           </div>
           <div className="layout-header-right">
+            <div className="layout-sse-status">
+              <span
+                className="layout-sse-dot"
+                style={{
+                  backgroundColor:
+                    connectionStatus === 'connected'    ? '#22c55e' :
+                    connectionStatus === 'reconnecting' ? '#f59e0b' : '#ef4444',
+                }}
+              />
+              <span className="layout-sse-label">
+                {connectionStatus === 'connected'    ? 'Conectado' :
+                 connectionStatus === 'reconnecting' ? 'Reconectando...' : 'Sin conexión'}
+              </span>
+            </div>
             <span className="layout-header-theme">Verde oscuro</span>
             <span className="layout-header-clock" aria-live="polite">{formattedTime}</span>
           </div>
@@ -137,6 +246,11 @@ export default function Layout() {
           <Outlet />
         </main>
       </div>
+
+      <NewOrderModal
+        open={newOrderModalOpen}
+        onClose={() => setNewOrderModalOpen(false)}
+      />
     </div>
   )
 }

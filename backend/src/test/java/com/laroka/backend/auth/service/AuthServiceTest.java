@@ -19,6 +19,7 @@ import com.laroka.backend.shared.security.JwtService;
 import com.laroka.backend.staffuser.entity.StaffUser;
 import com.laroka.backend.staffuser.entity.UserRole;
 import com.laroka.backend.staffuser.repository.StaffUserRepository;
+import com.laroka.backend.tenant.entity.Tenant;
 
 @ExtendWith(MockitoExtension.class)
 class AuthServiceTest {
@@ -31,7 +32,8 @@ class AuthServiceTest {
 	private AuthService authService;
 
 	private StaffUser staffUser() {
-		Branch branch = Branch.builder().id(1).name("Playa Unión").build();
+		Tenant tenant = Tenant.builder().id(1).name("LaRoka").build();
+		Branch branch = Branch.builder().id(1).name("Playa Unión").tenant(tenant).build();
 		return StaffUser.builder()
 			.id(1)
 			.name("Admin")
@@ -45,7 +47,7 @@ class AuthServiceTest {
 	@Test
 	void login_validCredentials_returnsToken() {
 		StaffUser user = staffUser();
-		when(staffUserRepository.findByEmail("admin@laroka.com")).thenReturn(Optional.of(user));
+		when(staffUserRepository.findByEmailWithBranchAndTenant("admin@laroka.com")).thenReturn(Optional.of(user));
 		when(passwordEncoder.matches("admin123", user.getPasswordHash())).thenReturn(true);
 		when(jwtService.generateToken(user)).thenReturn("jwt.token.here");
 
@@ -56,7 +58,7 @@ class AuthServiceTest {
 
 	@Test
 	void login_userNotFound_throwsInvalidCredentialsException() {
-		when(staffUserRepository.findByEmail("unknown@laroka.com")).thenReturn(Optional.empty());
+		when(staffUserRepository.findByEmailWithBranchAndTenant("unknown@laroka.com")).thenReturn(Optional.empty());
 
 		assertThatThrownBy(() -> authService.login("unknown@laroka.com", "anyPassword"))
 			.isInstanceOf(InvalidCredentialsException.class)
@@ -66,7 +68,7 @@ class AuthServiceTest {
 	@Test
 	void login_wrongPassword_throwsInvalidCredentialsException() {
 		StaffUser user = staffUser();
-		when(staffUserRepository.findByEmail("admin@laroka.com")).thenReturn(Optional.of(user));
+		when(staffUserRepository.findByEmailWithBranchAndTenant("admin@laroka.com")).thenReturn(Optional.of(user));
 		when(passwordEncoder.matches("wrongpassword", user.getPasswordHash())).thenReturn(false);
 
 		assertThatThrownBy(() -> authService.login("admin@laroka.com", "wrongpassword"))
