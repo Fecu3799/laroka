@@ -107,14 +107,14 @@ function getNextStatus(status, orderType) {
   return null
 }
 
-function filterOrders(orders, activeTab, searchQuery) {
+function filterOrders(orders, activeTab, searchQuery, dismissedIds) {
   let list = orders
-  if (activeTab !== 'ALL') {
-    if (activeTab === 'ON_THE_WAY') {
-      list = list.filter(o => o.status === 'ON_THE_WAY' || o.status === 'READY_FOR_PICKUP')
-    } else {
-      list = list.filter(o => o.status === activeTab)
-    }
+  if (activeTab === 'ALL') {
+    list = list.filter(o => !dismissedIds.has(o.id))
+  } else if (activeTab === 'ON_THE_WAY') {
+    list = list.filter(o => o.status === 'ON_THE_WAY' || o.status === 'READY_FOR_PICKUP')
+  } else {
+    list = list.filter(o => o.status === activeTab)
   }
   if (searchQuery.trim()) {
     const q = searchQuery.toLowerCase()
@@ -146,8 +146,8 @@ function sortOrders(orders) {
   })
 }
 
-function tabCount(orders, key) {
-  if (key === 'ALL') return orders.length
+function tabCount(orders, key, dismissedIds) {
+  if (key === 'ALL') return orders.filter(o => !dismissedIds.has(o.id)).length
   if (key === 'ON_THE_WAY') return orders.filter(o => o.status === 'ON_THE_WAY' || o.status === 'READY_FOR_PICKUP').length
   return orders.filter(o => o.status === key).length
 }
@@ -269,7 +269,7 @@ function PaymentStatusIcon({ status }) {
 export default function Orders() {
   const navigate  = useNavigate()
   const { token } = useAuth()
-  const { orders, loading, error, newOrderCount, refresh, incrementNewOrders, dismissOrder, updateOrderInList, updatePaymentInList } =
+  const { orders, loading, error, refresh, dismissOrder, dismissedIds, updateOrderInList, updatePaymentInList } =
     useOrders(token)
 
   const [activeTab,   setActiveTab]   = useState('ALL')
@@ -277,52 +277,6 @@ export default function Orders() {
   const [selectedId,  setSelectedId]  = useState(null)
   const [advancing,   setAdvancing]   = useState(null)
   const { detail, refetchDetail } = useOrderDetail(selectedId, token)
-  // ── SSE ─────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!token) return
-    let active = true
-    let controller = null
-    let reader = null
-
-    async function connect() {
-      while (active) {
-        try {
-          controller = new AbortController()
-          const res = await fetch(`${API_URL}/backoffice/events`, {
-            headers: { Authorization: `Bearer ${token}` },
-            signal: controller.signal,
-          })
-          if (!res.ok) {
-            if (res.status === 401 || res.status === 403) { active = false; return }
-            throw new Error(`HTTP ${res.status}`)
-          }
-          reader = res.body.getReader()
-          const decoder = new TextDecoder()
-          let buffer = ''
-          while (active) {
-            const { done, value } = await reader.read()
-            if (done) break
-            buffer += decoder.decode(value, { stream: true })
-            const lines = buffer.split('\n')
-            buffer = lines.pop()
-            for (const line of lines) {
-              if (line.startsWith('data:')) {
-                try {
-                  const json = JSON.parse(line.slice(5).trim())
-                  if (json.type === 'NEW_ORDER') incrementNewOrders()
-                } catch { /* noop */ }
-              }
-            }
-          }
-        } catch { /* noop */ }
-        if (active) await new Promise(r => setTimeout(r, 2000))
-      }
-    }
-
-    connect()
-    return () => { active = false; controller?.abort(); reader?.cancel() }
-  }, [token, incrementNewOrders])
-
   // ── Auto-clear selected if order leaves visible list ─────────
   useEffect(() => {
     if (selectedId && !orders.find(o => o.id === selectedId)) {
@@ -352,7 +306,7 @@ export default function Orders() {
     DELIVERED:      orders.filter(o => o.status === 'DELIVERED').length,
   }
   const activeCount   = orders.filter(o => !TERMINAL.has(o.status)).length
-  const visibleOrders = sortOrders(filterOrders(orders, activeTab, searchQuery))
+  const visibleOrders = sortOrders(filterOrders(orders, activeTab, searchQuery, dismissedIds))
   const selectedOrder = orders.find(o => o.id === selectedId) ?? null
   const panelOrder    = (detail?.id === selectedId ? detail : null) ?? selectedOrder
   const panelOpen     = selectedId !== null
@@ -398,15 +352,12 @@ export default function Orders() {
         </div>
 
         <button
-          className={`orders-refresh-btn${newOrderCount > 0 ? ' orders-refresh-btn--notify' : ''}`}
+          className="orders-refresh-btn"
           type="button"
           onClick={refresh}
         >
           <RefreshIcon />
           Actualizar lista
-          {newOrderCount > 0 && (
-            <span className="orders-refresh-badge">{newOrderCount}</span>
-          )}
         </button>
       </div>
 
@@ -421,7 +372,7 @@ export default function Orders() {
           >
             {tab.label}
             <span className={`orders-tab-pill${activeTab === tab.key ? ' orders-tab-pill--active' : ''}`}>
-              {tabCount(orders, tab.key)}
+              {tabCount(orders, tab.key, dismissedIds)}
             </span>
           </button>
         ))}

@@ -7,6 +7,12 @@ export default function useOrders(token) {
   const [loading, setLoading]         = useState(true)
   const [error, setError]             = useState(null)
   const [newOrderCount, setNewOrderCount] = useState(0)
+  const [dismissedIds, setDismissedIds] = useState(() => {
+    try {
+      const stored = sessionStorage.getItem('laroka_dismissed_ids')
+      return stored ? new Set(JSON.parse(stored)) : new Set()
+    } catch { return new Set() }
+  })
 
   const fetchOrders = useCallback(async () => {
     if (!token) return
@@ -27,15 +33,22 @@ export default function useOrders(token) {
 
   useEffect(() => { fetchOrders() }, [fetchOrders])
 
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('laroka_dismissed_ids', JSON.stringify([...dismissedIds]))
+    } catch { /* noop */ }
+  }, [dismissedIds])
+
   const refresh = useCallback(() => {
     setNewOrderCount(0)
+    setDismissedIds(new Set())
     fetchOrders()
   }, [fetchOrders])
 
   const incrementNewOrders = useCallback(() => setNewOrderCount(n => n + 1), [])
 
   const dismissOrder = useCallback((id) => {
-    setOrders(prev => prev.filter(o => o.id !== id))
+    setDismissedIds(prev => new Set([...prev, id]))
   }, [])
 
   const updateOrderInList = useCallback((id, newStatus) => {
@@ -46,5 +59,5 @@ export default function useOrders(token) {
     setOrders(prev => prev.map(o => o.id === id ? { ...o, paymentStatus } : o))
   }, [])
 
-  return { orders, loading, error, newOrderCount, refresh, incrementNewOrders, dismissOrder, updateOrderInList, updatePaymentInList }
+  return { orders, loading, error, newOrderCount, refresh, incrementNewOrders, dismissOrder, dismissedIds, updateOrderInList, updatePaymentInList }
 }
