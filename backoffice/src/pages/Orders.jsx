@@ -1,9 +1,16 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
 import useAuth from '../hooks/useAuth'
 import useOrders from '../hooks/useOrders'
 import useOrderDetail from '../hooks/useOrderDetail'
 import { advanceOrderStatus } from '../services/ordersService'
+import {
+  STATUS_CONFIG,
+  STATUS_PRIORITY,
+  sortOrders,
+  getNextStatus,
+  canGoBack as goBackAllowed,
+  canCancel as cancelAllowed,
+} from '../utils/ordersUtils'
 import './Orders.css'
 
 const API_URL = import.meta.env.VITE_API_URL ?? ''
@@ -11,16 +18,6 @@ const API_URL = import.meta.env.VITE_API_URL ?? ''
 // ── Constants ─────────────────────────────────────────────────
 
 const TERMINAL = new Set(['DELIVERED', 'CANCELLED'])
-
-const STATUS_CONFIG = {
-  PENDING_PAYMENT:  { label: 'Pago pendiente', bg: '#6b672e', color: '#c5cda7', border: '#4a6b50' },
-  RECEIVED:         { label: 'Recibido',       bg: '#1d3557', color: '#90bdf9', border: '#2a4a80' },
-  IN_PREPARATION:   { label: 'En preparación', bg: '#2d1f00', color: '#fbbf24', border: '#5c3d00' },
-  ON_THE_WAY:       { label: 'En camino',      bg: '#2d1047', color: '#c084fc', border: '#5a1f8a' },
-  READY_FOR_PICKUP: { label: 'Para retirar',   bg: '#1e0a3a', color: '#a78bfa', border: '#4c1d95' },
-  DELIVERED:        { label: 'Entregado',      bg: '#0a2e14', color: '#4ade80', border: '#1a5c2c' },
-  CANCELLED:        { label: 'Cancelado',      bg: '#2e0f0f', color: '#f87171', border: '#5c1f1f' },
-}
 
 const PAYMENT_STATUS_LABEL = {
   APPROVED:  'Pagado',
@@ -100,13 +97,6 @@ function getInitials(name) {
   return name.trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase()
 }
 
-function getNextStatus(status, orderType) {
-  if (status === 'RECEIVED')       return 'IN_PREPARATION'
-  if (status === 'IN_PREPARATION') return orderType === 'DELIVERY' ? 'ON_THE_WAY' : 'READY_FOR_PICKUP'
-  if (status === 'ON_THE_WAY' || status === 'READY_FOR_PICKUP') return 'DELIVERED'
-  return null
-}
-
 function filterOrders(orders, activeTab, searchQuery, dismissedIds) {
   let list = orders
   if (activeTab === 'ALL') {
@@ -124,26 +114,6 @@ function filterOrders(orders, activeTab, searchQuery, dismissedIds) {
     )
   }
   return list
-}
-
-const STATUS_PRIORITY = {
-  CANCELLATION_REQUESTED: 0,
-  RECEIVED:               1,
-  IN_PREPARATION:         2,
-  ON_THE_WAY:             3,
-  READY_FOR_PICKUP:       3,
-  DELIVERED:              4,
-  CANCELLED:              4,
-  PENDING_PAYMENT:        5,
-}
-
-function sortOrders(orders) {
-  return [...orders].sort((a, b) => {
-    const pa = STATUS_PRIORITY[a.status] ?? 99
-    const pb = STATUS_PRIORITY[b.status] ?? 99
-    if (pa !== pb) return pa - pb
-    return new Date(b.createdAt) - new Date(a.createdAt)
-  })
 }
 
 function tabCount(orders, key, dismissedIds) {
@@ -267,7 +237,6 @@ function PaymentStatusIcon({ status }) {
 // ── Main component ────────────────────────────────────────────
 
 export default function Orders() {
-  const navigate  = useNavigate()
   const { token } = useAuth()
   const { orders, loading, error, refresh, dismissOrder, dismissedIds, updateOrderInList, updatePaymentInList } =
     useOrders(token)
@@ -590,8 +559,8 @@ function OrderDetail({ order, onClose, onAdvance, advancing, token, onRefetch, o
   const [paying,        setPaying]        = useState(false)
   const [actionLoading, setActionLoading] = useState(null)
 
-  const canGoBack = ['IN_PREPARATION', 'ON_THE_WAY', 'READY_FOR_PICKUP'].includes(order.status)
-  const canCancel = order.status === 'RECEIVED'
+  const canGoBack = goBackAllowed(order.status)
+  const canCancel = cancelAllowed(order.status)
 
   const confirmPayment = async (e) => {
     e.stopPropagation()

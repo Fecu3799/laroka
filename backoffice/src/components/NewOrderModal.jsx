@@ -4,6 +4,7 @@ import useAuth from '../hooks/useAuth'
 import { createBackofficeOrder } from '../services/ordersService'
 import { fetchBranchMenu } from '../services/catalogService'
 import { fetchBranches } from '../services/branchService'
+import { canConfirmOrder } from '../utils/ordersUtils'
 import './NewOrderModal.css'
 
 function formatPrice(n) {
@@ -97,8 +98,7 @@ export default function NewOrderModal({ open, onClose }) {
   const computedDeliveryFee = orderType === 'DELIVERY' ? branchDeliveryFee : 0
   const total              = subtotal + computedDeliveryFee + branchServiceFee
   const itemCount          = cartItems.reduce((s, i) => s + i.quantity, 0)
-  const canConfirm         = cartItems.length > 0 &&
-    (orderType !== 'DELIVERY' || deliveryAddress.trim().length > 0)
+  const canConfirm         = canConfirmOrder({ cartItems, orderType, deliveryAddress })
 
   // ── Cart operations ──────────────────────────────────────────
 
