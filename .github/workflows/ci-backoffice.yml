@@ -25,12 +25,12 @@ jobs:
         run: npm ci
         working-directory: backoffice
 
-      - name: Build
-        run: npm run build
-        working-directory: backoffice
-
       - name: Lint (ESLint)
         run: npm run lint
+        working-directory: backoffice
+
+      - name: Build
+        run: npm run build
         working-directory: backoffice
 
       - name: Test

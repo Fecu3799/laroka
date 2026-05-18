@@ -21,12 +21,12 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
 
-      - name: Build
-        run: ./mvnw package -DskipTests --no-transfer-progress
-        working-directory: backend
-
       - name: Lint (Checkstyle)
         run: ./mvnw checkstyle:check --no-transfer-progress
+        working-directory: backend
+
+      - name: Build
+        run: ./mvnw package -DskipTests --no-transfer-progress
         working-directory: backend
 
       - name: Test

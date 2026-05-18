@@ -25,12 +25,12 @@ jobs:
         run: npm ci
         working-directory: client
 
-      - name: Build
-        run: npm run build
-        working-directory: client
-
       - name: Lint (ESLint)
         run: npm run lint
+        working-directory: client
+
+      - name: Build
+        run: npm run build
         working-directory: client
 
       - name: Test
