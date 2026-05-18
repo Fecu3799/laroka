@@ -32,3 +32,7 @@ jobs:
       - name: Lint (ESLint)
         run: npm run lint
         working-directory: backoffice
+
+      - name: Test
+        run: npm test
+        working-directory: backoffice
