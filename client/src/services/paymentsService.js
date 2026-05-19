@@ -16,3 +16,4 @@ export async function initiatePayment(orderId) {
   const data = await res.json()
   return data.paymentLink
 }
+

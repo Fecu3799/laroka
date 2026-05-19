@@ -31,3 +31,4 @@ export function useCart(initialItems = []) {
 
   return { items, addItem, removeItem, updateQty, clearCart, total, count }
 }
+
