@@ -37,4 +37,4 @@ jobs:
       - name: Trigger deploy
         env:
           deploy_url: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
-        run: curl "$deploy_url"
+        run: curl -X POST "$deploy_url"

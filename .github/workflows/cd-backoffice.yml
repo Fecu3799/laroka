@@ -1,0 +1,19 @@
+name: CD Backoffice
+
+on:
+  push:
+    branches:
+      - tp-devops
+    paths:
+      - 'backoffice/**'
+
+jobs:
+  deploy:
+    name: Deploy to Vercel (Panel)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger Vercel Deploy
+        env:
+          deploy_url: ${{ secrets.VERCEL_DEPLOY_HOOK_BACKOFFICE }}
+        run: curl -X POST "$deploy_url"
