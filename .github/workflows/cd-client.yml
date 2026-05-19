@@ -3,7 +3,7 @@ name: CD Client
 on:
   push:
     branches:
-      - tp-devops
+      - main
     paths:
       - 'client/**'
 
