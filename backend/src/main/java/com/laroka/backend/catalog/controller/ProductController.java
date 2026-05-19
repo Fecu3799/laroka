@@ -29,6 +29,7 @@ import jakarta.validation.Valid;
 
 import lombok.RequiredArgsConstructor;
 
+
 @RestController
 @RequestMapping("/backoffice/products")
 @RequiredArgsConstructor
