@@ -21,6 +21,8 @@ RUN apk add --no-cache curl unzip && \
 
 COPY --from=build /app/target/*.jar app.jar
 
+RUN find /app/newrelic -name "newrelic.jar" 2>/dev/null
+
 ENTRYPOINT ["java", \
   "-javaagent:/app/newrelic/newrelic/newrelic.jar", \
   "-Dnewrelic.config.app_name=laroka-backend", \
