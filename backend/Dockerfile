@@ -10,5 +10,19 @@ RUN chmod +x mvnw && ./mvnw package -DskipTests
 # Stage 2: Run the application
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
+
+
+# New Relic agent
+RUN apk add --no-cache curl unzip && \
+    curl -L -o newrelic-java.zip https://download.newrelic.com/newrelic/java-agent/newrelic-agent/current/newrelic-java.zip && \
+    unzip newrelic-java.zip -d /app/newrelic && \
+    rm newrelic-java.zip && \
+    apk del unzip
+
 COPY --from=build /app/target/*.jar app.jar
-ENTRYPOINT ["java", "-jar", "app.jar"]
+
+ENTRYPOINT ["java", \
+  "-javaagent:/app/newrelic/newrelic/newrelic.jar", \
+  "-Dnewrelic.config.app_name=laroka-backend", \
+  "-Dnewrelic.config.log_file_name=STDOUT", \
+  "-jar", "app.jar"]
