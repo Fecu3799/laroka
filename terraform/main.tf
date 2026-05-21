@@ -26,14 +26,11 @@ resource "render_web_service" "backend" {
   region  = "oregon"
 
   runtime_source = {
-    docker = {
-        repo_url        = "https://github.com/Fecu3799/laroka"
-        branch          = "main"
-        dockerfile_path = "./backend/Dockerfile"
-        context         = "./backend"
-        auto_deploy     = false
+    image = {
+        image_url = "docker.io/fecu3799/laroka-backend"
+        tag       = "latest"
     }
-  }
+}
 
   env_vars = {
     DB_URL                     = { value = var.db_url }
