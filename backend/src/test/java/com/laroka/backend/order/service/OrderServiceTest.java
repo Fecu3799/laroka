@@ -50,8 +50,6 @@ import com.laroka.backend.tenant.entity.Tenant;
 import com.laroka.backend.shared.exception.BusinessException;
 import com.laroka.backend.order.dto.OrderFilterParams;
 import com.laroka.backend.order.entity.OrderStatusHistory;
-import com.laroka.backend.order.service.BackofficeOrderDetail;
-import com.laroka.backend.order.service.BackofficeOrderRow;
 
 @ExtendWith(MockitoExtension.class)
 class OrderServiceTest {
