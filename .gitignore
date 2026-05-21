@@ -18,3 +18,7 @@ Thumbs.db
 
 # Node
 node_modules/
+
+# Terraform
+terraform/*.tfvars
+terraform/.terraform/
