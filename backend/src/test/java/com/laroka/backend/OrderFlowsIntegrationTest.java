@@ -2,7 +2,6 @@ package com.laroka.backend;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -29,7 +28,6 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.laroka.backend.order.entity.OrderStatus;
 import com.laroka.backend.order.repository.OrderRepository;
@@ -128,12 +126,6 @@ class OrderFlowsIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"nextStatus\":\"" + nextStatus + "\"}"))
             .andExpect(status().isNoContent());
-    }
-
-    private void assertHistory(UUID orderId, int expectedSize, OrderStatus expectedLastTo) {
-        List<OrderStatusHistory> history = historyRepository.findByOrderIdOrderByChangedAtAsc(orderId);
-        assertThat(history).hasSize(expectedSize);
-        assertThat(history.get(expectedSize - 1).getToStatus()).isEqualTo(expectedLastTo);
     }
 
     private void assertHistory(UUID orderId, int expectedSize, OrderStatus expectedFromAt,
