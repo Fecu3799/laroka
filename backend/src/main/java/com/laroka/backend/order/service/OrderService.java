@@ -29,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.laroka.backend.branch.entity.Branch;
 import com.laroka.backend.branch.exception.BranchNotFoundException;
 import com.laroka.backend.branch.repository.BranchRepository;
+import com.laroka.backend.branch.service.BranchService;
 import com.laroka.backend.catalog.entity.Product;
 import com.laroka.backend.catalog.exception.ProductNotFoundException;
 import com.laroka.backend.catalog.repository.BranchProductRepository;
@@ -58,6 +59,7 @@ public class OrderService {
     private final OrderStatusHistoryRepository historyRepository;
     private final OrderItemRepository orderItemRepository;
     private final BranchRepository branchRepository;
+    private final BranchService branchService;
     private final ProductRepository productRepository;
     private final BranchProductRepository branchProductRepository;
     private final IdempotencyStore idempotencyStore;
@@ -348,6 +350,11 @@ public class OrderService {
                     log.warn("Branch not found | branchId={}", order.getBranch().getId());
                     return new BranchNotFoundException(order.getBranch().getId());
                 });
+
+        if (!branchService.isOpen(branch.getId())) {
+            log.warn("Order rejected — branch closed | branchId={}", branch.getId());
+            throw new BusinessException("El local no está disponible en este momento");
+        }
 
         if (order.getOrderType() == OrderType.DELIVERY
                 && (order.getDeliveryAddress() == null || order.getDeliveryAddress().isBlank())) {

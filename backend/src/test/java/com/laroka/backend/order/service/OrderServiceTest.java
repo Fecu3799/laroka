@@ -30,6 +30,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.laroka.backend.branch.entity.Branch;
 import com.laroka.backend.branch.exception.BranchNotFoundException;
 import com.laroka.backend.branch.repository.BranchRepository;
+import com.laroka.backend.branch.service.BranchService;
 import com.laroka.backend.catalog.entity.BranchProduct;
 import com.laroka.backend.catalog.entity.Product;
 import com.laroka.backend.catalog.repository.BranchProductRepository;
@@ -57,6 +58,7 @@ class OrderServiceTest {
     @Mock private OrderRepository orderRepository;
     @Mock private OrderStatusHistoryRepository historyRepository;
     @Mock private BranchRepository branchRepository;
+    @Mock private BranchService branchService;
     @Mock private ProductRepository productRepository;
     @Mock private BranchProductRepository branchProductRepository;
     @Mock private IdempotencyStore idempotencyStore;
@@ -122,6 +124,7 @@ class OrderServiceTest {
     private void stubBaseCreation(Branch branch, Product product) {
         when(idempotencyStore.get(any())).thenReturn(Optional.empty());
         when(branchRepository.findById(branch.getId())).thenReturn(Optional.of(branch));
+        when(branchService.isOpen(branch.getId())).thenReturn(true);
         when(productRepository.findById(product.getId())).thenReturn(Optional.of(product));
         when(branchProductRepository.findByBranchIdAndProductId(branch.getId(), product.getId()))
                 .thenReturn(Optional.empty());
@@ -160,6 +163,7 @@ class OrderServiceTest {
 
         when(idempotencyStore.get(any())).thenReturn(Optional.empty());
         when(branchRepository.findById(1)).thenReturn(Optional.of(branch));
+        when(branchService.isOpen(1)).thenReturn(true);
         when(productRepository.findById(1)).thenReturn(Optional.of(product));
         when(branchProductRepository.findByBranchIdAndProductId(1, 1)).thenReturn(Optional.of(bp));
         when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -229,6 +233,36 @@ class OrderServiceTest {
         assertThatThrownBy(() ->
                 service.createOrder(takeawayOrder(branch), List.of(itemFor(1, 1)), PaymentMethod.MERCADOPAGO, "key-4"))
                 .isInstanceOf(BranchNotFoundException.class);
+    }
+
+    // --- createOrder: validación de horario (US-06-05) ---
+
+    @Test
+    void createOrder_branchOpen_createsOrderSuccessfully() {
+        Tenant p = tenant();
+        Branch branch = branch(p);
+        Product product = product(new BigDecimal("1000.00"));
+        stubBaseCreation(branch, product);
+
+        OrderCreationResult result = service.createOrder(
+                takeawayOrder(branch), List.of(itemFor(1, 1)), PaymentMethod.MERCADOPAGO, "key-open");
+
+        assertThat(result.order()).isNotNull();
+        assertThat(result.fromCache()).isFalse();
+        verify(orderRepository).save(any(Order.class));
+    }
+
+    @Test
+    void createOrder_branchClosed_throwsBusinessException() {
+        when(idempotencyStore.get(any())).thenReturn(Optional.empty());
+        Branch branch = branch(tenant());
+        when(branchRepository.findById(branch.getId())).thenReturn(Optional.of(branch));
+        when(branchService.isOpen(branch.getId())).thenReturn(false);
+
+        assertThatThrownBy(() ->
+                service.createOrder(takeawayOrder(branch), List.of(itemFor(1, 1)), PaymentMethod.MERCADOPAGO, "key-closed"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("El local no está disponible en este momento");
     }
 
     // --- createOrder: idempotencia ---
