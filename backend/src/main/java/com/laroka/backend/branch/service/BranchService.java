@@ -1,6 +1,11 @@
 package com.laroka.backend.branch.service;
 
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.stereotype.Service;
 
@@ -54,6 +59,29 @@ public class BranchService {
 	public void delete(Integer id) {
 		repository.delete(findById(id));
 	}
+
+	public boolean isOpen(Integer branchId) {
+		return isOpenAt(findById(branchId), LocalDate.now(), LocalTime.now());
+	}
+
+	static boolean isOpenAt(Branch branch, LocalDate date, LocalTime now) {
+		String dayCode = DAY_CODES.get(date.getDayOfWeek());
+		List<String> openDays = Arrays.asList(branch.getOpenDays().split(","));
+		if (!openDays.contains(dayCode)) {
+			return false;
+		}
+		return !now.isBefore(branch.getOpeningTime()) && !now.isAfter(branch.getClosingTime());
+	}
+
+	private static final Map<DayOfWeek, String> DAY_CODES = Map.of(
+		DayOfWeek.MONDAY,    "LUN",
+		DayOfWeek.TUESDAY,   "MAR",
+		DayOfWeek.WEDNESDAY, "MIE",
+		DayOfWeek.THURSDAY,  "JUE",
+		DayOfWeek.FRIDAY,    "VIE",
+		DayOfWeek.SATURDAY,  "SAB",
+		DayOfWeek.SUNDAY,    "DOM"
+	);
 
 	private Tenant validateTenantExists(Integer tenantId) {
 		return tenantRepository.findById(tenantId)
