@@ -412,10 +412,10 @@ public class OrderService {
         Order saved = orderRepository.save(order);
         recordHistory(saved, null, OrderStatus.PENDING_PAYMENT);
 
-        log.info("Order created | orderId={} branchId={} orderType={} paymentMethod={} subtotal={} deliveryFee={} serviceFee={} total={} origin={}",
+        log.info("Order created | orderId={} branchId={} orderType={} paymentMethod={} subtotal={} deliveryFee={} serviceFee={} total={} origin={} requestId={}",
                 saved.getId(), saved.getBranch().getId(), saved.getOrderType(),
                 paymentMethod, saved.getSubtotal(), saved.getDeliveryFee(),
-                saved.getServiceFee(), saved.getTotalAmount(), saved.getOrigin());
+                saved.getServiceFee(), saved.getTotalAmount(), saved.getOrigin(), idempotencyKey);
 
         if (paymentMethod == PaymentMethod.CASH) {
             log.info("Cash order auto-received | orderId={}", saved.getId());

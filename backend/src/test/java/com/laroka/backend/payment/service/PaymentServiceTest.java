@@ -176,6 +176,40 @@ class PaymentServiceTest {
         verify(notificationService, never()).sendNewOrderEvent(any(), any(), any());
     }
 
+    // --- processWebhook: order already activated (second guard) ---
+
+    @Test
+    void processWebhook_approvedButOrderAlreadyReceived_skipsActivationAndNotification() {
+        UUID orderId = UUID.randomUUID();
+        String paymentId = "mp-pay-006";
+
+        // Payment has the mpPaymentId but is still PENDING (e.g. MP had previously returned "pending")
+        // — so the early-return guard does NOT fire
+        Payment pendingWithMpId = Payment.builder()
+                .id(UUID.randomUUID())
+                .status(PaymentStatus.PENDING)
+                .method(PaymentMethod.MERCADOPAGO)
+                .mercadopagoPaymentId(paymentId)
+                .order(Order.builder().id(orderId).build())
+                .build();
+        when(paymentRepository.findByMercadopagoPaymentId(paymentId)).thenReturn(Optional.of(pendingWithMpId));
+        when(paymentGateway.fetchPayment(paymentId))
+                .thenReturn(new PaymentGateway.PaymentInfo("approved", orderId.toString()));
+        when(paymentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        // Order is already RECEIVED — second guard must prevent re-activation
+        Branch branch = Branch.builder().id(1).name("Playa Unión").build();
+        Order order = Order.builder()
+                .id(orderId).status(OrderStatus.RECEIVED).branch(branch).build();
+        when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
+
+        service.processWebhook(null, "req-redelivery", paymentId, event("payment", paymentId));
+
+        assertThat(pendingWithMpId.getStatus()).isEqualTo(PaymentStatus.APPROVED);
+        verify(orderService, never()).transitionStatus(any(), any());
+        verify(notificationService, never()).sendNewOrderEvent(any(), any(), any());
+    }
+
     // --- processWebhook: invalid signature ---
 
     @Test

@@ -84,10 +84,10 @@ public class PaymentService {
 
     @Transactional
     public void processWebhook(String xSignature, String xRequestId, String dataId, WebhookEventDTO event) {
-        log.info("processWebhook: type={}, dataId={}", event.getType(), dataId);
+        log.info("processWebhook: type={}, dataId={}, requestId={}", event.getType(), dataId, xRequestId);
 
         if (!"payment".equals(event.getType())) {
-            log.warn("processWebhook: ignored event type={}", event.getType());
+            log.warn("processWebhook: ignored event type={}, requestId={}", event.getType(), xRequestId);
             return;
         }
 
@@ -98,12 +98,14 @@ public class PaymentService {
         Optional<Payment> existingByPaymentId = paymentRepository.findByMercadopagoPaymentId(paymentId);
         if (existingByPaymentId.isPresent()
                 && existingByPaymentId.get().getStatus() != PaymentStatus.PENDING) {
-            log.warn("processWebhook: duplicate webhook ignored — paymentId={}, currentStatus={}", paymentId, existingByPaymentId.get().getStatus());
+            log.warn("processWebhook: duplicate webhook ignored — paymentId={}, currentStatus={}, requestId={}",
+                    paymentId, existingByPaymentId.get().getStatus(), xRequestId);
             return;
         }
 
         PaymentGateway.PaymentInfo info = paymentGateway.fetchPayment(paymentId);
-        log.info("processWebhook: fetchPayment result — status={}, externalReference={}", info.status(), info.externalReference());
+        log.info("processWebhook: fetchPayment result — status={}, externalReference={}, requestId={}",
+                info.status(), info.externalReference(), xRequestId);
 
         PaymentStatus newStatus = mapMpStatus(info.status());
         UUID orderId = UUID.fromString(info.externalReference());
@@ -112,24 +114,29 @@ public class PaymentService {
                 paymentRepository.findByOrderId(orderId)
                         .orElseThrow(() -> new PaymentNotFoundException(orderId)));
 
-        log.info("processWebhook: updating payment — paymentId={}, newStatus={}", payment.getId(), newStatus);
+        log.info("processWebhook: updating payment — paymentId={}, orderId={}, newStatus={}, requestId={}",
+                payment.getId(), orderId, newStatus, xRequestId);
         payment.setMercadopagoPaymentId(paymentId);
         payment.setStatus(newStatus);
         if (newStatus == PaymentStatus.APPROVED) {
             payment.setPaidAt(LocalDateTime.now());
         }
         paymentRepository.save(payment);
-        log.info("processWebhook: payment updated — paymentId={}, newStatus={}", payment.getId(), newStatus);
+        log.info("processWebhook: payment saved — paymentId={}, orderId={}, newStatus={}, requestId={}",
+                payment.getId(), orderId, newStatus, xRequestId);
 
         if (newStatus == PaymentStatus.APPROVED) {
             Order order = orderRepository.findByIdWithBranch(orderId)
                     .orElseThrow(() -> new OrderNotFoundException(orderId));
 
             if (order.getStatus() == OrderStatus.PENDING_PAYMENT) {
-                log.info("processWebhook: transitioning order to RECEIVED — orderId={}", orderId);
+                log.info("processWebhook: transitioning order to RECEIVED — orderId={}, requestId={}", orderId, xRequestId);
                 orderService.transitionStatus(orderId, OrderStatus.RECEIVED);
-                log.info("processWebhook: order transitioned to RECEIVED — orderId={}", orderId);
+                log.info("processWebhook: order transitioned to RECEIVED — orderId={}, requestId={}", orderId, xRequestId);
                 notificationService.sendNewOrderEvent(order.getBranch().getId(), orderId, order.getCreatedAt());
+            } else {
+                log.warn("processWebhook: order not in PENDING_PAYMENT, skipping activation — orderId={}, orderStatus={}, requestId={}",
+                        orderId, order.getStatus(), xRequestId);
             }
         }
     }
