@@ -9,6 +9,10 @@ public interface PaymentGateway {
 
     PaymentInfo fetchPayment(String paymentId);
 
+    String chargeQr(String mpPosId, UUID orderId, BigDecimal amount);
+
+    void cancelQrCharge(String externalId);
+
     record PaymentInfo(String status, String externalReference) {}
 
     record BackUrls(String success, String failure, String pending) {}

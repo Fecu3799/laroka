@@ -10,7 +10,9 @@ import java.util.Map;
 import org.springframework.stereotype.Service;
 
 import com.laroka.backend.branch.entity.Branch;
+import com.laroka.backend.branch.entity.BranchQR;
 import com.laroka.backend.branch.exception.BranchNotFoundException;
+import com.laroka.backend.branch.repository.BranchQRRepository;
 import com.laroka.backend.branch.repository.BranchRepository;
 import com.laroka.backend.tenant.entity.Tenant;
 import com.laroka.backend.tenant.exception.TenantNotFoundException;
@@ -24,6 +26,7 @@ public class BranchService {
 
 	private final BranchRepository repository;
 	private final TenantRepository tenantRepository;
+	private final BranchQRRepository branchQrRepository;
 
 	public Branch findById(Integer id) {
 		return repository.findById(id)
@@ -58,6 +61,16 @@ public class BranchService {
 
 	public void delete(Integer id) {
 		repository.delete(findById(id));
+	}
+
+	public BranchQR saveQrConfig(Integer branchId, String mpPosId, String mpQrId) {
+		Branch branch = findById(branchId);
+		BranchQR qr = branchQrRepository.findByBranchId(branchId)
+			.orElseGet(() -> BranchQR.builder().branch(branch).build());
+		qr.setMpPosId(mpPosId);
+		qr.setMpQrId(mpQrId);
+		qr.setActive(true);
+		return branchQrRepository.save(qr);
 	}
 
 	public boolean isOpen(Integer branchId) {

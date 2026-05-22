@@ -15,6 +15,9 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.laroka.backend.branch.entity.BranchQR;
+import com.laroka.backend.branch.exception.BranchQRNotFoundException;
+import com.laroka.backend.branch.repository.BranchQRRepository;
 import com.laroka.backend.notification.service.NotificationService;
 import com.laroka.backend.order.entity.Order;
 import com.laroka.backend.order.entity.OrderStatus;
@@ -43,6 +46,7 @@ public class PaymentService {
     private final OrderService orderService;
     private final PaymentGateway paymentGateway;
     private final NotificationService notificationService;
+    private final BranchQRRepository branchQrRepository;
 
     @Value("${mercadopago.webhook-secret:}")
     private String webhookSecret;
@@ -125,6 +129,10 @@ public class PaymentService {
         log.info("processWebhook: payment saved — paymentId={}, orderId={}, newStatus={}, requestId={}",
                 payment.getId(), orderId, newStatus, xRequestId);
 
+        if (newStatus != PaymentStatus.PENDING) {
+            clearQrActivePayment(orderId);
+        }
+
         if (newStatus == PaymentStatus.APPROVED) {
             Order order = orderRepository.findByIdWithBranch(orderId)
                     .orElseThrow(() -> new OrderNotFoundException(orderId));
@@ -174,6 +182,49 @@ public class PaymentService {
         return saved;
     }
 
+    @Transactional
+    public void chargeQr(UUID orderId, Integer branchId) {
+        BranchQR branchQr = branchQrRepository.findByBranchId(branchId)
+                .orElseThrow(() -> new BranchQRNotFoundException(branchId));
+
+        if (!branchQr.isActive()) {
+            throw new BusinessException("El QR de la sucursal no está activo");
+        }
+
+        Order order = orderRepository.findByIdWithBranch(orderId)
+                .orElseThrow(() -> new OrderNotFoundException(orderId));
+
+        if (!order.getBranch().getId().equals(branchId)) {
+            log.warn("chargeQr: branch mismatch | orderId={} orderBranch={} userBranch={}",
+                    orderId, order.getBranch().getId(), branchId);
+            throw new AccessDeniedException("El pedido no pertenece a la sucursal del usuario");
+        }
+
+        if (order.getStatus() != OrderStatus.PENDING_PAYMENT) {
+            throw new BusinessException("El pedido no está en estado PENDING_PAYMENT");
+        }
+
+        if (branchQr.getActivePaymentId() != null) {
+            log.info("chargeQr: cancelling previous active charge | externalId={} branchId={}",
+                    branchQr.getActivePaymentId(), branchId);
+            paymentGateway.cancelQrCharge(branchQr.getActivePaymentId());
+            branchQr.setActivePaymentId(null);
+        }
+
+        String externalId = paymentGateway.chargeQr(branchQr.getMpPosId(), orderId, order.getTotalAmount());
+        branchQr.setActivePaymentId(externalId);
+        branchQrRepository.save(branchQr);
+
+        Payment payment = paymentRepository.findByOrderId(orderId)
+                .orElseGet(() -> Payment.builder().id(UUID.randomUUID()).order(order).build());
+        payment.setMethod(PaymentMethod.QR_CODE);
+        payment.setStatus(PaymentStatus.PENDING);
+        paymentRepository.save(payment);
+
+        log.info("chargeQr: QR charge initiated | orderId={} branchId={} externalId={}",
+                orderId, branchId, externalId);
+    }
+
     @Transactional(readOnly = true)
     public Payment findByOrderId(UUID orderId) {
         return paymentRepository.findByOrderId(orderId)
@@ -183,6 +234,19 @@ public class PaymentService {
     @Transactional(readOnly = true)
     public Optional<Payment> findOptionalByOrderId(UUID orderId) {
         return paymentRepository.findByOrderId(orderId);
+    }
+
+    private void clearQrActivePayment(UUID orderId) {
+        orderRepository.findByIdWithBranch(orderId).ifPresent(order ->
+            branchQrRepository.findByBranchId(order.getBranch().getId()).ifPresent(qr -> {
+                if (qr.getActivePaymentId() != null) {
+                    qr.setActivePaymentId(null);
+                    branchQrRepository.save(qr);
+                    log.info("clearQrActivePayment: cleared | branchId={} orderId={}",
+                            order.getBranch().getId(), orderId);
+                }
+            })
+        );
     }
 
     private void validateWebhookSignature(String xSignature, String xRequestId, String dataId) {

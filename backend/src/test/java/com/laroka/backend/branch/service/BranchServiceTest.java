@@ -20,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.laroka.backend.branch.entity.Branch;
 import com.laroka.backend.branch.exception.BranchNotFoundException;
+import com.laroka.backend.branch.repository.BranchQRRepository;
 import com.laroka.backend.branch.repository.BranchRepository;
 import com.laroka.backend.tenant.entity.Tenant;
 import com.laroka.backend.tenant.exception.TenantNotFoundException;
@@ -33,6 +34,9 @@ class BranchServiceTest {
 
 	@Mock
 	private TenantRepository tenantRepository;
+
+	@Mock
+	private BranchQRRepository branchQrRepository;
 
 	@InjectMocks
 	private BranchService service;
