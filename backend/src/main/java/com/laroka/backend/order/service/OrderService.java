@@ -148,6 +148,60 @@ public class OrderService {
         return saved;
     }
 
+    @Transactional
+    public void cancelOrder(UUID orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> {
+                    log.warn("Order not found | orderId={}", orderId);
+                    return new OrderNotFoundException(orderId);
+                });
+
+        if (!OrderStateMachine.canCancel(order.getStatus())) {
+            throw new BusinessException("El pedido no puede cancelarse en este estado");
+        }
+
+        OrderStatus previous = order.getStatus();
+        OrderStatus next = previous == OrderStatus.RECEIVED
+                ? OrderStatus.CANCELLED
+                : OrderStatus.CANCELLATION_REQUESTED;
+        order.setStatus(next);
+        Order saved = orderRepository.save(order);
+        recordHistory(saved, previous, next);
+        log.info("Order cancel flow | orderId={} from={} to={}", saved.getId(), previous, next);
+    }
+
+    @Transactional
+    public void resolveCancellationRequest(UUID orderId, String action, Integer branchId, Integer staffUserId) {
+        Order order = orderRepository.findByIdWithBranch(orderId)
+                .orElseThrow(() -> {
+                    log.warn("Order not found | orderId={}", orderId);
+                    return new OrderNotFoundException(orderId);
+                });
+
+        if (!order.getBranch().getId().equals(branchId)) {
+            log.warn("Branch mismatch on cancel-request | orderId={} orderBranch={} userBranch={}",
+                    orderId, order.getBranch().getId(), branchId);
+            throw new AccessDeniedException("El pedido no pertenece a la sucursal del usuario");
+        }
+
+        if (order.getStatus() != OrderStatus.CANCELLATION_REQUESTED) {
+            throw new BusinessException("El pedido no está en estado de cancelación solicitada");
+        }
+
+        OrderStatus next = switch (action) {
+            case "APPROVE" -> OrderStatus.CANCELLED;
+            case "REJECT" -> OrderStatus.IN_PREPARATION;
+            default -> throw new BusinessException("action debe ser APPROVE o REJECT");
+        };
+
+        OrderStatus previous = order.getStatus();
+        order.setStatus(next);
+        Order saved = orderRepository.save(order);
+        recordHistory(saved, previous, next, staffUserId);
+        log.info("Cancellation request resolved | orderId={} action={} to={} staffUserId={}",
+                saved.getId(), action, next, staffUserId);
+    }
+
     @Transactional(readOnly = true)
     public Order findById(UUID id) {
         return orderRepository.findByIdWithBranch(id)
