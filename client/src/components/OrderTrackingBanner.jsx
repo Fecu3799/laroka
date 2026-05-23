@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { usePreferredBranch } from '../hooks/usePreferredBranch'
 import { readActiveOrders, removeActiveOrder } from '../utils/activeOrders'
+import { cancelOrder } from '../services/ordersService'
 import styles from './OrderTrackingBanner.module.css'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080'
@@ -82,18 +83,68 @@ function PhoneIcon() {
   )
 }
 
-function OrderSlide({ orderId, order, isExpanded, items, itemsLoading, itemsError, onToggleExpand, estimatedDeliveryMinutes, onPhoneClick }) {
-  const [cancelling, setCancelling] = useState(false)
-  const [cancelRequested, setCancelRequested] = useState(false)
+function ConfirmCancelModal({ isRequest, onConfirm, onClose, loading, error }) {
+  return (
+    <div
+      className={styles.modalOverlay}
+      role="dialog"
+      aria-modal="true"
+      onClick={(e) => { if (e.target === e.currentTarget && !loading) onClose() }}
+    >
+      <div className={styles.modalBox}>
+        <p className={styles.modalTitle}>
+          {isRequest ? '¿Solicitar cancelación?' : '¿Cancelar pedido?'}
+        </p>
+        <p className={styles.modalBody}>
+          {isRequest
+            ? 'Se enviará una solicitud al local. La decisión final queda a cargo del local.'
+            : 'El pedido será cancelado y no podrá reactivarse.'}
+        </p>
+        {error && <p className={styles.modalError}>{error}</p>}
+        <div className={styles.modalActions}>
+          <button
+            className={styles.modalBtnDismiss}
+            onClick={onClose}
+            disabled={loading}
+          >
+            VOLVER
+          </button>
+          <button
+            className={styles.modalBtnConfirm}
+            onClick={onConfirm}
+            disabled={loading}
+          >
+            {loading ? 'PROCESANDO...' : isRequest ? 'SOLICITAR' : 'CANCELAR'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
-  const handleCancel = async () => {
-    if (!window.confirm('¿Cancelar el pedido?')) return
+function OrderSlide({ orderId, order, isExpanded, items, itemsLoading, itemsError, onToggleExpand, estimatedDeliveryMinutes, onPhoneClick, onOrderUpdate }) {
+  const [showModal, setShowModal] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
+  const [cancelError, setCancelError] = useState(null)
+
+  const canDirectCancel = order?.status === 'RECEIVED'
+  const canRequestCancel = order?.status === 'IN_PREPARATION'
+
+  const handleOpenModal = () => {
+    setCancelError(null)
+    setShowModal(true)
+  }
+
+  const handleConfirmCancel = async () => {
+    const isDirectCancel = order?.status === 'RECEIVED'
     setCancelling(true)
+    setCancelError(null)
     try {
-      const res = await fetch(`${API_BASE}/orders/${orderId}/cancel`, { method: 'POST' })
-      if (res.ok) setCancelRequested(true)
-    } catch {
-      // ignore
+      await cancelOrder(orderId)
+      setShowModal(false)
+      onOrderUpdate(orderId, isDirectCancel ? 'CANCELLED' : 'CANCELLATION_REQUESTED')
+    } catch (err) {
+      setCancelError(err.is422 ? err.message : 'No se pudo procesar la solicitud.')
     } finally {
       setCancelling(false)
     }
@@ -109,6 +160,8 @@ function OrderSlide({ orderId, order, isExpanded, items, itemsLoading, itemsErro
     )
   }
 
+  const isRequest = canRequestCancel
+
   const progress = PROGRESS[order.status] ?? 10
   const isPendingPayment = order.status === 'PENDING_PAYMENT'
   const isDelivery = order.orderType === 'DELIVERY'
@@ -117,6 +170,16 @@ function OrderSlide({ orderId, order, isExpanded, items, itemsLoading, itemsErro
   for (const h of (order.history ?? [])) historyMap[h.toStatus] = h
 
   return (
+    <>
+    {showModal && (
+      <ConfirmCancelModal
+        isRequest={isRequest}
+        onConfirm={handleConfirmCancel}
+        onClose={() => { if (!cancelling) setShowModal(false) }}
+        loading={cancelling}
+        error={cancelError}
+      />
+    )}
     <div className={styles.slideContent}>
       <div className={styles.topRow}>
         <div className={styles.titleBlock}>
@@ -215,13 +278,19 @@ function OrderSlide({ orderId, order, isExpanded, items, itemsLoading, itemsErro
             </>
           )}
 
-          {order.status === 'RECEIVED' && !cancelRequested && (
-            <button
-              className={styles.cancelBtn}
-              onClick={handleCancel}
-              disabled={cancelling}
-            >
-              {cancelling ? 'CANCELANDO...' : 'CANCELAR PEDIDO'}
+          {order.status === 'CANCELLATION_REQUESTED' && (
+            <p className={styles.cancelMessage}>
+              Cancelación solicitada, esperando respuesta del local.
+            </p>
+          )}
+          {canDirectCancel && (
+            <button className={styles.cancelBtn} onClick={handleOpenModal}>
+              CANCELAR PEDIDO
+            </button>
+          )}
+          {canRequestCancel && (
+            <button className={styles.cancelBtn} onClick={handleOpenModal}>
+              SOLICITAR CANCELACIÓN
             </button>
           )}
         </div>
@@ -236,6 +305,7 @@ function OrderSlide({ orderId, order, isExpanded, items, itemsLoading, itemsErro
         </button>
       )}
     </div>
+    </>
   )
 }
 
@@ -382,6 +452,23 @@ export function OrderTrackingBanner({ branchId }) {
     touchStartRef.current = null
   }
 
+  const handleOrderUpdate = useCallback((orderId, newStatus) => {
+    if (TERMINAL_STATUSES.includes(newStatus)) {
+      removeActiveOrder(orderId)
+      setOrderEntries(prev => prev.filter(e => e.orderId !== orderId))
+      setOrdersData(prev => {
+        const next = { ...prev }
+        delete next[orderId]
+        return next
+      })
+    } else {
+      setOrdersData(prev => ({
+        ...prev,
+        [orderId]: { ...prev[orderId], status: newStatus },
+      }))
+    }
+  }, [])
+
   const handlePhoneClick = () => {
     if (phone && window.confirm('¿Llamar al local?')) {
       window.location.href = `tel:${phone}`
@@ -422,6 +509,7 @@ export function OrderTrackingBanner({ branchId }) {
                   onToggleExpand={handleToggleExpand}
                   estimatedDeliveryMinutes={estimatedDeliveryMinutes}
                   onPhoneClick={handlePhoneClick}
+                  onOrderUpdate={handleOrderUpdate}
                 />
               </div>
             ))}
