@@ -15,6 +15,9 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.laroka.backend.branch.entity.BranchQR;
+import com.laroka.backend.branch.exception.BranchQRNotFoundException;
+import com.laroka.backend.branch.repository.BranchQRRepository;
 import com.laroka.backend.notification.service.NotificationService;
 import com.laroka.backend.order.entity.Order;
 import com.laroka.backend.order.entity.OrderStatus;
@@ -43,6 +46,7 @@ public class PaymentService {
     private final OrderService orderService;
     private final PaymentGateway paymentGateway;
     private final NotificationService notificationService;
+    private final BranchQRRepository branchQrRepository;
 
     @Value("${mercadopago.webhook-secret:}")
     private String webhookSecret;
@@ -84,10 +88,10 @@ public class PaymentService {
 
     @Transactional
     public void processWebhook(String xSignature, String xRequestId, String dataId, WebhookEventDTO event) {
-        log.info("processWebhook: type={}, dataId={}", event.getType(), dataId);
+        log.info("processWebhook: type={}, dataId={}, requestId={}", event.getType(), dataId, xRequestId);
 
         if (!"payment".equals(event.getType())) {
-            log.warn("processWebhook: ignored event type={}", event.getType());
+            log.warn("processWebhook: ignored event type={}, requestId={}", event.getType(), xRequestId);
             return;
         }
 
@@ -98,12 +102,14 @@ public class PaymentService {
         Optional<Payment> existingByPaymentId = paymentRepository.findByMercadopagoPaymentId(paymentId);
         if (existingByPaymentId.isPresent()
                 && existingByPaymentId.get().getStatus() != PaymentStatus.PENDING) {
-            log.warn("processWebhook: duplicate webhook ignored — paymentId={}, currentStatus={}", paymentId, existingByPaymentId.get().getStatus());
+            log.warn("processWebhook: duplicate webhook ignored — paymentId={}, currentStatus={}, requestId={}",
+                    paymentId, existingByPaymentId.get().getStatus(), xRequestId);
             return;
         }
 
         PaymentGateway.PaymentInfo info = paymentGateway.fetchPayment(paymentId);
-        log.info("processWebhook: fetchPayment result — status={}, externalReference={}", info.status(), info.externalReference());
+        log.info("processWebhook: fetchPayment result — status={}, externalReference={}, requestId={}",
+                info.status(), info.externalReference(), xRequestId);
 
         PaymentStatus newStatus = mapMpStatus(info.status());
         UUID orderId = UUID.fromString(info.externalReference());
@@ -112,24 +118,33 @@ public class PaymentService {
                 paymentRepository.findByOrderId(orderId)
                         .orElseThrow(() -> new PaymentNotFoundException(orderId)));
 
-        log.info("processWebhook: updating payment — paymentId={}, newStatus={}", payment.getId(), newStatus);
+        log.info("processWebhook: updating payment — paymentId={}, orderId={}, newStatus={}, requestId={}",
+                payment.getId(), orderId, newStatus, xRequestId);
         payment.setMercadopagoPaymentId(paymentId);
         payment.setStatus(newStatus);
         if (newStatus == PaymentStatus.APPROVED) {
             payment.setPaidAt(LocalDateTime.now());
         }
         paymentRepository.save(payment);
-        log.info("processWebhook: payment updated — paymentId={}, newStatus={}", payment.getId(), newStatus);
+        log.info("processWebhook: payment saved — paymentId={}, orderId={}, newStatus={}, requestId={}",
+                payment.getId(), orderId, newStatus, xRequestId);
+
+        if (newStatus != PaymentStatus.PENDING) {
+            clearQrActivePayment(orderId);
+        }
 
         if (newStatus == PaymentStatus.APPROVED) {
             Order order = orderRepository.findByIdWithBranch(orderId)
                     .orElseThrow(() -> new OrderNotFoundException(orderId));
 
             if (order.getStatus() == OrderStatus.PENDING_PAYMENT) {
-                log.info("processWebhook: transitioning order to RECEIVED — orderId={}", orderId);
+                log.info("processWebhook: transitioning order to RECEIVED — orderId={}, requestId={}", orderId, xRequestId);
                 orderService.transitionStatus(orderId, OrderStatus.RECEIVED);
-                log.info("processWebhook: order transitioned to RECEIVED — orderId={}", orderId);
+                log.info("processWebhook: order transitioned to RECEIVED — orderId={}, requestId={}", orderId, xRequestId);
                 notificationService.sendNewOrderEvent(order.getBranch().getId(), orderId, order.getCreatedAt());
+            } else {
+                log.warn("processWebhook: order not in PENDING_PAYMENT, skipping activation — orderId={}, orderStatus={}, requestId={}",
+                        orderId, order.getStatus(), xRequestId);
             }
         }
     }
@@ -167,6 +182,49 @@ public class PaymentService {
         return saved;
     }
 
+    @Transactional
+    public void chargeQr(UUID orderId, Integer branchId) {
+        BranchQR branchQr = branchQrRepository.findByBranchId(branchId)
+                .orElseThrow(() -> new BranchQRNotFoundException(branchId));
+
+        if (!branchQr.isActive()) {
+            throw new BusinessException("El QR de la sucursal no está activo");
+        }
+
+        Order order = orderRepository.findByIdWithBranch(orderId)
+                .orElseThrow(() -> new OrderNotFoundException(orderId));
+
+        if (!order.getBranch().getId().equals(branchId)) {
+            log.warn("chargeQr: branch mismatch | orderId={} orderBranch={} userBranch={}",
+                    orderId, order.getBranch().getId(), branchId);
+            throw new AccessDeniedException("El pedido no pertenece a la sucursal del usuario");
+        }
+
+        if (order.getStatus() != OrderStatus.PENDING_PAYMENT) {
+            throw new BusinessException("El pedido no está en estado PENDING_PAYMENT");
+        }
+
+        if (branchQr.getActivePaymentId() != null) {
+            log.info("chargeQr: cancelling previous active charge | externalId={} branchId={}",
+                    branchQr.getActivePaymentId(), branchId);
+            paymentGateway.cancelQrCharge(branchQr.getActivePaymentId());
+            branchQr.setActivePaymentId(null);
+        }
+
+        String externalId = paymentGateway.chargeQr(branchQr.getMpPosId(), orderId, order.getTotalAmount());
+        branchQr.setActivePaymentId(externalId);
+        branchQrRepository.save(branchQr);
+
+        Payment payment = paymentRepository.findByOrderId(orderId)
+                .orElseGet(() -> Payment.builder().id(UUID.randomUUID()).order(order).build());
+        payment.setMethod(PaymentMethod.QR_CODE);
+        payment.setStatus(PaymentStatus.PENDING);
+        paymentRepository.save(payment);
+
+        log.info("chargeQr: QR charge initiated | orderId={} branchId={} externalId={}",
+                orderId, branchId, externalId);
+    }
+
     @Transactional(readOnly = true)
     public Payment findByOrderId(UUID orderId) {
         return paymentRepository.findByOrderId(orderId)
@@ -176,6 +234,19 @@ public class PaymentService {
     @Transactional(readOnly = true)
     public Optional<Payment> findOptionalByOrderId(UUID orderId) {
         return paymentRepository.findByOrderId(orderId);
+    }
+
+    private void clearQrActivePayment(UUID orderId) {
+        orderRepository.findByIdWithBranch(orderId).ifPresent(order ->
+            branchQrRepository.findByBranchId(order.getBranch().getId()).ifPresent(qr -> {
+                if (qr.getActivePaymentId() != null) {
+                    qr.setActivePaymentId(null);
+                    branchQrRepository.save(qr);
+                    log.info("clearQrActivePayment: cleared | branchId={} orderId={}",
+                            order.getBranch().getId(), orderId);
+                }
+            })
+        );
     }
 
     private void validateWebhookSignature(String xSignature, String xRequestId, String dataId) {

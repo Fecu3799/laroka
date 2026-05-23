@@ -29,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.laroka.backend.branch.entity.Branch;
 import com.laroka.backend.branch.exception.BranchNotFoundException;
 import com.laroka.backend.branch.repository.BranchRepository;
+import com.laroka.backend.branch.service.BranchService;
 import com.laroka.backend.catalog.entity.Product;
 import com.laroka.backend.catalog.exception.ProductNotFoundException;
 import com.laroka.backend.catalog.repository.BranchProductRepository;
@@ -58,6 +59,7 @@ public class OrderService {
     private final OrderStatusHistoryRepository historyRepository;
     private final OrderItemRepository orderItemRepository;
     private final BranchRepository branchRepository;
+    private final BranchService branchService;
     private final ProductRepository productRepository;
     private final BranchProductRepository branchProductRepository;
     private final IdempotencyStore idempotencyStore;
@@ -146,6 +148,60 @@ public class OrderService {
         log.info("Backoffice previous status transition | orderId={} from={} to={} staffUserId={}",
                 saved.getId(), current, previousStatus, staffUserId);
         return saved;
+    }
+
+    @Transactional
+    public void cancelOrder(UUID orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> {
+                    log.warn("Order not found | orderId={}", orderId);
+                    return new OrderNotFoundException(orderId);
+                });
+
+        if (!OrderStateMachine.canCancel(order.getStatus())) {
+            throw new BusinessException("El pedido no puede cancelarse en este estado");
+        }
+
+        OrderStatus previous = order.getStatus();
+        OrderStatus next = previous == OrderStatus.RECEIVED
+                ? OrderStatus.CANCELLED
+                : OrderStatus.CANCELLATION_REQUESTED;
+        order.setStatus(next);
+        Order saved = orderRepository.save(order);
+        recordHistory(saved, previous, next);
+        log.info("Order cancel flow | orderId={} from={} to={}", saved.getId(), previous, next);
+    }
+
+    @Transactional
+    public void resolveCancellationRequest(UUID orderId, String action, Integer branchId, Integer staffUserId) {
+        Order order = orderRepository.findByIdWithBranch(orderId)
+                .orElseThrow(() -> {
+                    log.warn("Order not found | orderId={}", orderId);
+                    return new OrderNotFoundException(orderId);
+                });
+
+        if (!order.getBranch().getId().equals(branchId)) {
+            log.warn("Branch mismatch on cancel-request | orderId={} orderBranch={} userBranch={}",
+                    orderId, order.getBranch().getId(), branchId);
+            throw new AccessDeniedException("El pedido no pertenece a la sucursal del usuario");
+        }
+
+        if (order.getStatus() != OrderStatus.CANCELLATION_REQUESTED) {
+            throw new BusinessException("El pedido no está en estado de cancelación solicitada");
+        }
+
+        OrderStatus next = switch (action) {
+            case "APPROVE" -> OrderStatus.CANCELLED;
+            case "REJECT" -> OrderStatus.IN_PREPARATION;
+            default -> throw new BusinessException("action debe ser APPROVE o REJECT");
+        };
+
+        OrderStatus previous = order.getStatus();
+        order.setStatus(next);
+        Order saved = orderRepository.save(order);
+        recordHistory(saved, previous, next, staffUserId);
+        log.info("Cancellation request resolved | orderId={} action={} to={} staffUserId={}",
+                saved.getId(), action, next, staffUserId);
     }
 
     @Transactional(readOnly = true)
@@ -295,6 +351,11 @@ public class OrderService {
                     return new BranchNotFoundException(order.getBranch().getId());
                 });
 
+        if (!branchService.isOpen(branch.getId())) {
+            log.warn("Order rejected — branch closed | branchId={}", branch.getId());
+            throw new BusinessException("El local no está disponible en este momento");
+        }
+
         if (order.getOrderType() == OrderType.DELIVERY
                 && (order.getDeliveryAddress() == null || order.getDeliveryAddress().isBlank())) {
             throw new BusinessException("La dirección de entrega es obligatoria para pedidos de tipo DELIVERY");
@@ -351,10 +412,10 @@ public class OrderService {
         Order saved = orderRepository.save(order);
         recordHistory(saved, null, OrderStatus.PENDING_PAYMENT);
 
-        log.info("Order created | orderId={} branchId={} orderType={} paymentMethod={} subtotal={} deliveryFee={} serviceFee={} total={} origin={}",
+        log.info("Order created | orderId={} branchId={} orderType={} paymentMethod={} subtotal={} deliveryFee={} serviceFee={} total={} origin={} requestId={}",
                 saved.getId(), saved.getBranch().getId(), saved.getOrderType(),
                 paymentMethod, saved.getSubtotal(), saved.getDeliveryFee(),
-                saved.getServiceFee(), saved.getTotalAmount(), saved.getOrigin());
+                saved.getServiceFee(), saved.getTotalAmount(), saved.getOrigin(), idempotencyKey);
 
         if (paymentMethod == PaymentMethod.CASH) {
             log.info("Cash order auto-received | orderId={}", saved.getId());

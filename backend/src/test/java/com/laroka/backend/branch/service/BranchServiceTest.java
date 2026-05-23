@@ -6,6 +6,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -17,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.laroka.backend.branch.entity.Branch;
 import com.laroka.backend.branch.exception.BranchNotFoundException;
+import com.laroka.backend.branch.repository.BranchQRRepository;
 import com.laroka.backend.branch.repository.BranchRepository;
 import com.laroka.backend.tenant.entity.Tenant;
 import com.laroka.backend.tenant.exception.TenantNotFoundException;
@@ -30,6 +34,9 @@ class BranchServiceTest {
 
 	@Mock
 	private TenantRepository tenantRepository;
+
+	@Mock
+	private BranchQRRepository branchQrRepository;
 
 	@InjectMocks
 	private BranchService service;
@@ -153,6 +160,87 @@ class BranchServiceTest {
 
 		assertThatThrownBy(() -> service.delete(99))
 			.isInstanceOf(BranchNotFoundException.class);
+	}
+
+	// --- isOpenAt (US-06-08) ---
+
+	private Branch scheduledbranch(String openDays, LocalTime opening, LocalTime closing) {
+		return Branch.builder()
+			.id(1).name("Playa Unión").address("Av. Principal 123")
+			.estimatedDeliveryMinutes(30).phone("+542804123456")
+			.openingTime(opening).closingTime(closing).openDays(openDays)
+			.tenant(tenant())
+			.build();
+	}
+
+	private LocalDate monday()   { return LocalDate.now().with(DayOfWeek.MONDAY); }
+	private LocalDate saturday() { return LocalDate.now().with(DayOfWeek.SATURDAY); }
+	private LocalDate sunday()   { return LocalDate.now().with(DayOfWeek.SUNDAY); }
+
+	@Test
+	void isOpenAt_duringOpenHoursOnOpenDay_returnsTrue() {
+		Branch branch = scheduledbranch("LUN,MAR,MIE,JUE,VIE,SAB",
+			LocalTime.of(10, 0), LocalTime.of(23, 0));
+
+		assertThat(BranchService.isOpenAt(branch, monday(), LocalTime.of(13, 0))).isTrue();
+	}
+
+	@Test
+	void isOpenAt_beforeOpeningTimeOnOpenDay_returnsFalse() {
+		Branch branch = scheduledbranch("LUN,MAR,MIE,JUE,VIE,SAB",
+			LocalTime.of(10, 0), LocalTime.of(23, 0));
+
+		assertThat(BranchService.isOpenAt(branch, monday(), LocalTime.of(9, 59))).isFalse();
+	}
+
+	@Test
+	void isOpenAt_afterClosingTimeOnOpenDay_returnsFalse() {
+		Branch branch = scheduledbranch("LUN,MAR,MIE,JUE,VIE,SAB",
+			LocalTime.of(10, 0), LocalTime.of(22, 0));
+
+		assertThat(BranchService.isOpenAt(branch, monday(), LocalTime.of(22, 1))).isFalse();
+	}
+
+	@Test
+	void isOpenAt_exactlyAtOpeningTime_returnsTrue() {
+		Branch branch = scheduledbranch("LUN,MAR,MIE,JUE,VIE,SAB",
+			LocalTime.of(10, 0), LocalTime.of(23, 0));
+
+		assertThat(BranchService.isOpenAt(branch, monday(), LocalTime.of(10, 0))).isTrue();
+	}
+
+	@Test
+	void isOpenAt_exactlyAtClosingTime_returnsTrue() {
+		Branch branch = scheduledbranch("LUN,MAR,MIE,JUE,VIE,SAB",
+			LocalTime.of(10, 0), LocalTime.of(23, 0));
+
+		assertThat(BranchService.isOpenAt(branch, monday(), LocalTime.of(23, 0))).isTrue();
+	}
+
+	@Test
+	void isOpenAt_duringOpenHoursOnClosedDay_returnsFalse() {
+		Branch branch = scheduledbranch("MAR,MIE,JUE,VIE,SAB,DOM",
+			LocalTime.of(10, 0), LocalTime.of(23, 0));
+
+		assertThat(BranchService.isOpenAt(branch, monday(), LocalTime.of(13, 0))).isFalse();
+	}
+
+	@Test
+	void isOpenAt_openOnWeekend_returnsTrue() {
+		Branch branch = scheduledbranch("LUN,MAR,MIE,JUE,VIE,SAB,DOM",
+			LocalTime.of(10, 0), LocalTime.of(23, 0));
+
+		assertThat(BranchService.isOpenAt(branch, saturday(), LocalTime.of(20, 0))).isTrue();
+		assertThat(BranchService.isOpenAt(branch, sunday(), LocalTime.of(20, 0))).isTrue();
+	}
+
+	@Test
+	void isOpen_delegatesToFindById() {
+		Branch branch = scheduledbranch("LUN,MAR,MIE,JUE,VIE,SAB,DOM",
+			LocalTime.of(0, 0), LocalTime.of(23, 59));
+		when(branchRepository.findById(1)).thenReturn(Optional.of(branch));
+
+		assertThat(service.isOpen(1)).isTrue();
 	}
 
 }

@@ -38,4 +38,7 @@ public class BranchQR {
 
 	@Column(name = "active", nullable = false)
 	private boolean active;
+
+	@Column(name = "active_payment_id")
+	private String activePaymentId;
 }

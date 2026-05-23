@@ -18,7 +18,10 @@ import jakarta.validation.Valid;
 
 import com.laroka.backend.branch.dto.BranchRequestDTO;
 import com.laroka.backend.branch.dto.BranchResponseDTO;
+import com.laroka.backend.branch.dto.QrConfigRequestDTO;
+import com.laroka.backend.branch.dto.QrConfigResponseDTO;
 import com.laroka.backend.branch.entity.Branch;
+import com.laroka.backend.branch.entity.BranchQR;
 import com.laroka.backend.branch.mapper.BranchMapper;
 import com.laroka.backend.branch.service.BranchService;
 
@@ -68,5 +71,24 @@ public class BranchController {
 	public ResponseEntity<Void> delete(@PathVariable Integer id) {
 		service.delete(id);
 		return ResponseEntity.noContent().build();
+	}
+
+	@PostMapping("/{id}/qr-config")
+	@Operation(summary = "Save QR config", description = "Creates or updates the MercadoPago QR configuration for a branch.")
+	public ResponseEntity<QrConfigResponseDTO> saveQrConfig(
+			@PathVariable Integer id,
+			@Valid @RequestBody QrConfigRequestDTO dto) {
+		BranchQR saved = service.saveQrConfig(id, dto.getMpPosId(), dto.getMpQrId());
+		return ResponseEntity.ok(toQrConfigResponse(saved));
+	}
+
+	private QrConfigResponseDTO toQrConfigResponse(BranchQR qr) {
+		return QrConfigResponseDTO.builder()
+				.id(qr.getId())
+				.branchId(qr.getBranch().getId())
+				.mpPosId(qr.getMpPosId())
+				.mpQrId(qr.getMpQrId())
+				.active(qr.isActive())
+				.build();
 	}
 }

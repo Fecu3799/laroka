@@ -119,6 +119,81 @@ public class MercadoPagoAdapter implements PaymentGateway {
         }
     }
 
+    @Override
+    public String chargeQr(String mpPosId, UUID orderId, BigDecimal amount) {
+        log.info("chargeQr: mpPosId={}, orderId={}, amount={}", mpPosId, orderId, amount);
+
+        if (accessToken == null || accessToken.isBlank()) {
+            log.warn("chargeQr: accessToken not configured, returning sandbox external_id");
+            return "SANDBOX_QR_" + orderId;
+        }
+
+        Map<String, Object> item = Map.of(
+                "sku_number", "PEDIDO",
+                "category", "food",
+                "title", "Pedido LaRoka",
+                "description", "Pedido LaRoka #" + orderId,
+                "unit_measure", "unit",
+                "quantity", 1,
+                "unit_price", amount,
+                "total_amount", amount
+        );
+
+        Map<String, Object> body = new java.util.LinkedHashMap<>();
+        body.put("external_reference", orderId.toString());
+        body.put("title", "Pedido LaRoka");
+        body.put("description", "Pedido LaRoka #" + orderId);
+        body.put("total_amount", amount);
+        body.put("items", List.of(item));
+
+        String url = "https://api.mercadopago.com/instore/qrs/" + mpPosId + "/qrs";
+
+        try {
+            MpQrChargeResponse response = restClient.put()
+                    .uri(url)
+                    .header("Authorization", "Bearer " + accessToken)
+                    .header("Content-Type", "application/json")
+                    .body(body)
+                    .retrieve()
+                    .body(MpQrChargeResponse.class);
+
+            if (response == null || response.externalId() == null) {
+                throw new BusinessException("MercadoPago no devolvió un external_id para el cobro QR");
+            }
+            log.info("chargeQr: QR charged — externalId={}", response.externalId());
+            return response.externalId();
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("chargeQr: error calling MercadoPago QR API — mpPosId={}, error={}", mpPosId, e.getMessage());
+            throw new BusinessException("Error al cargar el cobro en el QR: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public void cancelQrCharge(String externalId) {
+        log.info("cancelQrCharge: externalId={}", externalId);
+
+        if (accessToken == null || accessToken.isBlank()) {
+            log.warn("cancelQrCharge: accessToken not configured, skipping cancel");
+            return;
+        }
+
+        String url = "https://api.mercadopago.com/instore/qrs/" + externalId;
+
+        try {
+            restClient.delete()
+                    .uri(url)
+                    .header("Authorization", "Bearer " + accessToken)
+                    .retrieve()
+                    .toBodilessEntity();
+            log.info("cancelQrCharge: QR charge cancelled — externalId={}", externalId);
+        } catch (Exception e) {
+            log.error("cancelQrCharge: error cancelling QR charge — externalId={}, error={}", externalId, e.getMessage());
+            throw new BusinessException("Error al cancelar el cobro QR activo: " + e.getMessage());
+        }
+    }
+
     private record MpPreferenceResponse(
             @JsonProperty("id") String id,
             @JsonProperty("init_point") String initPoint
@@ -127,5 +202,9 @@ public class MercadoPagoAdapter implements PaymentGateway {
     private record MpPaymentResponse(
             @JsonProperty("status") String status,
             @JsonProperty("external_reference") String externalReference
+    ) {}
+
+    private record MpQrChargeResponse(
+            @JsonProperty("external_id") String externalId
     ) {}
 }

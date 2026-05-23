@@ -27,6 +27,10 @@ public class OrderStateMachine {
         };
     }
 
+    public static boolean canCancel(OrderStatus status) {
+        return status == OrderStatus.RECEIVED || status == OrderStatus.IN_PREPARATION;
+    }
+
     public static OrderStatus getPreviousStatus(OrderStatus current, OrderType orderType) {
         return switch (current) {
             case IN_PREPARATION -> OrderStatus.RECEIVED;

@@ -58,6 +58,13 @@ public class OrderController {
         return ResponseEntity.ok(orderMapper.toStatusResponseDTO(order, order.getStatusHistory()));
     }
 
+    @PostMapping("/{id}/cancel")
+    @Operation(summary = "Cancel order", description = "Cancels an order. Only allowed when status is RECEIVED. Returns 422 if cancellation is not permitted.")
+    public ResponseEntity<Void> cancelOrder(@PathVariable UUID id) {
+        orderService.cancelOrder(id);
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/{id}/items")
     @Operation(summary = "Get order items", description = "Returns the list of items for an order.")
     public ResponseEntity<List<OrderItemStatusDTO>> getOrderItems(@PathVariable UUID id) {

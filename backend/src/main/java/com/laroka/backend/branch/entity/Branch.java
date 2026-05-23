@@ -2,6 +2,7 @@ package com.laroka.backend.branch.entity;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 
 import com.laroka.backend.tenant.entity.Tenant;
 
@@ -50,6 +51,15 @@ public class Branch {
 
 	@Column(name = "phone", nullable = false)
 	private String phone;
+
+	@Column(name = "opening_time", nullable = false)
+	private LocalTime openingTime;
+
+	@Column(name = "closing_time", nullable = false)
+	private LocalTime closingTime;
+
+	@Column(name = "open_days", nullable = false, length = 50)
+	private String openDays;
 
 	@ManyToOne(fetch = FetchType.LAZY)
 	@JoinColumn(name = "tenant_id", nullable = false)

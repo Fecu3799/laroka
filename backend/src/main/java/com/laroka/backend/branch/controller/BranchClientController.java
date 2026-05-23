@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.laroka.backend.branch.dto.BranchPublicDTO;
+import com.laroka.backend.branch.dto.BranchStatusDTO;
 import com.laroka.backend.branch.mapper.BranchMapper;
 import com.laroka.backend.branch.service.BranchService;
 import com.laroka.backend.catalog.dto.MenuCategoryDTO;
@@ -41,6 +42,12 @@ public class BranchClientController {
 	@Operation(summary = "Get branch by ID", description = "Returns branch information including delivery and service fees")
 	public ResponseEntity<BranchPublicDTO> findById(@PathVariable Integer id) {
 		return ResponseEntity.ok(branchMapper.toPublicDTO(branchService.findById(id)));
+	}
+
+	@GetMapping("/{id}/status")
+	@Operation(summary = "Get branch open/closed status", description = "Returns whether the branch is currently open based on its schedule (opening_time, closing_time, open_days).")
+	public ResponseEntity<BranchStatusDTO> getBranchStatus(@PathVariable Integer id) {
+		return ResponseEntity.ok(BranchStatusDTO.builder().open(branchService.isOpen(id)).build());
 	}
 
 	@GetMapping("/{id}/menu")

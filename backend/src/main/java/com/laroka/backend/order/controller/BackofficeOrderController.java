@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.laroka.backend.order.dto.BackofficeOrderDetailDTO;
 import com.laroka.backend.order.dto.BackofficeOrderPageDTO;
 import com.laroka.backend.order.dto.BackofficeOrderResponseDTO;
+import com.laroka.backend.order.dto.CancelRequestActionDTO;
 import com.laroka.backend.order.dto.OrderFilterParams;
 import com.laroka.backend.order.dto.UpdateOrderStatusRequestDTO;
 import com.laroka.backend.order.entity.OrderStatus;
@@ -129,6 +130,20 @@ public class BackofficeOrderController {
             @AuthenticationPrincipal CustomUserDetails principal) {
 
         orderService.transitionToPreviousStatusForBackoffice(id,
+                principal.getBranchId(), principal.getUserId());
+        return ResponseEntity.noContent().build();
+    }
+
+    @PatchMapping("/{id}/cancel-request")
+    @Operation(summary = "Resolve cancellation request",
+            description = "Approves or rejects a cancellation request. action=APPROVE → CANCELLED, action=REJECT → IN_PREPARATION. " +
+                    "Returns 422 if order is not in CANCELLATION_REQUESTED, 403 if order belongs to a different branch.")
+    public ResponseEntity<Void> resolveCancellationRequest(
+            @PathVariable UUID id,
+            @Valid @RequestBody CancelRequestActionDTO dto,
+            @AuthenticationPrincipal CustomUserDetails principal) {
+
+        orderService.resolveCancellationRequest(id, dto.getAction(),
                 principal.getBranchId(), principal.getUserId());
         return ResponseEntity.noContent().build();
     }
