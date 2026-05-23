@@ -30,3 +30,4 @@ public class AuthController {
 		return ResponseEntity.ok(LoginResponseDTO.builder().token(token).build());
 	}
 }
+

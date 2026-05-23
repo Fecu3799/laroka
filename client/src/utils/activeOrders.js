@@ -1,38 +1,45 @@
-const STORAGE_KEY = 'laroka_active_orders'
+const STORAGE_KEY = "laroka_active_orders";
 
 export function readActiveOrders() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return []
-    const parsed = JSON.parse(raw)
-    return parsed.map(e =>
-      typeof e === 'object' && e && e.orderId
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return parsed.map((e) =>
+      typeof e === "object" && e && e.orderId
         ? e
-        : { orderId: e, branchId: null }
-    )
+        : { orderId: e, branchId: null },
+    );
   } catch {
-    return []
+    return [];
   }
 }
 
 export function addActiveOrder(orderId, branchId) {
   try {
-    const current = readActiveOrders()
-    const exists = current.some(e => e.orderId === orderId)
+    const current = readActiveOrders();
+    const exists = current.some((e) => e.orderId === orderId);
     if (!exists) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify([...current, { orderId, branchId }]))
-      window.dispatchEvent(new Event('laroka_orders_updated'))
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify([...current, { orderId, branchId }]),
+      );
+      window.dispatchEvent(new Event("laroka_orders_updated"));
     }
-  } catch { /* storage unavailable */ }
+  } catch {
+    /* storage unavailable */
+  }
 }
 
 export function removeActiveOrder(orderId) {
   try {
-    const current = readActiveOrders()
+    const current = readActiveOrders();
     localStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify(current.filter(e => e.orderId !== orderId))
-    )
-    window.dispatchEvent(new Event('laroka_orders_updated'))
-  } catch { /* storage unavailable */ }
+      JSON.stringify(current.filter((e) => e.orderId !== orderId)),
+    );
+    window.dispatchEvent(new Event("laroka_orders_updated"));
+  } catch {
+    /* storage unavailable */
+  }
 }
