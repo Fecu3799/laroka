@@ -32,3 +32,15 @@ export async function advanceOrderStatus(orderId, nextStatus, token) {
   })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
 }
+
+export async function resolveCancelRequest(orderId, action, token) {
+  const res = await fetch(`${API_URL}/backoffice/orders/${orderId}/cancel-request`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ action }),
+  })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+}

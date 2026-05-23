@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import useAuth from '../hooks/useAuth'
 import useOrders from '../hooks/useOrders'
 import useOrderDetail from '../hooks/useOrderDetail'
-import { advanceOrderStatus } from '../services/ordersService'
+import { advanceOrderStatus, resolveCancelRequest } from '../services/ordersService'
 import {
   STATUS_CONFIG,
   STATUS_PRIORITY,
@@ -103,6 +103,8 @@ function filterOrders(orders, activeTab, searchQuery, dismissedIds) {
     list = list.filter(o => !dismissedIds.has(o.id))
   } else if (activeTab === 'ON_THE_WAY') {
     list = list.filter(o => o.status === 'ON_THE_WAY' || o.status === 'READY_FOR_PICKUP')
+  } else if (activeTab === 'IN_PREPARATION') {
+    list = list.filter(o => o.status === 'IN_PREPARATION' || o.status === 'CANCELLATION_REQUESTED')
   } else {
     list = list.filter(o => o.status === activeTab)
   }
@@ -119,6 +121,7 @@ function filterOrders(orders, activeTab, searchQuery, dismissedIds) {
 function tabCount(orders, key, dismissedIds) {
   if (key === 'ALL') return orders.filter(o => !dismissedIds.has(o.id)).length
   if (key === 'ON_THE_WAY') return orders.filter(o => o.status === 'ON_THE_WAY' || o.status === 'READY_FOR_PICKUP').length
+  if (key === 'IN_PREPARATION') return orders.filter(o => o.status === 'IN_PREPARATION' || o.status === 'CANCELLATION_REQUESTED').length
   return orders.filter(o => o.status === key).length
 }
 
@@ -442,6 +445,7 @@ function OrderRow({ order, isSelected, advancing, contracted, onSelect, onAdvanc
         isSelected ? 'orders-row--selected'  : '',
         isTerminal ? 'orders-row--cancelled' : '',
         contracted ? 'orders-row--contracted': '',
+        order.status === 'CANCELLATION_REQUESTED' ? 'orders-row--cancel-request' : '',
       ].filter(Boolean).join(' ')}
       onClick={onSelect}
     >
@@ -539,6 +543,8 @@ function OrderRow({ order, isSelected, advancing, contracted, onSelect, onAdvanc
             <button className="action-advance-btn" type="button" onClick={onAdvance}>
               {advancing === order.id ? '···' : 'Avanzar →'}
             </button>
+          ) : order.status === 'CANCELLATION_REQUESTED' ? (
+            <span className="action-cancel-request-badge">⚠ Resolver</span>
           ) : (
             <span className="action-none">—</span>
           )}
@@ -556,8 +562,9 @@ function OrderDetail({ order, onClose, onAdvance, advancing, token, onRefetch, o
   const payCfg = PAYMENT_BADGE_CONFIG[order.paymentStatus] ?? {}
   const next   = getNextStatus(order.status, order.orderType)
 
-  const [paying,        setPaying]        = useState(false)
-  const [actionLoading, setActionLoading] = useState(null)
+  const [paying,               setPaying]               = useState(false)
+  const [actionLoading,        setActionLoading]        = useState(null)
+  const [cancelRequestLoading, setCancelRequestLoading] = useState(null)
 
   const canGoBack = goBackAllowed(order.status)
   const canCancel = cancelAllowed(order.status)
@@ -614,6 +621,17 @@ function OrderDetail({ order, onClose, onAdvance, advancing, token, onRefetch, o
       onRefresh()
     } catch { /* silent */ }
     finally { setActionLoading(null) }
+  }
+
+  const handleCancelRequest = async (action) => {
+    const key = action === 'APPROVE' ? 'approve' : 'reject'
+    setCancelRequestLoading(key)
+    try {
+      await resolveCancelRequest(order.id, action, token)
+      onRefetch()
+      onRefresh()
+    } catch { /* silent */ }
+    finally { setCancelRequestLoading(null) }
   }
 
   const sequence   = order.orderType === 'DELIVERY' ? SEQUENCE_DELIVERY : SEQUENCE_TAKEAWAY
@@ -799,52 +817,79 @@ function OrderDetail({ order, onClose, onAdvance, advancing, token, onRefetch, o
           {/* Right: Action buttons */}
           <div className="detail-bottom-right">
 
-            {next ? (
-              <button
-                className="detail-action-btn detail-action-advance"
-                type="button"
-                onClick={e => onAdvance(e, order)}
-                disabled={advancing === order.id}
-              >
-                {advancing === order.id ? '···' : `Avanzar a ${STATUS_CONFIG[next]?.label} →`}
-              </button>
+            {order.status === 'CANCELLATION_REQUESTED' ? (
+              <>
+                <div className="detail-cancel-request-banner">
+                  <span className="detail-cancel-request-title">Solicitud de cancelación</span>
+                  <span className="detail-cancel-request-body">El cliente solicitó cancelar este pedido.</span>
+                </div>
+                <button
+                  className="detail-action-btn detail-action-approve-cancel"
+                  type="button"
+                  onClick={() => handleCancelRequest('APPROVE')}
+                  disabled={cancelRequestLoading !== null}
+                >
+                  {cancelRequestLoading === 'approve' ? '···' : 'Aprobar cancelación'}
+                </button>
+                <button
+                  className="detail-action-btn detail-action-reject-cancel"
+                  type="button"
+                  onClick={() => handleCancelRequest('REJECT')}
+                  disabled={cancelRequestLoading !== null}
+                >
+                  {cancelRequestLoading === 'reject' ? '···' : 'Rechazar cancelación'}
+                </button>
+              </>
             ) : (
-              <div className="detail-action-btn detail-action-advance--done">
-                Pedido finalizado
-              </div>
-            )}
+              <>
+                {next ? (
+                  <button
+                    className="detail-action-btn detail-action-advance"
+                    type="button"
+                    onClick={e => onAdvance(e, order)}
+                    disabled={advancing === order.id}
+                  >
+                    {advancing === order.id ? '···' : `Avanzar a ${STATUS_CONFIG[next]?.label} →`}
+                  </button>
+                ) : (
+                  <div className="detail-action-btn detail-action-advance--done">
+                    Pedido finalizado
+                  </div>
+                )}
 
-            {order.paymentMethod === 'CASH' && order.paymentStatus !== 'APPROVED' && (
-              <button
-                className="detail-action-btn detail-action-pay"
-                type="button"
-                onClick={confirmPayment}
-                disabled={paying}
-              >
-                {paying ? '···' : 'Marcar como pagado'}
-              </button>
-            )}
+                {order.paymentMethod === 'CASH' && order.paymentStatus !== 'APPROVED' && (
+                  <button
+                    className="detail-action-btn detail-action-pay"
+                    type="button"
+                    onClick={confirmPayment}
+                    disabled={paying}
+                  >
+                    {paying ? '···' : 'Marcar como pagado'}
+                  </button>
+                )}
 
-            {canGoBack && (
-              <button
-                className="detail-action-btn detail-action-back"
-                type="button"
-                onClick={goBack}
-                disabled={actionLoading === 'back'}
-              >
-                {actionLoading === 'back' ? '···' : <><ArrowLeftIcon /> Atrás</>}
-              </button>
-            )}
+                {canGoBack && (
+                  <button
+                    className="detail-action-btn detail-action-back"
+                    type="button"
+                    onClick={goBack}
+                    disabled={actionLoading === 'back'}
+                  >
+                    {actionLoading === 'back' ? '···' : <><ArrowLeftIcon /> Atrás</>}
+                  </button>
+                )}
 
-            {canCancel && (
-              <button
-                className="detail-action-btn detail-action-cancel"
-                type="button"
-                onClick={cancelOrder}
-                disabled={actionLoading === 'cancel'}
-              >
-                {actionLoading === 'cancel' ? '···' : <><XCancelIcon /> Cancelar</>}
-              </button>
+                {canCancel && (
+                  <button
+                    className="detail-action-btn detail-action-cancel"
+                    type="button"
+                    onClick={cancelOrder}
+                    disabled={actionLoading === 'cancel'}
+                  >
+                    {actionLoading === 'cancel' ? '···' : <><XCancelIcon /> Cancelar</>}
+                  </button>
+                )}
+              </>
             )}
 
           </div>
