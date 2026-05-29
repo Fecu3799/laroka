@@ -301,6 +301,7 @@ public class PaymentService {
         }
 
         String message = "id:" + dataId + ";request-id:" + xRequestId + ";ts:" + ts + ";";
+        String messageWithoutRequestId = "id:" + dataId + ";ts:" + ts + ";";
 
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
@@ -308,15 +309,27 @@ public class PaymentService {
             byte[] hash = mac.doFinal(message.getBytes(StandardCharsets.UTF_8));
             String computed = HexFormat.of().formatHex(hash);
 
+            byte[] hashWithoutReqId = Mac.getInstance("HmacSHA256")
+                    .doFinal(messageWithoutRequestId.getBytes(StandardCharsets.UTF_8));
+            // re-init is needed; easier to create a fresh Mac
+            Mac macAlt = Mac.getInstance("HmacSHA256");
+            macAlt.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            String computedAlt = HexFormat.of().formatHex(macAlt.doFinal(messageWithoutRequestId.getBytes(StandardCharsets.UTF_8)));
+
             if (!computed.equals(v1)) {
                 log.warn("validateWebhookSignature: HMAC mismatch — " +
-                        "xSignature=[{}], ts=[{}], v1_prefix=[{}], computed_prefix=[{}], secretHint=[{}], message=[{}]",
+                        "xSignature=[{}], ts=[{}], v1_prefix=[{}], " +
+                        "computed_prefix=[{}], computedAlt_prefix=[{}], " +
+                        "altMatchesFull={}, secretHint=[{}], message=[{}], messageAlt=[{}]",
                         xSignature,
                         ts,
                         v1.length() >= 8 ? v1.substring(0, 8) : v1,
                         computed.length() >= 8 ? computed.substring(0, 8) : computed,
+                        computedAlt.length() >= 8 ? computedAlt.substring(0, 8) : computedAlt,
+                        computedAlt.equals(v1),
                         secretHint,
-                        message);
+                        message,
+                        messageWithoutRequestId);
                 throw new BusinessException("Firma del webhook inválida");
             }
         } catch (BusinessException e) {
