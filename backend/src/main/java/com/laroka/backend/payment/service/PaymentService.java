@@ -278,7 +278,7 @@ public class PaymentService {
             throw new BusinessException("Formato de firma del webhook inválido");
         }
 
-        String message = "id:" + dataId + ";request-id:" + xRequestId + ";ts:" + ts;
+        String message = "id:" + dataId + ";request-id:" + xRequestId + ";ts:" + ts + ";";
 
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
