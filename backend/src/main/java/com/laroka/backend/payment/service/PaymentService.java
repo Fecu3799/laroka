@@ -1,6 +1,7 @@
 package com.laroka.backend.payment.service;
 
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.util.HexFormat;
 import java.util.List;
@@ -271,7 +272,14 @@ public class PaymentService {
         String secretHint = secret.length() >= 8
                 ? secret.substring(0, 4) + "..." + secret.substring(secret.length() - 4)
                 : "***";
-        log.info("validateWebhookSignature: secretLen={}, secretHint={}", secret.length(), secretHint);
+        String secretSha256;
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(secret.getBytes(StandardCharsets.UTF_8));
+            secretSha256 = HexFormat.of().formatHex(digest);
+        } catch (Exception e) {
+            secretSha256 = "error";
+        }
+        log.info("validateWebhookSignature: secretLen={}, secretHint={}, secretSha256={}", secret.length(), secretHint, secretSha256);
 
         String ts = null;
         String v1 = null;
