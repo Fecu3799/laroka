@@ -251,9 +251,11 @@ public class PaymentService {
 
     private void validateWebhookSignature(String xSignature, String xRequestId, String dataId) {
         if (webhookSecret == null || webhookSecret.isBlank()) {
+            log.warn("validateWebhookSignature: webhookSecret not configured — skipping validation");
             return;
         }
         if (xSignature == null || xSignature.isBlank()) {
+            log.warn("validateWebhookSignature: x-signature header missing — dataId={}, requestId={}", dataId, xRequestId);
             throw new BusinessException("Firma del webhook requerida");
         }
 
@@ -272,6 +274,7 @@ public class PaymentService {
         }
 
         if (ts == null || v1 == null) {
+            log.warn("validateWebhookSignature: invalid x-signature format — header={}, dataId={}, requestId={}", xSignature, dataId, xRequestId);
             throw new BusinessException("Formato de firma del webhook inválido");
         }
 
@@ -284,11 +287,13 @@ public class PaymentService {
             String computed = HexFormat.of().formatHex(hash);
 
             if (!computed.equals(v1)) {
+                log.warn("validateWebhookSignature: HMAC mismatch — dataId={}, requestId={}, message={}", dataId, xRequestId, message);
                 throw new BusinessException("Firma del webhook inválida");
             }
         } catch (BusinessException e) {
             throw e;
         } catch (Exception e) {
+            log.error("validateWebhookSignature: unexpected error — dataId={}, requestId={}, error={}", dataId, xRequestId, e.getMessage());
             throw new BusinessException("Error al validar la firma del webhook: " + e.getMessage());
         }
     }

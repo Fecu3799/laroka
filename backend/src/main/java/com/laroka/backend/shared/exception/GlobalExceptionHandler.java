@@ -43,6 +43,7 @@ public class GlobalExceptionHandler {
 	@ExceptionHandler(BusinessException.class)
 	public ResponseEntity<Map<String, Object>> handleBusinessException(
 			BusinessException ex, HttpServletRequest request) {
+		log.warn("BusinessException en {} {}: {}", request.getMethod(), request.getRequestURI(), ex.getMessage());
 		return buildResponse(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage(), null, request);
 	}
 
