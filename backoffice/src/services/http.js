@@ -17,7 +17,7 @@ export async function apiFetch(url, options = {}) {
   try {
     const body = await res.json()
     message = body?.message ?? null
-  } catch {}
+  } catch { /* ignore */ }
 
   if (res.status >= 500) {
     dispatchToast('Ocurrió un error. Intentá de nuevo.')
