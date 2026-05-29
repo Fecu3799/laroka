@@ -100,6 +100,18 @@ export default function NewOrderModal({ open, onClose }) {
   const itemCount          = cartItems.reduce((s, i) => s + i.quantity, 0)
   const canConfirm         = canConfirmOrder({ cartItems, orderType, deliveryAddress })
 
+  const handleDebugFill = import.meta.env.DEV
+    ? () => {
+        const next = (parseInt(localStorage.getItem('laroka_debug_fill_count') || '0', 10)) + 1
+        localStorage.setItem('laroka_debug_fill_count', String(next))
+        const ts = new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+        setCustomerName(`Dev User #${next}`)
+        setCustomerPhone('2804000000')
+        setDeliveryAddress('Av. Roca 123, Puerto Madryn')
+        setNotes(`[DEBUG #${next} · ${ts}]`)
+      }
+    : null
+
   // ── Cart operations ──────────────────────────────────────────
 
   function addToCart(product) {
@@ -322,6 +334,17 @@ export default function NewOrderModal({ open, onClose }) {
 
             {/* Form */}
             <div className="nom-form-section">
+
+              {import.meta.env.DEV && (
+                <button
+                  type="button"
+                  className="nom-debug-fill-btn"
+                  onClick={handleDebugFill}
+                  title="Rellenar campos con datos de prueba"
+                >
+                  🛠 Fill Debug Data
+                </button>
+              )}
 
               <div className="nom-field">
                 <div className="nom-field-label">MODALIDAD</div>

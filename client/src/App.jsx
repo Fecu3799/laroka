@@ -4,6 +4,7 @@ import { BranchSelection } from './components/BranchSelection'
 import { MenuScreen } from './components/MenuScreen'
 import { PaymentResultScreen } from './components/PaymentResultScreen'
 import { PendingModal } from './components/PaymentModals'
+import { Toast } from './components/Toast'
 import { usePreferredBranch } from './hooks/usePreferredBranch'
 import { useTheme } from './hooks/useTheme'
 import './App.css'
@@ -95,19 +96,22 @@ function App() {
   }
 
   return (
-    <div className="screen screen--enter">
-      <MenuScreen
-        branchId={selectedBranchId}
-        branchName={selectedBranchName}
-        onChangeBranch={handleChangeBranch}
-        onSwitchBranch={handleSwitchBranch}
-        paymentFailureRecovery={paymentFailureRecovery}
-        onPaymentFailureConsumed={handlePaymentFailureConsumed}
-      />
-      {paymentPendingModal && (
-        <PendingModal onClose={() => setPaymentPendingModal(false)} />
-      )}
-    </div>
+    <>
+      <div className="screen screen--enter">
+        <MenuScreen
+          branchId={selectedBranchId}
+          branchName={selectedBranchName}
+          onChangeBranch={handleChangeBranch}
+          onSwitchBranch={handleSwitchBranch}
+          paymentFailureRecovery={paymentFailureRecovery}
+          onPaymentFailureConsumed={handlePaymentFailureConsumed}
+        />
+        {paymentPendingModal && (
+          <PendingModal onClose={() => setPaymentPendingModal(false)} />
+        )}
+      </div>
+      <Toast />
+    </>
   )
 }
 

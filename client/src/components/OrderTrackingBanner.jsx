@@ -144,7 +144,7 @@ function OrderSlide({ orderId, order, isExpanded, items, itemsLoading, itemsErro
       setShowModal(false)
       onOrderUpdate(orderId, isDirectCancel ? 'CANCELLED' : 'CANCELLATION_REQUESTED')
     } catch (err) {
-      setCancelError(err.is422 ? err.message : 'No se pudo procesar la solicitud.')
+      setCancelError(err.status === 422 ? err.message : 'No se pudo procesar la solicitud.')
     } finally {
       setCancelling(false)
     }
