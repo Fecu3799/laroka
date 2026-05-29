@@ -301,8 +301,14 @@ public class PaymentService {
             String computed = HexFormat.of().formatHex(hash);
 
             if (!computed.equals(v1)) {
-                log.warn("validateWebhookSignature: HMAC mismatch — dataId={}, requestId={}, message={}, computed={}, received={}",
-                        dataId, xRequestId, message, computed, v1);
+                log.warn("validateWebhookSignature: HMAC mismatch — " +
+                        "xSignature=[{}], ts=[{}], v1_prefix=[{}], computed_prefix=[{}], secretHint=[{}], message=[{}]",
+                        xSignature,
+                        ts,
+                        v1.length() >= 8 ? v1.substring(0, 8) : v1,
+                        computed.length() >= 8 ? computed.substring(0, 8) : computed,
+                        secretHint,
+                        message);
                 throw new BusinessException("Firma del webhook inválida");
             }
         } catch (BusinessException e) {
