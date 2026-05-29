@@ -2,6 +2,8 @@ import { useState } from 'react'
 import styles from './CheckoutScreen.module.css'
 import { usePreferredBranch } from '../hooks/usePreferredBranch'
 
+const _DEBUG_COUNT_KEY = 'laroka_debug_fill_count'
+
 function formatPrice(amount) {
   return `$${Number(amount).toLocaleString('es-AR')}`
 }
@@ -92,6 +94,19 @@ export function CheckoutScreen({ onBack, onConfirm, items = [], initialData = nu
 
   const isFormValid = nombre.trim() && telefono.trim() && (!isDelivery || direccion.trim())
 
+  const handleDebugFill = import.meta.env.DEV
+    ? () => {
+        const next = (parseInt(localStorage.getItem(_DEBUG_COUNT_KEY) || '0', 10)) + 1
+        localStorage.setItem(_DEBUG_COUNT_KEY, String(next))
+        const ts = new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+        setNombre(`Dev User #${next}`)
+        setTelefono('2804000000')
+        setDireccion('Av. Roca 123, Puerto Madryn')
+        setNotas(`[DEBUG #${next} · ${ts}]`)
+        setErrors({ nombre: '', telefono: '', direccion: '' })
+      }
+    : null
+
   const handleConfirm = async () => {
     const newErrors = {
       nombre: nombre.trim() ? '' : 'Ingresá tu nombre',
@@ -128,6 +143,16 @@ export function CheckoutScreen({ onBack, onConfirm, items = [], initialData = nu
           <button className={styles.backBtn} aria-label="Volver" onClick={onBack}>
             <BackIcon />
           </button>
+          {import.meta.env.DEV && (
+            <button
+              type="button"
+              className={styles.debugFillBtn}
+              onClick={handleDebugFill}
+              title="Rellenar campos con datos de prueba"
+            >
+              🛠 Fill Debug Data
+            </button>
+          )}
           <button
             className={isDelivery ? styles.toggleBtnActive : styles.toggleBtnInactive}
             aria-pressed={isDelivery}

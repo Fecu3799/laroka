@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 
 const STORAGE_KEY = 'laroka_preferred_branch'
 
@@ -31,15 +31,15 @@ export function usePreferredBranch() {
     return { preferredBranchId: id, preferredBranchName: name, deliveryFee, serviceFee, phone, estimatedDeliveryMinutes, isLoaded: true }
   })
 
-  const saveBranch = ({ id, name, deliveryFee, serviceFee, phone = null, estimatedDeliveryMinutes = null }) => {
+  const saveBranch = useCallback(({ id, name, deliveryFee, serviceFee, phone = null, estimatedDeliveryMinutes = null }) => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ id, name, deliveryFee, serviceFee, phone, estimatedDeliveryMinutes }))
     setState(prev => ({ ...prev, preferredBranchId: id, preferredBranchName: name, deliveryFee, serviceFee, phone, estimatedDeliveryMinutes }))
-  }
+  }, [])
 
-  const clearBranch = () => {
+  const clearBranch = useCallback(() => {
     localStorage.removeItem(STORAGE_KEY)
     setState(prev => ({ ...prev, preferredBranchId: null, preferredBranchName: null, deliveryFee: 0, serviceFee: 0, phone: null, estimatedDeliveryMinutes: null }))
-  }
+  }, [])
 
   return {
     preferredBranchId: state.preferredBranchId,

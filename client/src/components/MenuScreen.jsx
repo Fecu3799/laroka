@@ -112,6 +112,30 @@ function ComingSoon() {
   )
 }
 
+function BranchSwitchWarningModal({ onConfirm, onCancel }) {
+  return (
+    <div
+      className="branch-switch-overlay"
+      onClick={(e) => { if (e.target === e.currentTarget) onCancel() }}
+    >
+      <div className="branch-switch-modal">
+        <p className="branch-switch-title">¿Cambiar sucursal?</p>
+        <p className="branch-switch-body">
+          Tenés productos de otra sucursal en tu carrito. Si cambiás, se vaciará el carrito.
+        </p>
+        <div className="branch-switch-actions">
+          <button className="branch-switch-cancel" onClick={onCancel}>
+            Cancelar
+          </button>
+          <button className="branch-switch-confirm" onClick={onConfirm}>
+            Cambiar sucursal
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function MenuScreen({ branchId, branchName, onSwitchBranch, paymentFailureRecovery = null, onPaymentFailureConsumed = () => {} }) {
   const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(true)
@@ -135,6 +159,7 @@ export function MenuScreen({ branchId, branchName, onSwitchBranch, paymentFailur
     paymentFailureRecovery?.items?.map(i => ({ ...i })) || []
   )
   const [activeBranchIds, setActiveBranchIds] = useState(() => readActiveBranchIds())
+  const [pendingBranch, setPendingBranch] = useState(null)
 
   const syncActiveBranchIds = useCallback(() => {
     setActiveBranchIds(readActiveBranchIds())
@@ -250,10 +275,25 @@ export function MenuScreen({ branchId, branchName, onSwitchBranch, paymentFailur
     if (newBranchId !== branchId) {
       const branch = branches.find(b => b.id === newBranchId)
       if (branch) {
-        onSwitchBranch(branch)
+        if (count > 0) {
+          setPendingBranch(branch)
+        } else {
+          onSwitchBranch(branch)
+        }
       }
     }
   }
+
+  const handleConfirmBranchSwitch = useCallback(() => {
+    if (!pendingBranch) return
+    clearCart()
+    onSwitchBranch(pendingBranch)
+    setPendingBranch(null)
+  }, [pendingBranch, clearCart, onSwitchBranch])
+
+  const handleCancelBranchSwitch = useCallback(() => {
+    setPendingBranch(null)
+  }, [])
 
   return (
     <div className="menu-screen">
@@ -414,6 +454,13 @@ export function MenuScreen({ branchId, branchName, onSwitchBranch, paymentFailur
           </Motion.div>
         )}
       </AnimatePresence>
+
+      {pendingBranch && (
+        <BranchSwitchWarningModal
+          onConfirm={handleConfirmBranchSwitch}
+          onCancel={handleCancelBranchSwitch}
+        />
+      )}
     </div>
   )
 }

@@ -1,11 +1,12 @@
 export const STATUS_CONFIG = {
-  PENDING_PAYMENT:  { label: 'Pago pendiente', bg: '#6b672e', color: '#c5cda7', border: '#4a6b50' },
-  RECEIVED:         { label: 'Recibido',       bg: '#1d3557', color: '#90bdf9', border: '#2a4a80' },
-  IN_PREPARATION:   { label: 'En preparación', bg: '#2d1f00', color: '#fbbf24', border: '#5c3d00' },
-  ON_THE_WAY:       { label: 'En camino',      bg: '#2d1047', color: '#c084fc', border: '#5a1f8a' },
-  READY_FOR_PICKUP: { label: 'Para retirar',   bg: '#1e0a3a', color: '#a78bfa', border: '#4c1d95' },
-  DELIVERED:        { label: 'Entregado',      bg: '#0a2e14', color: '#4ade80', border: '#1a5c2c' },
-  CANCELLED:        { label: 'Cancelado',      bg: '#2e0f0f', color: '#f87171', border: '#5c1f1f' },
+  PENDING_PAYMENT:         { label: 'Pago pendiente',   bg: '#6b672e', color: '#c5cda7', border: '#4a6b50' },
+  RECEIVED:                { label: 'Recibido',         bg: '#1d3557', color: '#90bdf9', border: '#2a4a80' },
+  IN_PREPARATION:          { label: 'En preparación',   bg: '#2d1f00', color: '#fbbf24', border: '#5c3d00' },
+  CANCELLATION_REQUESTED:  { label: 'Canc. solicitada', bg: '#3d1a00', color: '#fb923c', border: '#7c3a00' },
+  ON_THE_WAY:              { label: 'En camino',        bg: '#2d1047', color: '#c084fc', border: '#5a1f8a' },
+  READY_FOR_PICKUP:        { label: 'Para retirar',     bg: '#1e0a3a', color: '#a78bfa', border: '#4c1d95' },
+  DELIVERED:               { label: 'Entregado',        bg: '#0a2e14', color: '#4ade80', border: '#1a5c2c' },
+  CANCELLED:               { label: 'Cancelado',        bg: '#2e0f0f', color: '#f87171', border: '#5c1f1f' },
 }
 
 export const STATUS_PRIORITY = {

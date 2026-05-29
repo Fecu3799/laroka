@@ -4,6 +4,7 @@ import logo from '../assets/logo.png'
 import useAuth from '../hooks/useAuth'
 import { logout } from '../services/authService'
 import NewOrderModal from './NewOrderModal'
+import { Toast } from './Toast'
 import './Layout.css'
 
 const API_URL = import.meta.env.VITE_API_URL ?? ''
@@ -251,6 +252,7 @@ export default function Layout() {
         open={newOrderModalOpen}
         onClose={() => setNewOrderModalOpen(false)}
       />
+      <Toast />
     </div>
   )
 }

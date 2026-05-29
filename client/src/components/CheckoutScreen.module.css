@@ -81,6 +81,26 @@
   color: var(--co-text-sec);
 }
 
+/* ── Debug fill button (DEV only, tree-shaken in prod) ── */
+.debugFillBtn {
+  position: absolute;
+  right: 0;
+  background: none;
+  border: 1px dashed rgba(255, 200, 0, 0.4);
+  border-radius: 4px;
+  color: rgba(255, 200, 0, 0.7);
+  font-size: 10px;
+  font-family: monospace;
+  padding: 3px 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+}
+.debugFillBtn:hover {
+  border-color: rgba(255, 200, 0, 0.8);
+  color: rgba(255, 200, 0, 1);
+}
+
 /* ── Card base ── */
 .card {
   background: var(--co-card);

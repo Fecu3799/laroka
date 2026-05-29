@@ -297,6 +297,8 @@
 .orders-row--selected            { border-left-color: #fecd18; background: rgba(254, 205, 24, 0.04); }
 .orders-row--selected:hover      { background: rgba(254, 205, 24, 0.06); }
 .orders-row--cancelled           { opacity: 0.65; }
+.orders-row--cancel-request      { border-left-color: #fb923c; background: rgba(251, 146, 60, 0.04); }
+.orders-row--cancel-request:hover { background: rgba(251, 146, 60, 0.07); }
 
 /* ── Col: PEDIDO ─────────────────────────────────────────────── */
 
@@ -1157,3 +1159,74 @@
 }
 
 .detail-action-cancel:hover { border-color: rgba(248, 113, 113, 0.45); }
+
+/* ── Cancellation request row indicator ──────────────────────── */
+
+.action-cancel-request-badge {
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fb923c;
+  background: rgba(251, 146, 60, 0.1);
+  border: 1px solid rgba(251, 146, 60, 0.3);
+  border-radius: 6px;
+  padding: 5px 10px;
+  white-space: nowrap;
+}
+
+/* ── Cancellation request detail panel ───────────────────────── */
+
+.detail-cancel-request-banner {
+  background: rgba(251, 146, 60, 0.08);
+  border: 1px solid rgba(251, 146, 60, 0.25);
+  border-left: 3px solid #fb923c;
+  border-radius: 9px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.detail-cancel-request-title {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fb923c;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.detail-cancel-request-body {
+  font-family: 'Inter', sans-serif;
+  font-size: 12.5px;
+  color: #e8f0ea;
+  opacity: 0.75;
+  line-height: 1.4;
+}
+
+.detail-action-approve-cancel {
+  background: transparent;
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  color: #f87171;
+  transition: border-color 0.15s;
+}
+
+.detail-action-approve-cancel:hover:not(:disabled) {
+  border-color: rgba(248, 113, 113, 0.6);
+}
+
+.detail-action-approve-cancel:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.detail-action-reject-cancel {
+  background: transparent;
+  border: 1px solid rgba(101, 163, 105, 0.2);
+  color: #7a9b80;
+  transition: border-color 0.15s;
+}
+
+.detail-action-reject-cancel:hover:not(:disabled) {
+  border-color: rgba(101, 163, 105, 0.5);
+  color: #e8f0ea;
+}
+
+.detail-action-reject-cancel:disabled { opacity: 0.5; cursor: not-allowed; }

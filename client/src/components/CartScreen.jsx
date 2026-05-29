@@ -5,6 +5,7 @@ import { FailureModal } from './PaymentModals'
 import { usePreferredBranch } from '../hooks/usePreferredBranch'
 import { addActiveOrder } from '../utils/activeOrders'
 import { initiatePayment } from '../services/paymentsService'
+import { apiFetch } from '../services/http'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080'
 
@@ -166,12 +167,11 @@ export function CartScreen({ items, extras = [], onBack, onRemove, onUpdateQty, 
       paymentMethod: formData.paymentMethod,
       items: items.map(i => ({ productId: i.id, quantity: i.qty })),
     }
-    const res = await fetch(`${API_BASE}/orders`, {
+    const res = await apiFetch(`${API_BASE}/orders`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     })
-    if (!res.ok) throw new Error('Error al crear el pedido')
     const data = await res.json()
 
     if (formData.paymentMethod === 'MERCADOPAGO') {
