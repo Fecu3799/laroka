@@ -259,6 +259,12 @@ public class PaymentService {
             throw new BusinessException("Firma del webhook requerida");
         }
 
+        String secret = webhookSecret.trim();
+        String secretHint = secret.length() >= 8
+                ? secret.substring(0, 4) + "..." + secret.substring(secret.length() - 4)
+                : "***";
+        log.info("validateWebhookSignature: secretLen={}, secretHint={}", secret.length(), secretHint);
+
         String ts = null;
         String v1 = null;
         for (String part : xSignature.split(",")) {
@@ -282,12 +288,13 @@ public class PaymentService {
 
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
-            mac.init(new SecretKeySpec(webhookSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
             byte[] hash = mac.doFinal(message.getBytes(StandardCharsets.UTF_8));
             String computed = HexFormat.of().formatHex(hash);
 
             if (!computed.equals(v1)) {
-                log.warn("validateWebhookSignature: HMAC mismatch — dataId={}, requestId={}, message={}", dataId, xRequestId, message);
+                log.warn("validateWebhookSignature: HMAC mismatch — dataId={}, requestId={}, message={}, computed={}, received={}",
+                        dataId, xRequestId, message, computed, v1);
                 throw new BusinessException("Firma del webhook inválida");
             }
         } catch (BusinessException e) {
