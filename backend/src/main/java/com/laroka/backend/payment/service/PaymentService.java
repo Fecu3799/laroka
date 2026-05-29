@@ -51,6 +51,9 @@ public class PaymentService {
     @Value("${mercadopago.webhook-secret:}")
     private String webhookSecret;
 
+    @Value("${debug.skip-webhook-signature-validation:false}")
+    private boolean skipWebhookSignatureValidation;
+
     @Transactional
     public String initiatePayment(UUID orderId, PaymentGateway.BackUrls backUrls) {
         log.info("initiatePayment: orderId={}, totalAmount will be resolved from order", orderId);
@@ -250,6 +253,11 @@ public class PaymentService {
     }
 
     private void validateWebhookSignature(String xSignature, String xRequestId, String dataId) {
+        if (skipWebhookSignatureValidation) {
+            log.warn("validateWebhookSignature: SIGNATURE VALIDATION SKIPPED (debug flag active) — dataId={}, requestId={}", dataId, xRequestId);
+            return;
+        }
+
         if (webhookSecret == null || webhookSecret.isBlank()) {
             log.warn("validateWebhookSignature: webhookSecret not configured — skipping validation");
             return;
