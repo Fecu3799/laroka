@@ -306,12 +306,8 @@ public class PaymentService {
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
             mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
-            byte[] hash = mac.doFinal(message.getBytes(StandardCharsets.UTF_8));
-            String computed = HexFormat.of().formatHex(hash);
+            String computed = HexFormat.of().formatHex(mac.doFinal(message.getBytes(StandardCharsets.UTF_8)));
 
-            byte[] hashWithoutReqId = Mac.getInstance("HmacSHA256")
-                    .doFinal(messageWithoutRequestId.getBytes(StandardCharsets.UTF_8));
-            // re-init is needed; easier to create a fresh Mac
             Mac macAlt = Mac.getInstance("HmacSHA256");
             macAlt.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
             String computedAlt = HexFormat.of().formatHex(macAlt.doFinal(messageWithoutRequestId.getBytes(StandardCharsets.UTF_8)));
