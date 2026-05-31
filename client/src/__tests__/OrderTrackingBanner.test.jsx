@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, waitFor, act } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { OrderTrackingBanner } from '../components/OrderTrackingBanner'
 
 vi.mock('../hooks/usePreferredBranch', () => ({
@@ -169,9 +170,32 @@ describe('OrderTrackingBanner — status PENDING_PAYMENT', () => {
     expect(screen.queryByText(/llega en/i)).not.toBeInTheDocument()
   })
 
-  it('no renderiza el botón de detalles', async () => {
+  it('renderiza el botón Ver detalle', async () => {
     setup()
     await waitFor(() => screen.getByText('Pago en proceso'))
-    expect(screen.queryByRole('button', { name: /ver detalles/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /ver detalle/i })).toBeInTheDocument()
+  })
+
+  it('clicking Ver detalle abre el modal de detalle', async () => {
+    const user = userEvent.setup()
+    setup()
+    await waitFor(() => screen.getByText('Pago en proceso'))
+
+    await user.click(screen.getByRole('button', { name: /ver detalle/i }))
+
+    expect(screen.getByRole('button', { name: /cerrar/i })).toBeInTheDocument()
+  })
+
+  it('en el modal, clicking "Cancelar pedido" muestra la confirmación inline', async () => {
+    const user = userEvent.setup()
+    setup()
+    await waitFor(() => screen.getByText('Pago en proceso'))
+
+    await user.click(screen.getByRole('button', { name: /ver detalle/i }))
+    await screen.findByRole('button', { name: /cerrar/i })
+
+    await user.click(screen.getByRole('button', { name: /^cancelar pedido$/i }))
+
+    expect(screen.getByText(/el pedido será cancelado y no podrá reactivarse/i)).toBeInTheDocument()
   })
 })

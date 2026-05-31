@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { usePreferredBranch } from '../hooks/usePreferredBranch'
 import { readActiveOrders, removeActiveOrder } from '../utils/activeOrders'
 import { cancelOrder } from '../services/ordersService'
@@ -27,7 +28,6 @@ const STATUS_LABELS = {
   CANCELLED: 'CANCELADO',
   CANCELLATION_REQUESTED: 'CANCELACIÓN SOL.',
 }
-
 
 const DELIVERY_STEPS = ['RECEIVED', 'IN_PREPARATION', 'ON_THE_WAY', 'DELIVERED']
 const TAKEAWAY_STEPS = ['RECEIVED', 'IN_PREPARATION', 'READY_FOR_PICKUP', 'DELIVERED']
@@ -61,14 +61,6 @@ function ItemsSkeleton() {
   )
 }
 
-function ChevronIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
 function PhoneIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -83,66 +75,264 @@ function PhoneIcon() {
   )
 }
 
-function ConfirmCancelModal({ isRequest, onConfirm, onClose, loading, error }) {
-  return (
-    <div
-      className={styles.modalOverlay}
-      role="dialog"
-      aria-modal="true"
-      onClick={(e) => { if (e.target === e.currentTarget && !loading) onClose() }}
-    >
-      <div className={styles.modalBox}>
-        <p className={styles.modalTitle}>
-          {isRequest ? '¿Solicitar cancelación?' : '¿Cancelar pedido?'}
-        </p>
-        <p className={styles.modalBody}>
-          {isRequest
-            ? 'Se enviará una solicitud al local. La decisión final queda a cargo del local.'
-            : 'El pedido será cancelado y no podrá reactivarse.'}
-        </p>
-        {error && <p className={styles.modalError}>{error}</p>}
-        <div className={styles.modalActions}>
-          <button
-            className={styles.modalBtnDismiss}
-            onClick={onClose}
-            disabled={loading}
-          >
-            VOLVER
-          </button>
-          <button
-            className={styles.modalBtnConfirm}
-            onClick={onConfirm}
-            disabled={loading}
-          >
-            {loading ? 'PROCESANDO...' : isRequest ? 'SOLICITAR' : 'CANCELAR'}
-          </button>
+// ── Detail modal ──────────────────────────────────────────────
+
+function OrderDetailModal({
+  order,
+  items,
+  itemsLoading,
+  itemsError,
+  confirmingCancel,
+  cancelling,
+  cancelError,
+  canDirectCancel,
+  canRequestCancel,
+  onClose,
+  onRequestCancel,
+  onConfirmCancel,
+  onCancelBack,
+}) {
+  const isDelivery = order.orderType === 'DELIVERY'
+  const steps = isDelivery ? DELIVERY_STEPS : TAKEAWAY_STEPS
+  const historyMap = {}
+  for (const h of (order.history ?? [])) historyMap[h.toStatus] = h
+
+  return createPortal(
+    <>
+      <style>{`@keyframes _lrModalIn{from{opacity:0;transform:scale(.85)}to{opacity:1;transform:scale(1)}}`}</style>
+      <div
+        role="dialog"
+        aria-modal="true"
+        style={{
+          position: 'fixed', inset: 0,
+          background: 'rgba(0,0,0,0.75)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 300, padding: '16px', boxSizing: 'border-box',
+        }}
+        onClick={(e) => { if (e.target === e.currentTarget && !cancelling) onClose() }}
+      >
+        <div
+          style={{
+            background: 'var(--bg-card-product, #1a1a1a)',
+            borderRadius: '16px',
+            width: '100%', maxWidth: '440px', maxHeight: '80vh',
+            display: 'flex', flexDirection: 'column',
+            overflow: 'hidden',
+            animation: '_lrModalIn 200ms ease-out forwards',
+          }}
+        >
+          {/* ── Scrollable body ──────────────────────────── */}
+          <div style={{ overflowY: 'auto', padding: '20px 20px 0', flex: 1 }}>
+            {isDelivery && order.deliveryAddress && (
+              <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)', marginBottom: '16px', marginTop: 0 }}>
+                {order.deliveryAddress}
+              </p>
+            )}
+
+            <p className={styles.sectionLabel}>HISTORIAL</p>
+            <ul className={styles.historyList}>
+              {steps.map(step => {
+                const entry = historyMap[step]
+                return (
+                  <li key={step} className={styles.historyItem}>
+                    <span className={styles.historyBullet} data-done={!!entry} />
+                    <span className={styles.historyLabel} data-done={!!entry}>
+                      {STEP_LABELS[step]}
+                    </span>
+                    <span className={styles.historyTime}>
+                      {entry ? formatTime(entry.changedAt) : '—'}
+                    </span>
+                  </li>
+                )
+              })}
+            </ul>
+
+            <div className={styles.panelSeparator} />
+
+            <p className={styles.sectionLabel}>TU PEDIDO</p>
+            {itemsLoading && <ItemsSkeleton />}
+            {itemsError && <p className={styles.itemsError}>No se pudieron cargar los items.</p>}
+            {items && (
+              <>
+                <ul className={styles.itemsList}>
+                  {items.map((item, i) => (
+                    <li key={i} className={styles.itemRow}>
+                      <span className={styles.itemQtyName}>{item.quantity}× {item.name}</span>
+                      <span className={styles.itemPrice}>{formatPrice(item.subtotal)}</span>
+                    </li>
+                  ))}
+                </ul>
+                <div className={styles.totalsContainer}>
+                  <div className={styles.totalRow}>
+                    <span>Subtotal</span>
+                    <span>{formatPrice(order.subtotal)}</span>
+                  </div>
+                  {isDelivery && (
+                    <div className={styles.totalRow}>
+                      <span>Cargo de delivery</span>
+                      <span>{formatPrice(order.deliveryFee)}</span>
+                    </div>
+                  )}
+                  <div className={styles.totalRow}>
+                    <span>Cargo de servicio</span>
+                    <span>{formatPrice(order.serviceFee)}</span>
+                  </div>
+                  <div className={styles.totalsSeparator} />
+                  <div className={`${styles.totalRow} ${styles.totalRowFinal}`}>
+                    <span>Total</span>
+                    <span>{formatPrice(order.totalAmount)}</span>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {order.status === 'CANCELLATION_REQUESTED' && (
+              <p className={styles.cancelMessage}>
+                Cancelación solicitada, esperando respuesta del local.
+              </p>
+            )}
+
+            <div style={{ height: '20px' }} />
+          </div>
+
+          {/* ── Footer ───────────────────────────────────── */}
+          <div style={{
+            padding: '16px 20px',
+            borderTop: '1px solid rgba(255,255,255,0.08)',
+            flexShrink: 0,
+          }}>
+            {confirmingCancel ? (
+              <>
+                <p style={{
+                  fontSize: '13px',
+                  color: 'rgba(255,255,255,0.7)',
+                  margin: '0 0 12px',
+                  lineHeight: 1.45,
+                }}>
+                  {canDirectCancel
+                    ? 'El pedido será cancelado y no podrá reactivarse.'
+                    : 'Se enviará una solicitud al local. La decisión final queda a cargo del local.'}
+                </p>
+                {cancelError && (
+                  <p style={{ fontSize: '13px', color: 'var(--color-danger, #f87171)', margin: '0 0 12px' }}>
+                    {cancelError}
+                  </p>
+                )}
+                <div className={styles.modalActions}>
+                  <button className={styles.modalBtnDismiss} onClick={onCancelBack} disabled={cancelling}>
+                    Volver
+                  </button>
+                  <button className={styles.modalBtnConfirm} onClick={onConfirmCancel} disabled={cancelling}>
+                    {cancelling
+                      ? 'Procesando...'
+                      : canDirectCancel ? 'Confirmar cancelación' : 'Confirmar solicitud'}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  style={{
+                    flex: 1,
+                    fontFamily: "'Barlow Condensed', sans-serif",
+                    fontWeight: 700,
+                    fontSize: '14px',
+                    letterSpacing: '0.06em',
+                    color: 'rgba(255,255,255,0.65)',
+                    background: 'transparent',
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    borderRadius: '8px',
+                    padding: '10px',
+                    cursor: 'pointer',
+                  }}
+                  onClick={onClose}
+                >
+                  Cerrar
+                </button>
+                {(canDirectCancel || canRequestCancel) && (
+                  <button
+                    style={{ flex: 1 }}
+                    className={styles.cancelBtn}
+                    onClick={onRequestCancel}
+                  >
+                    {canRequestCancel ? 'Solicitar cancelación' : 'Cancelar pedido'}
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </>,
+    document.body
   )
 }
 
-function OrderSlide({ orderId, order, isExpanded, items, itemsLoading, itemsError, onToggleExpand, estimatedDeliveryMinutes, onPhoneClick, onOrderUpdate }) {
-  const [showModal, setShowModal] = useState(false)
+// ── OrderSlide ────────────────────────────────────────────────
+
+function OrderSlide({ orderId, order, estimatedDeliveryMinutes, onPhoneClick, onOrderUpdate, onModalChange }) {
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [confirmingCancel, setConfirmingCancel] = useState(false)
+
+  const [items, setItems] = useState(null)
+  const [itemsLoading, setItemsLoading] = useState(false)
+  const [itemsError, setItemsError] = useState(false)
+  const fetchedRef = useRef(false)
+
   const [cancelling, setCancelling] = useState(false)
   const [cancelError, setCancelError] = useState(null)
 
-  const canDirectCancel = order?.status === 'RECEIVED'
+  const canDirectCancel = order?.status === 'RECEIVED' || order?.status === 'PENDING_PAYMENT'
   const canRequestCancel = order?.status === 'IN_PREPARATION'
 
-  const handleOpenModal = () => {
+  const fetchItems = useCallback(async () => {
+    if (fetchedRef.current) return
+    fetchedRef.current = true
+    setItemsLoading(true)
+    try {
+      const res = await fetch(`${API_BASE}/orders/${orderId}/items`)
+      if (!res.ok) throw new Error()
+      setItems(await res.json())
+    } catch {
+      setItemsError(true)
+      fetchedRef.current = false
+    } finally {
+      setItemsLoading(false)
+    }
+  }, [orderId])
+
+  const handleOpenDetailModal = () => {
+    setIsModalOpen(true)
+    onModalChange(true)
+    fetchItems()
+  }
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false)
+    setConfirmingCancel(false)
     setCancelError(null)
-    setShowModal(true)
+    onModalChange(false)
+  }
+
+  const handleRequestCancel = () => {
+    setConfirmingCancel(true)
+    setCancelError(null)
+  }
+
+  const handleCancelBack = () => {
+    setConfirmingCancel(false)
+    setCancelError(null)
   }
 
   const handleConfirmCancel = async () => {
-    const isDirectCancel = order?.status === 'RECEIVED'
     setCancelling(true)
     setCancelError(null)
     try {
       await cancelOrder(orderId)
-      setShowModal(false)
-      onOrderUpdate(orderId, isDirectCancel ? 'CANCELLED' : 'CANCELLATION_REQUESTED')
+      setIsModalOpen(false)
+      setConfirmingCancel(false)
+      onModalChange(false)
+      onOrderUpdate(orderId, canDirectCancel ? 'CANCELLED' : 'CANCELLATION_REQUESTED')
     } catch (err) {
       setCancelError(err.status === 422 ? err.message : 'No se pudo procesar la solicitud.')
     } finally {
@@ -160,173 +350,95 @@ function OrderSlide({ orderId, order, isExpanded, items, itemsLoading, itemsErro
     )
   }
 
-  const isRequest = canRequestCancel
-
   const progress = PROGRESS[order.status] ?? 10
   const isPendingPayment = order.status === 'PENDING_PAYMENT'
   const isDelivery = order.orderType === 'DELIVERY'
-  const steps = isDelivery ? DELIVERY_STEPS : TAKEAWAY_STEPS
-  const historyMap = {}
-  for (const h of (order.history ?? [])) historyMap[h.toStatus] = h
 
   return (
     <>
-    {showModal && (
-      <ConfirmCancelModal
-        isRequest={isRequest}
-        onConfirm={handleConfirmCancel}
-        onClose={() => { if (!cancelling) setShowModal(false) }}
-        loading={cancelling}
-        error={cancelError}
-      />
-    )}
-    <div className={styles.slideContent}>
-      <div className={styles.topRow}>
-        <div className={styles.titleBlock}>
-          <span className={styles.title}>
-            {order.status === 'PENDING_PAYMENT' ? 'Pago en proceso' : 'Pedido en proceso'}
-          </span>
-          {!isPendingPayment && estimatedDeliveryMinutes && (
-            <span className={styles.eta}>Llega en ~{estimatedDeliveryMinutes} min</span>
-          )}
-        </div>
-        <button className={styles.phoneBtn} aria-label="Llamar al local" onClick={onPhoneClick}>
-          <PhoneIcon />
-        </button>
-      </div>
-
-      <div className={styles.metaRow}>
-        <span className={styles.badge} data-status={order.status}>
-          {STATUS_LABELS[order.status] ?? order.status}
-        </span>
-        {isDelivery && order.deliveryAddress && (
-          <span className={styles.address}>{order.deliveryAddress}</span>
-        )}
-      </div>
-
-      {!isPendingPayment && (
-        <div className={styles.progressRow} data-testid="progress-bar">
-          <span className={styles.progressEmoji} aria-hidden="true">🏪</span>
-          <div className={styles.progressTrack}>
-            <div className={styles.progressFill} style={{ width: `${progress}%` }} />
-            <span className={styles.scooter} style={{ left: `${progress}%` }} aria-hidden="true">
-              🛵
+      {isModalOpen && (
+        <OrderDetailModal
+          order={order}
+          items={items}
+          itemsLoading={itemsLoading}
+          itemsError={itemsError}
+          confirmingCancel={confirmingCancel}
+          cancelling={cancelling}
+          cancelError={cancelError}
+          canDirectCancel={canDirectCancel}
+          canRequestCancel={canRequestCancel}
+          onClose={handleCloseModal}
+          onRequestCancel={handleRequestCancel}
+          onConfirmCancel={handleConfirmCancel}
+          onCancelBack={handleCancelBack}
+        />
+      )}
+      <div className={styles.slideContent}>
+        <div className={styles.topRow}>
+          <div className={styles.titleBlock}>
+            <span className={styles.title}>
+              {isPendingPayment ? 'Pago en proceso' : 'Pedido en proceso'}
             </span>
+            {!isPendingPayment && estimatedDeliveryMinutes && (
+              <span className={styles.eta}>Llega en ~{estimatedDeliveryMinutes} min</span>
+            )}
           </div>
-          <span className={styles.progressEmoji} aria-hidden="true">🏠</span>
+          <button className={styles.phoneBtn} aria-label="Llamar al local" onClick={onPhoneClick}>
+            <PhoneIcon />
+          </button>
         </div>
-      )}
 
-      {isExpanded && (
-        <div className={styles.expandPanel}>
-          <div className={styles.panelSeparator} />
-
-          <p className={styles.sectionLabel}>HISTORIAL</p>
-          <ul className={styles.historyList}>
-            {steps.map(step => {
-              const entry = historyMap[step]
-              return (
-                <li key={step} className={styles.historyItem}>
-                  <span className={styles.historyBullet} data-done={!!entry} />
-                  <span className={styles.historyLabel} data-done={!!entry}>
-                    {STEP_LABELS[step]}
-                  </span>
-                  <span className={styles.historyTime}>
-                    {entry ? formatTime(entry.changedAt) : '—'}
-                  </span>
-                </li>
-              )
-            })}
-          </ul>
-
-          <p className={styles.sectionLabel}>TU PEDIDO</p>
-          {itemsLoading && <ItemsSkeleton />}
-          {itemsError && (
-            <p className={styles.itemsError}>No se pudieron cargar los items.</p>
-          )}
-          {items && (
-            <>
-              <ul className={styles.itemsList}>
-                {items.map((item, i) => (
-                  <li key={i} className={styles.itemRow}>
-                    <span className={styles.itemQtyName}>{item.quantity}× {item.name}</span>
-                    <span className={styles.itemPrice}>{formatPrice(item.subtotal)}</span>
-                  </li>
-                ))}
-              </ul>
-              <div className={styles.totalsContainer}>
-                <div className={styles.totalRow}>
-                  <span>Subtotal</span>
-                  <span>{formatPrice(order.subtotal)}</span>
-                </div>
-                {isDelivery && (
-                  <div className={styles.totalRow}>
-                    <span>Cargo de delivery</span>
-                    <span>{formatPrice(order.deliveryFee)}</span>
-                  </div>
-                )}
-                <div className={styles.totalRow}>
-                  <span>Cargo de servicio</span>
-                  <span>{formatPrice(order.serviceFee)}</span>
-                </div>
-                <div className={styles.totalsSeparator} />
-                <div className={`${styles.totalRow} ${styles.totalRowFinal}`}>
-                  <span>Total</span>
-                  <span>{formatPrice(order.totalAmount)}</span>
-                </div>
-              </div>
-            </>
-          )}
-
-          {order.status === 'CANCELLATION_REQUESTED' && (
-            <p className={styles.cancelMessage}>
-              Cancelación solicitada, esperando respuesta del local.
-            </p>
-          )}
-          {canDirectCancel && (
-            <button className={styles.cancelBtn} onClick={handleOpenModal}>
-              CANCELAR PEDIDO
-            </button>
-          )}
-          {canRequestCancel && (
-            <button className={styles.cancelBtn} onClick={handleOpenModal}>
-              SOLICITAR CANCELACIÓN
-            </button>
-          )}
-        </div>
-      )}
-
-      {!isPendingPayment && (
-        <button className={styles.expandBtn} onClick={onToggleExpand}>
-          {isExpanded ? 'OCULTAR DETALLES' : 'VER DETALLES'}
-          <span className={`${styles.expandChevron}${isExpanded ? ` ${styles.expandChevronOpen}` : ''}`}>
-            <ChevronIcon />
+        <div className={styles.metaRow}>
+          <span className={styles.badge} data-status={order.status}>
+            {STATUS_LABELS[order.status] ?? order.status}
           </span>
+          {isDelivery && order.deliveryAddress && (
+            <span className={styles.address}>{order.deliveryAddress}</span>
+          )}
+        </div>
+
+        {!isPendingPayment && (
+          <div className={styles.progressRow} data-testid="progress-bar">
+            <span className={styles.progressEmoji} aria-hidden="true">🏪</span>
+            <div className={styles.progressTrack}>
+              <div className={styles.progressFill} style={{ width: `${progress}%` }} />
+              <span className={styles.scooter} style={{ left: `${progress}%` }} aria-hidden="true">
+                🛵
+              </span>
+            </div>
+            <span className={styles.progressEmoji} aria-hidden="true">🏠</span>
+          </div>
+        )}
+
+        {/* stopPropagation on touch prevents ghost-click on portal modal backdrop */}
+        <button
+          className={styles.expandBtn}
+          onClick={handleOpenDetailModal}
+          onTouchStart={(e) => e.stopPropagation()}
+          onTouchEnd={(e) => e.stopPropagation()}
+        >
+          Ver detalle
         </button>
-      )}
-    </div>
+      </div>
     </>
   )
 }
 
+// ── OrderTrackingBanner ───────────────────────────────────────
+
 export function OrderTrackingBanner({ branchId }) {
   const { estimatedDeliveryMinutes, phone } = usePreferredBranch()
 
-  // All tracked entries — polling runs on all of them regardless of branch
   const [orderEntries, setOrderEntries] = useState(() => readActiveOrders())
   const [ordersData, setOrdersData] = useState({})
   const [activeIndex, setActiveIndex] = useState(0)
-  const [isExpanded, setIsExpanded] = useState(false)
-  const [ordersItems, setOrdersItems] = useState({})
 
   const orderEntriesRef = useRef(orderEntries)
-  const ordersItemsRef = useRef(ordersItems)
   const touchStartRef = useRef(null)
   const visibleEntriesRef = useRef([])
   const clampedIndexRef = useRef(0)
-  const isExpandedRef = useRef(false)
+  const anyModalOpenRef = useRef(false)
 
-  // Derived from prop — recalculates immediately whenever branchId changes
   const visibleEntries = orderEntries.filter(e => e.branchId === branchId)
   const n = visibleEntries.length
   const clampedIndex = Math.min(activeIndex, Math.max(0, n - 1))
@@ -334,13 +446,10 @@ export function OrderTrackingBanner({ branchId }) {
   // Keep refs in sync after every render
   useEffect(() => {
     orderEntriesRef.current = orderEntries
-    ordersItemsRef.current = ordersItems
-    isExpandedRef.current = isExpanded
     visibleEntriesRef.current = visibleEntries
     clampedIndexRef.current = clampedIndex
   })
 
-  // Merge newly added entries without restarting the poll
   const reloadOrders = useCallback(() => {
     const fresh = readActiveOrders()
     setOrderEntries(prev => {
@@ -358,41 +467,6 @@ export function OrderTrackingBanner({ branchId }) {
       window.removeEventListener('storage', reloadOrders)
     }
   }, [reloadOrders])
-
-  const fetchItems = useCallback(async (orderId) => {
-    const cur = ordersItemsRef.current[orderId]
-    if (cur?.loading || cur?.data != null) return
-    ordersItemsRef.current = {
-      ...ordersItemsRef.current,
-      [orderId]: { data: null, loading: true, error: false },
-    }
-    setOrdersItems(prev => ({ ...prev, [orderId]: { data: null, loading: true, error: false } }))
-    try {
-      const res = await fetch(`${API_BASE}/orders/${orderId}/items`)
-      if (!res.ok) throw new Error()
-      const data = await res.json()
-      setOrdersItems(prev => ({ ...prev, [orderId]: { data, loading: false, error: false } }))
-    } catch {
-      setOrdersItems(prev => ({ ...prev, [orderId]: { data: null, loading: false, error: true } }))
-    }
-  }, [])
-
-  const handleToggleExpand = useCallback(() => {
-    const opening = !isExpandedRef.current
-    setIsExpanded(opening)
-    if (opening) {
-      const entries = visibleEntriesRef.current
-      const activeId = entries[clampedIndexRef.current]?.orderId
-      if (activeId) fetchItems(activeId)
-      let delay = 300
-      for (const { orderId } of entries) {
-        if (orderId !== activeId) {
-          setTimeout(() => fetchItems(orderId), delay)
-          delay += 300
-        }
-      }
-    }
-  }, [fetchItems])
 
   // Single interval polls all tracked entries via ref — no restart when one is added
   useEffect(() => {
@@ -438,11 +512,12 @@ export function OrderTrackingBanner({ branchId }) {
   }, [orderEntries.length > 0])
 
   const handleTouchStart = (e) => {
+    if (anyModalOpenRef.current) return
     touchStartRef.current = e.touches[0].clientX
   }
 
   const handleTouchEnd = (e) => {
-    if (touchStartRef.current === null) return
+    if (anyModalOpenRef.current || touchStartRef.current === null) return
     const delta = e.changedTouches[0].clientX - touchStartRef.current
     if (delta < -50) {
       setActiveIndex(i => Math.min(n - 1, i + 1))
@@ -451,6 +526,10 @@ export function OrderTrackingBanner({ branchId }) {
     }
     touchStartRef.current = null
   }
+
+  const handleModalChange = useCallback((isOpen) => {
+    anyModalOpenRef.current = isOpen
+  }, [])
 
   const handleOrderUpdate = useCallback((orderId, newStatus) => {
     if (TERMINAL_STATUSES.includes(newStatus)) {
@@ -502,14 +581,10 @@ export function OrderTrackingBanner({ branchId }) {
                 <OrderSlide
                   orderId={orderId}
                   order={ordersData[orderId]}
-                  isExpanded={isExpanded}
-                  items={ordersItems[orderId]?.data ?? null}
-                  itemsLoading={ordersItems[orderId]?.loading ?? false}
-                  itemsError={ordersItems[orderId]?.error ?? false}
-                  onToggleExpand={handleToggleExpand}
                   estimatedDeliveryMinutes={estimatedDeliveryMinutes}
                   onPhoneClick={handlePhoneClick}
                   onOrderUpdate={handleOrderUpdate}
+                  onModalChange={handleModalChange}
                 />
               </div>
             ))}

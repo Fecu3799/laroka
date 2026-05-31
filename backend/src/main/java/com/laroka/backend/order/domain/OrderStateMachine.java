@@ -15,7 +15,7 @@ public class OrderStateMachine {
         OrderType type = order.getOrderType();
 
         return switch (current) {
-            case PENDING_PAYMENT -> List.of(OrderStatus.RECEIVED);
+            case PENDING_PAYMENT -> List.of(OrderStatus.RECEIVED, OrderStatus.CANCELLED);
             case RECEIVED -> List.of(OrderStatus.IN_PREPARATION, OrderStatus.CANCELLED);
             case IN_PREPARATION -> type == OrderType.DELIVERY
                     ? List.of(OrderStatus.ON_THE_WAY, OrderStatus.CANCELLATION_REQUESTED)
@@ -28,7 +28,9 @@ public class OrderStateMachine {
     }
 
     public static boolean canCancel(OrderStatus status) {
-        return status == OrderStatus.RECEIVED || status == OrderStatus.IN_PREPARATION;
+        return status == OrderStatus.PENDING_PAYMENT
+                || status == OrderStatus.RECEIVED
+                || status == OrderStatus.IN_PREPARATION;
     }
 
     public static OrderStatus getPreviousStatus(OrderStatus current, OrderType orderType) {

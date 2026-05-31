@@ -41,7 +41,7 @@ export function canGoBack(status) {
 }
 
 export function canCancel(status) {
-  return status === 'RECEIVED'
+  return status === 'PENDING_PAYMENT' || status === 'RECEIVED'
 }
 
 export function canConfirmOrder({ cartItems, orderType, deliveryAddress }) {

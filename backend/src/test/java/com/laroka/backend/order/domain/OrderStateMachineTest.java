@@ -53,8 +53,8 @@ class OrderStateMachineTest {
     }
 
     @Test
-    void canCancel_fromPendingPayment_returnsFalse() {
-        assertThat(OrderStateMachine.canCancel(OrderStatus.PENDING_PAYMENT)).isFalse();
+    void canCancel_fromPendingPayment_returnsTrue() {
+        assertThat(OrderStateMachine.canCancel(OrderStatus.PENDING_PAYMENT)).isTrue();
     }
 
     // --- getNextValidStatuses: flujos de cancelación ---

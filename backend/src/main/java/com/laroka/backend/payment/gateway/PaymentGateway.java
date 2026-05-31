@@ -13,6 +13,8 @@ public interface PaymentGateway {
 
     void cancelQrCharge(String externalId);
 
+    void refundPayment(String paymentId);
+
     record PaymentInfo(String status, String externalReference) {}
 
     record BackUrls(String success, String failure, String pending) {}

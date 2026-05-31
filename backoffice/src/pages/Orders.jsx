@@ -1291,9 +1291,13 @@ function OrderDetail({
                       ? "···"
                       : `Avanzar a ${STATUS_CONFIG[next]?.label} →`}
                   </button>
-                ) : (
+                ) : isTerminal ? (
                   <div className="detail-action-btn detail-action-advance--done">
                     Pedido finalizado
+                  </div>
+                ) : (
+                  <div className="detail-action-btn detail-action-advance--done">
+                    Esperando pago
                   </div>
                 )}
 

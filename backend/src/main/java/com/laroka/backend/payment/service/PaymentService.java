@@ -146,6 +146,19 @@ public class PaymentService {
                 orderService.transitionStatus(orderId, OrderStatus.RECEIVED);
                 log.info("processWebhook: order transitioned to RECEIVED — orderId={}, requestId={}", orderId, xRequestId);
                 notificationService.sendNewOrderEvent(order.getBranch().getId(), orderId, order.getCreatedAt());
+            } else if (order.getStatus() == OrderStatus.CANCELLED) {
+                log.error("processWebhook: pago aprobado para pedido CANCELADO — race condition detectada, iniciando reembolso automático | orderId={} mpPaymentId={} requestId={}",
+                        orderId, paymentId, xRequestId);
+                try {
+                    paymentGateway.refundPayment(paymentId);
+                    payment.setStatus(PaymentStatus.REFUNDED);
+                    paymentRepository.save(payment);
+                    log.info("processWebhook: reembolso iniciado correctamente en MercadoPago | orderId={} mpPaymentId={}",
+                            orderId, paymentId);
+                } catch (Exception e) {
+                    log.error("processWebhook: REEMBOLSO FALLIDO — ACCIÓN MANUAL REQUERIDA | orderId={} mpPaymentId={} error={}",
+                            orderId, paymentId, e.getMessage());
+                }
             } else {
                 log.warn("processWebhook: order not in PENDING_PAYMENT, skipping activation — orderId={}, orderStatus={}, requestId={}",
                         orderId, order.getStatus(), xRequestId);
