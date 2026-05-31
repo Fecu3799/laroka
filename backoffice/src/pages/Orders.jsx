@@ -919,6 +919,7 @@ function OrderDetail({
   const cfg = STATUS_CONFIG[order.status] ?? {};
   const payCfg = PAYMENT_BADGE_CONFIG[order.paymentStatus] ?? {};
   const next = getNextStatus(order.status, order.orderType);
+  const isTerminal = TERMINAL.has(order.status);
 
   const [paying, setPaying] = useState(false);
   const [actionLoading, setActionLoading] = useState(null);
@@ -1297,7 +1298,8 @@ function OrderDetail({
                 )}
 
                 {order.paymentMethod === "CASH" &&
-                  order.paymentStatus !== "APPROVED" && (
+                  order.paymentStatus !== "APPROVED" &&
+                  !isTerminal && (
                     <button
                       className="detail-action-btn detail-action-pay"
                       type="button"

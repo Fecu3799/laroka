@@ -117,6 +117,13 @@ public class OrderService {
                     + " para pedido de tipo " + order.getOrderType());
         }
 
+        if (newStatus == OrderStatus.DELIVERED) {
+            Payment payment = paymentRepository.findByOrderId(orderId).orElse(null);
+            if (payment == null || payment.getStatus() == PaymentStatus.PENDING) {
+                throw new BusinessException("El pedido no puede marcarse como entregado con pago pendiente");
+            }
+        }
+
         OrderStatus previous = order.getStatus();
         order.setStatus(newStatus);
         Order saved = orderRepository.save(order);
