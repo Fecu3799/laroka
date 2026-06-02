@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useOutletContext } from "react-router-dom";
 import useAuth from "../hooks/useAuth";
 import useOrders from "../hooks/useOrders";
 import useOrderDetail from "../hooks/useOrderDetail";
@@ -513,6 +514,7 @@ function PaymentStatusIcon({ status }) {
 
 export default function Orders() {
   const { token } = useAuth();
+  const { newOrderCount, resetNewOrders } = useOutletContext();
   const {
     orders,
     loading,
@@ -629,9 +631,16 @@ export default function Orders() {
           />
         </div>
 
-        <button className="orders-refresh-btn" type="button" onClick={refresh}>
+        <button
+          className={`orders-refresh-btn${newOrderCount > 0 ? ' orders-refresh-btn--notify' : ''}`}
+          type="button"
+          onClick={() => { resetNewOrders(); refresh(); }}
+        >
           <RefreshIcon />
           Actualizar lista
+          {newOrderCount > 0 && (
+            <span className="orders-refresh-badge">{newOrderCount}</span>
+          )}
         </button>
       </div>
 

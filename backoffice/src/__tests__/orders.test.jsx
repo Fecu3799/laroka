@@ -4,6 +4,11 @@ import Orders from '../pages/Orders'
 import useOrders from '../hooks/useOrders'
 import { STATUS_CONFIG } from '../utils/ordersUtils'
 
+vi.mock('react-router-dom', async (importOriginal) => {
+  const actual = await importOriginal()
+  return { ...actual, useOutletContext: () => ({ newOrderCount: 0, resetNewOrders: vi.fn() }) }
+})
+
 vi.mock('../hooks/useAuth', () => ({
   default: () => ({ token: 'test-token', branchId: 1, branchName: 'Test' }),
 }))
@@ -72,8 +77,6 @@ const DEFAULT_HOOK = {
   dismissedIds: new Set(),
   updateOrderInList: vi.fn(),
   updatePaymentInList: vi.fn(),
-  newOrderCount: 0,
-  incrementNewOrders: vi.fn(),
 }
 
 // ── Helpers ───────────────────────────────────────────────────

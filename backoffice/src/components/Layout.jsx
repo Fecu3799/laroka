@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import logo from '../assets/logo.png'
 import useAuth from '../hooks/useAuth'
@@ -136,9 +136,7 @@ export default function Layout() {
     return () => clearInterval(id)
   }, [])
 
-  useEffect(() => {
-    if (location.pathname === '/orders') setNewOrderCount(0)
-  }, [location.pathname])
+  const resetNewOrders = useCallback(() => setNewOrderCount(0), [])
 
   const formattedTime = time.toLocaleTimeString('es-AR', {
     hour: '2-digit',
@@ -244,7 +242,7 @@ export default function Layout() {
         </header>
 
         <main className="layout-main">
-          <Outlet />
+          <Outlet context={{ newOrderCount, resetNewOrders }} />
         </main>
       </div>
 
