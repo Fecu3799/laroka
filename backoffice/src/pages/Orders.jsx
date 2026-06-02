@@ -514,7 +514,7 @@ function PaymentStatusIcon({ status }) {
 
 export default function Orders() {
   const { token } = useAuth();
-  const { newOrderCount, resetNewOrders } = useOutletContext();
+  const { newOrderCount, cancelCount, resetCounts } = useOutletContext();
   const {
     orders,
     loading,
@@ -632,14 +632,21 @@ export default function Orders() {
         </div>
 
         <button
-          className={`orders-refresh-btn${newOrderCount > 0 ? ' orders-refresh-btn--notify' : ''}`}
+          className={`orders-refresh-btn${(newOrderCount > 0 || cancelCount > 0) ? ' orders-refresh-btn--notify' : ''}`}
           type="button"
-          onClick={() => { resetNewOrders(); refresh(); }}
+          onClick={() => { resetCounts(); refresh(); if (selectedId) refetchDetail(); }}
         >
           <RefreshIcon />
           Actualizar lista
-          {newOrderCount > 0 && (
-            <span className="orders-refresh-badge">{newOrderCount}</span>
+          {(newOrderCount > 0 || cancelCount > 0) && (
+            <span className="orders-refresh-badges">
+              {newOrderCount > 0 && (
+                <span className="orders-refresh-badge orders-refresh-badge--received">{newOrderCount}</span>
+              )}
+              {cancelCount > 0 && (
+                <span className="orders-refresh-badge orders-refresh-badge--cancel">{cancelCount}</span>
+              )}
+            </span>
           )}
         </button>
       </div>

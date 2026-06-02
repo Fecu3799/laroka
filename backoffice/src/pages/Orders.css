@@ -125,21 +125,34 @@
 
 .orders-refresh-btn--notify { border-color: rgba(239, 68, 68, 0.5); }
 
-.orders-refresh-badge {
+.orders-refresh-badges {
   position: absolute;
   top: -7px;
   right: -7px;
+  display: flex;
+  gap: 3px;
+}
+
+.orders-refresh-badge {
   min-width: 18px;
   height: 18px;
   padding: 0 4px;
-  background: #ef4444;
-  color: #fff;
   font-size: 10px;
   font-weight: 700;
   border-radius: 9px;
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.orders-refresh-badge--received {
+  background: #2563eb;
+  color: #fff;
+}
+
+.orders-refresh-badge--cancel {
+  background: #b91c1c;
+  color: #fecaca;
 }
 
 /* ── Tabs ────────────────────────────────────────────────────── */

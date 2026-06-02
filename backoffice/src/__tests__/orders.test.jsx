@@ -6,7 +6,7 @@ import { STATUS_CONFIG } from '../utils/ordersUtils'
 
 vi.mock('react-router-dom', async (importOriginal) => {
   const actual = await importOriginal()
-  return { ...actual, useOutletContext: () => ({ newOrderCount: 0, resetNewOrders: vi.fn() }) }
+  return { ...actual, useOutletContext: () => ({ newOrderCount: 0, cancelCount: 0, resetCounts: vi.fn() }) }
 })
 
 vi.mock('../hooks/useAuth', () => ({

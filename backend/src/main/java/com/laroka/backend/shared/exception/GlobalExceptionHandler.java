@@ -14,6 +14,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.context.request.async.AsyncRequestTimeoutException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 
 import com.laroka.backend.auth.exception.InvalidCredentialsException;
@@ -76,6 +77,11 @@ public class GlobalExceptionHandler {
 			NoHandlerFoundException ex, HttpServletRequest request) {
 		String message = "Endpoint no encontrado: " + request.getMethod() + " " + request.getRequestURI();
 		return buildResponse(HttpStatus.NOT_FOUND, message, null, request);
+	}
+
+	@ExceptionHandler(AsyncRequestTimeoutException.class)
+	public void handleAsyncTimeout() {
+		// ciclo de vida normal del SSE — la conexión expiró, no hay respuesta que escribir
 	}
 
 	@ExceptionHandler(Exception.class)

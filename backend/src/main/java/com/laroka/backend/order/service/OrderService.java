@@ -163,7 +163,7 @@ public class OrderService {
 
     @Transactional
     public void cancelOrder(UUID orderId) {
-        Order order = orderRepository.findById(orderId)
+        Order order = orderRepository.findByIdWithBranch(orderId)
                 .orElseThrow(() -> {
                     log.warn("Order not found | orderId={}", orderId);
                     return new OrderNotFoundException(orderId);
@@ -181,6 +181,10 @@ public class OrderService {
         Order saved = orderRepository.save(order);
         recordHistory(saved, previous, next);
         log.info("Order cancel flow | orderId={} from={} to={}", saved.getId(), previous, next);
+
+        if (next == OrderStatus.CANCELLATION_REQUESTED) {
+            notificationService.sendCancellationRequestEvent(saved.getBranch().getId(), saved.getId());
+        }
     }
 
     @Transactional

@@ -59,4 +59,25 @@ public class NotificationService {
         }
         emitters.removeAll(dead);
     }
+
+    public void sendCancellationRequestEvent(Integer branchId, UUID orderId) {
+        log.info("SSE cancellation-request | branchId={} orderId={} activeEmitters={}", branchId, orderId, emitters.size());
+        List<EmitterEntry> dead = new ArrayList<>();
+        for (EmitterEntry entry : emitters) {
+            if (entry.branchId().equals(branchId)) {
+                try {
+                    Map<String, Object> data = new LinkedHashMap<>();
+                    data.put("type", "CANCELLATION_REQUESTED");
+                    data.put("orderId", orderId.toString());
+                    data.put("branchId", branchId);
+                    entry.emitter().send(SseEmitter.event().name("cancellation-request").data(data));
+                    log.info("SSE cancellation-request sent | branchId={} orderId={}", branchId, orderId);
+                } catch (Exception e) {
+                    log.warn("SSE send failed, removing dead emitter | branchId={}", branchId);
+                    dead.add(entry);
+                }
+            }
+        }
+        emitters.removeAll(dead);
+    }
 }
