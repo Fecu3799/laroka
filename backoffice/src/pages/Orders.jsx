@@ -514,7 +514,7 @@ function PaymentStatusIcon({ status }) {
 
 export default function Orders() {
   const { token } = useAuth();
-  const { newOrderCount, cancelCount, resetCounts } = useOutletContext();
+  const { newOrderCount, cancelCount, resetCounts, setOpenOrderId } = useOutletContext();
   const {
     orders,
     loading,
@@ -540,6 +540,22 @@ export default function Orders() {
     return () =>
       window.removeEventListener("laroka:order-created", handleOrderCreated);
   }, [refresh]);
+
+  // ── Sync open panel ID to Layout ref ─────────────────────────
+  useEffect(() => { setOpenOrderId(selectedId) }, [selectedId, setOpenOrderId])
+
+  // ── SSE: update list + detail only when the panel is open for that order ───
+  useEffect(() => {
+    function handleOrderUpdated(e) {
+      const { orderId, type } = e.detail;
+      if (!selectedId || orderId !== selectedId) return;
+      if (type === 'CANCELLATION_REQUESTED') updateOrderInList(orderId, 'CANCELLATION_REQUESTED');
+      refetchDetail();
+    }
+    window.addEventListener("laroka:order-updated", handleOrderUpdated);
+    return () =>
+      window.removeEventListener("laroka:order-updated", handleOrderUpdated);
+  }, [selectedId, refetchDetail, updateOrderInList]);
 
   // ── Auto-clear selected if order leaves visible list ─────────
   useEffect(() => {

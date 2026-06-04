@@ -174,7 +174,7 @@ public class OrderService {
         }
 
         OrderStatus previous = order.getStatus();
-        OrderStatus next = previous == OrderStatus.RECEIVED
+        OrderStatus next = (previous == OrderStatus.RECEIVED || previous == OrderStatus.PENDING_PAYMENT)
                 ? OrderStatus.CANCELLED
                 : OrderStatus.CANCELLATION_REQUESTED;
         order.setStatus(next);

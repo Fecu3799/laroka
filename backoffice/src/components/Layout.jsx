@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import logo from '../assets/logo.png'
 import useAuth from '../hooks/useAuth'
@@ -63,6 +63,8 @@ export default function Layout() {
   const [newOrderCount, setNewOrderCount] = useState(0)
   const [cancelCount, setCancelCount] = useState(0)
   const [newOrderModalOpen, setNewOrderModalOpen] = useState(false)
+  const openOrderIdRef = useRef(null)
+  const setOpenOrderId = useCallback(id => { openOrderIdRef.current = id }, [])
 
   function handleLogout() {
     logout()
@@ -108,8 +110,13 @@ export default function Layout() {
               if (line.startsWith('data:')) {
                 try {
                   const json = JSON.parse(line.slice(5).trim())
-                  if (json.type === 'NEW_ORDER') setNewOrderCount(prev => prev + 1)
-                  else if (json.type === 'CANCELLATION_REQUESTED') setCancelCount(prev => prev + 1)
+                  if (json.orderId) {
+                    window.dispatchEvent(new CustomEvent('laroka:order-updated', { detail: { orderId: json.orderId, type: json.type } }))
+                    if (json.orderId !== openOrderIdRef.current) {
+                      if (json.type === 'NEW_ORDER') setNewOrderCount(prev => prev + 1)
+                      else if (json.type === 'CANCELLATION_REQUESTED') setCancelCount(prev => prev + 1)
+                    }
+                  }
                 } catch { /* noop */ }
               }
             }
@@ -244,7 +251,7 @@ export default function Layout() {
         </header>
 
         <main className="layout-main">
-          <Outlet context={{ newOrderCount, cancelCount, resetCounts }} />
+          <Outlet context={{ newOrderCount, cancelCount, resetCounts, setOpenOrderId }} />
         </main>
       </div>
 
