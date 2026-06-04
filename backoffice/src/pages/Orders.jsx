@@ -956,6 +956,8 @@ function OrderDetail({
   const [paying, setPaying] = useState(false);
   const [actionLoading, setActionLoading] = useState(null);
   const [cancelRequestLoading, setCancelRequestLoading] = useState(null);
+  const [cancelConfirming, setCancelConfirming] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
 
   const canGoBack = goBackAllowed(order.status);
   const canCancel = cancelAllowed(order.status);
@@ -1001,14 +1003,7 @@ function OrderDetail({
     }
   };
 
-  const cancelOrder = async (e) => {
-    e.stopPropagation();
-    if (
-      !window.confirm(
-        "¿Cancelar este pedido? Esta acción no se puede deshacer.",
-      )
-    )
-      return;
+  const handleCancelConfirm = async () => {
     setActionLoading("cancel");
     try {
       await apiFetch(`${API_URL}/backoffice/orders/${order.id}/status`, {
@@ -1017,7 +1012,7 @@ function OrderDetail({
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ nextStatus: "CANCELLED" }),
+        body: JSON.stringify({ nextStatus: "CANCELLED", reason: cancelReason.trim() }),
       });
       onRefetch();
       onRefresh();
@@ -1025,6 +1020,8 @@ function OrderDetail({
       /* empty */
     } finally {
       setActionLoading(null);
+      setCancelConfirming(false);
+      setCancelReason("");
     }
   };
 
@@ -1223,6 +1220,15 @@ function OrderDetail({
           </div>
         )}
 
+        {/* Motivo de cancelación */}
+        {(order.status === "CANCELLED" || order.status === "CANCELLATION_REQUESTED") &&
+          order.cancellationReason && (
+            <div className="detail-cancel-reason-block">
+              <div className="detail-overline">MOTIVO DE CANCELACIÓN</div>
+              <p className="detail-cancel-reason-text">{order.cancellationReason}</p>
+            </div>
+          )}
+
         {/* Bottom row: Historial + Actions */}
         <div className="detail-bottom-row">
           {/* Left: Historial */}
@@ -1346,7 +1352,7 @@ function OrderDetail({
                     </button>
                   )}
 
-                {canGoBack && (
+                {canGoBack && !cancelConfirming && (
                   <button
                     className="detail-action-btn detail-action-back"
                     type="button"
@@ -1364,20 +1370,45 @@ function OrderDetail({
                 )}
 
                 {canCancel && (
-                  <button
-                    className="detail-action-btn detail-action-cancel"
-                    type="button"
-                    onClick={cancelOrder}
-                    disabled={actionLoading === "cancel"}
-                  >
-                    {actionLoading === "cancel" ? (
-                      "···"
-                    ) : (
-                      <>
-                        <XCancelIcon /> Cancelar
-                      </>
-                    )}
-                  </button>
+                  cancelConfirming ? (
+                    <div className="detail-cancel-reason-form">
+                      <p className="detail-cancel-reason-label">Motivo de cancelación</p>
+                      <textarea
+                        className="detail-cancel-reason-input"
+                        value={cancelReason}
+                        onChange={(e) => setCancelReason(e.target.value)}
+                        placeholder="Ingresá el motivo..."
+                        rows={3}
+                      />
+                      <div className="detail-cancel-reason-actions">
+                        <button
+                          className="detail-action-btn detail-action-back"
+                          type="button"
+                          onClick={() => { setCancelConfirming(false); setCancelReason(""); }}
+                          disabled={actionLoading === "cancel"}
+                        >
+                          <ArrowLeftIcon /> Volver
+                        </button>
+                        <button
+                          className="detail-action-btn detail-action-cancel"
+                          type="button"
+                          onClick={handleCancelConfirm}
+                          disabled={!cancelReason.trim() || actionLoading === "cancel"}
+                        >
+                          {actionLoading === "cancel" ? "···" : "Confirmar"}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      className="detail-action-btn detail-action-cancel"
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); setCancelConfirming(true); }}
+                      disabled={actionLoading === "cancel"}
+                    >
+                      <XCancelIcon /> Cancelar
+                    </button>
+                  )
                 )}
               </>
             )}

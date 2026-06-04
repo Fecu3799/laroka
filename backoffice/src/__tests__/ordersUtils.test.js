@@ -117,7 +117,11 @@ describe('canCancel', () => {
     expect(canCancel('RECEIVED')).toBe(true)
   })
 
-  test.each(['IN_PREPARATION', 'ON_THE_WAY', 'READY_FOR_PICKUP', 'DELIVERED', 'CANCELLED', 'PENDING_PAYMENT'])(
+  test('PENDING_PAYMENT → true', () => {
+    expect(canCancel('PENDING_PAYMENT')).toBe(true)
+  })
+
+  test.each(['IN_PREPARATION', 'ON_THE_WAY', 'READY_FOR_PICKUP', 'DELIVERED', 'CANCELLED'])(
     '%s → false',
     (status) => expect(canCancel(status)).toBe(false)
   )

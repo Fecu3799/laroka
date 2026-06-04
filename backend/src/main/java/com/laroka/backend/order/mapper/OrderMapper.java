@@ -171,6 +171,7 @@ public class OrderMapper {
                 .toStatus(h.getToStatus())
                 .changedAt(h.getChangedAt())
                 .cancellationReason(h.getCancellationReason())
+                .cancelledByStaff(h.getStaffUserId() != null)
                 .build();
     }
 }

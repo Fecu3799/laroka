@@ -19,4 +19,5 @@ public class OrderStatusHistoryDTO {
     private OrderStatus toStatus;
     private LocalDateTime changedAt;
     private String cancellationReason;
+    private boolean cancelledByStaff;
 }

@@ -81,18 +81,74 @@ describe('OrderTrackingBanner', () => {
     })
   })
 
-  it('removes order from banner after CANCELLED status', async () => {
+  it('muestra botón Entendido cuando la cancelación fue iniciada por el cliente', async () => {
     seedOrder('order-1', 1)
     mockStatus('order-1', {
       status: 'CANCELLED',
       orderType: 'DELIVERY',
-      history: [],
+      history: [{ toStatus: 'CANCELLED', cancelledByStaff: false, cancellationReason: null, changedAt: new Date().toISOString() }],
     })
 
-    const { container } = render(<OrderTrackingBanner branchId={1} />)
+    render(<OrderTrackingBanner branchId={1} />)
 
     await waitFor(() => {
-      expect(container).toBeEmptyDOMElement()
+      expect(screen.getByText('CANCELADO')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /entendido/i })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /ver motivo/i })).not.toBeInTheDocument()
+    })
+  })
+
+  it('muestra botón Ver motivo cuando la cancelación fue iniciada por el operador', async () => {
+    seedOrder('order-1', 1)
+    mockStatus('order-1', {
+      status: 'CANCELLED',
+      orderType: 'DELIVERY',
+      history: [{ toStatus: 'CANCELLED', cancelledByStaff: true, cancellationReason: 'sin stock', changedAt: new Date().toISOString() }],
+    })
+
+    render(<OrderTrackingBanner branchId={1} />)
+
+    await waitFor(() => {
+      expect(screen.getByText('CANCELADO')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /ver motivo de cancelación/i })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /entendido/i })).not.toBeInTheDocument()
+    })
+  })
+
+  it('cuando hay entrada CANCELLATION_REQUESTED, muestra Entendido aunque el operador aprobó', async () => {
+    seedOrder('order-1', 1)
+    mockStatus('order-1', {
+      status: 'CANCELLED',
+      orderType: 'DELIVERY',
+      history: [
+        { toStatus: 'CANCELLATION_REQUESTED', cancelledByStaff: false, changedAt: new Date().toISOString() },
+        { toStatus: 'CANCELLED', cancelledByStaff: true, cancellationReason: null, changedAt: new Date().toISOString() },
+      ],
+    })
+
+    render(<OrderTrackingBanner branchId={1} />)
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /entendido/i })).toBeInTheDocument()
+    })
+  })
+
+  it('modal de motivo muestra el cancellationReason del operador', async () => {
+    seedOrder('order-1', 1)
+    mockStatus('order-1', {
+      status: 'CANCELLED',
+      orderType: 'DELIVERY',
+      history: [{ toStatus: 'CANCELLED', cancelledByStaff: true, cancellationReason: 'sin stock disponible', changedAt: new Date().toISOString() }],
+    })
+
+    render(<OrderTrackingBanner branchId={1} />)
+
+    await waitFor(() => screen.getByText('CANCELADO'))
+
+    await userEvent.setup().click(screen.getByRole('button', { name: /ver motivo de cancelación/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText('sin stock disponible')).toBeInTheDocument()
     })
   })
 

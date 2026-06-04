@@ -7,7 +7,6 @@ import styles from './OrderTrackingBanner.module.css'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080'
 const POLL_INTERVAL = 15_000
-const TERMINAL_STATUSES = ['DELIVERED', 'CANCELLED']
 
 const PROGRESS = {
   PENDING_PAYMENT: 0,
@@ -75,6 +74,39 @@ function PhoneIcon() {
   )
 }
 
+// ── Cancellation reason modal ─────────────────────────────────
+
+function CancellationReasonModal({ reason, onClose }) {
+  return createPortal(
+    <>
+      <style>{`@keyframes _lrModalIn{from{opacity:0;transform:scale(.85)}to{opacity:1;transform:scale(1)}}`}</style>
+      <div
+        role="dialog"
+        aria-modal="true"
+        style={{
+          position: 'fixed', inset: 0,
+          background: 'rgba(0,0,0,0.75)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 300, padding: '16px', boxSizing: 'border-box',
+        }}
+        onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+      >
+        <div className={styles.reasonModalBox}>
+          <p className={styles.sectionLabel}>MOTIVO DE CANCELACIÓN</p>
+          <p
+            className={styles.reasonText}
+            style={{ opacity: reason ? 1 : 0.45, fontStyle: reason ? 'normal' : 'italic' }}
+          >
+            {reason ?? 'Sin motivo indicado.'}
+          </p>
+          <button className={styles.modalBtnDismiss} onClick={onClose}>Cerrar</button>
+        </div>
+      </div>
+    </>,
+    document.body
+  )
+}
+
 // ── Detail modal ──────────────────────────────────────────────
 
 function OrderDetailModal({
@@ -87,6 +119,8 @@ function OrderDetailModal({
   cancelError,
   canDirectCancel,
   canRequestCancel,
+  cancelReason,
+  onReasonChange,
   onClose,
   onRequestCancel,
   onConfirmCancel,
@@ -206,13 +240,21 @@ function OrderDetailModal({
                 <p style={{
                   fontSize: '13px',
                   color: 'rgba(255,255,255,0.7)',
-                  margin: '0 0 12px',
+                  margin: '0 0 10px',
                   lineHeight: 1.45,
                 }}>
                   {canDirectCancel
                     ? 'El pedido será cancelado y no podrá reactivarse.'
                     : 'Se enviará una solicitud al local. La decisión final queda a cargo del local.'}
                 </p>
+                <textarea
+                  className={styles.cancelReasonInput}
+                  value={cancelReason}
+                  onChange={onReasonChange}
+                  placeholder={canRequestCancel ? 'Motivo (obligatorio)' : 'Motivo (opcional)'}
+                  rows={3}
+                  disabled={cancelling}
+                />
                 {cancelError && (
                   <p style={{ fontSize: '13px', color: 'var(--color-danger, #f87171)', margin: '0 0 12px' }}>
                     {cancelError}
@@ -222,7 +264,11 @@ function OrderDetailModal({
                   <button className={styles.modalBtnDismiss} onClick={onCancelBack} disabled={cancelling}>
                     Volver
                   </button>
-                  <button className={styles.modalBtnConfirm} onClick={onConfirmCancel} disabled={cancelling}>
+                  <button
+                    className={styles.modalBtnConfirm}
+                    onClick={onConfirmCancel}
+                    disabled={cancelling || (canRequestCancel && !cancelReason.trim())}
+                  >
                     {cancelling
                       ? 'Procesando...'
                       : canDirectCancel ? 'Confirmar cancelación' : 'Confirmar solicitud'}
@@ -270,9 +316,11 @@ function OrderDetailModal({
 
 // ── OrderSlide ────────────────────────────────────────────────
 
-function OrderSlide({ orderId, order, estimatedDeliveryMinutes, onPhoneClick, onOrderUpdate, onModalChange }) {
+function OrderSlide({ orderId, order, estimatedDeliveryMinutes, onPhoneClick, onOrderUpdate, onModalChange, onDismiss }) {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [confirmingCancel, setConfirmingCancel] = useState(false)
+  const [cancelReason, setCancelReason] = useState('')
+  const [reasonModalOpen, setReasonModalOpen] = useState(false)
 
   const [items, setItems] = useState(null)
   const [itemsLoading, setItemsLoading] = useState(false)
@@ -311,6 +359,7 @@ function OrderSlide({ orderId, order, estimatedDeliveryMinutes, onPhoneClick, on
     setIsModalOpen(false)
     setConfirmingCancel(false)
     setCancelError(null)
+    setCancelReason('')
     onModalChange(false)
   }
 
@@ -322,17 +371,20 @@ function OrderSlide({ orderId, order, estimatedDeliveryMinutes, onPhoneClick, on
   const handleCancelBack = () => {
     setConfirmingCancel(false)
     setCancelError(null)
+    setCancelReason('')
   }
 
   const handleConfirmCancel = async () => {
     setCancelling(true)
     setCancelError(null)
     try {
-      await cancelOrder(orderId)
+      const reason = cancelReason.trim() || null
+      await cancelOrder(orderId, reason)
       setIsModalOpen(false)
       setConfirmingCancel(false)
+      setCancelReason('')
       onModalChange(false)
-      onOrderUpdate(orderId, canDirectCancel ? 'CANCELLED' : 'CANCELLATION_REQUESTED')
+      onOrderUpdate(orderId, canDirectCancel ? 'CANCELLED' : 'CANCELLATION_REQUESTED', reason)
     } catch (err) {
       setCancelError(err.status === 422 ? err.message : 'No se pudo procesar la solicitud.')
     } finally {
@@ -347,6 +399,44 @@ function OrderSlide({ orderId, order, estimatedDeliveryMinutes, onPhoneClick, on
         <div className={`${styles.skeletonBlock} ${styles.skeletonBadge}`} />
         <div className={`${styles.skeletonBlock} ${styles.skeletonProgress}`} />
       </div>
+    )
+  }
+
+  if (order.status === 'CANCELLED') {
+    return (
+      <>
+        {reasonModalOpen && (
+          <CancellationReasonModal
+            reason={order.cancellationReason}
+            onClose={() => {
+              setReasonModalOpen(false)
+              onModalChange(false)
+              onDismiss(orderId)
+            }}
+          />
+        )}
+        <div className={styles.slideContent}>
+          <div className={styles.cancelledRow}>
+            <span className={styles.title} style={{ fontSize: '20px' }}>Pedido cancelado</span>
+            <span className={styles.badge} data-status="CANCELLED">CANCELADO</span>
+          </div>
+          {order.cancelledByStaff ? (
+            <button
+              className={styles.viewReasonBtn}
+              onClick={() => { setReasonModalOpen(true); onModalChange(true) }}
+            >
+              Ver motivo de cancelación
+            </button>
+          ) : (
+            <button
+              className={styles.acknowledgeBtn}
+              onClick={() => onDismiss(orderId)}
+            >
+              Entendido
+            </button>
+          )}
+        </div>
+      </>
     )
   }
 
@@ -367,6 +457,8 @@ function OrderSlide({ orderId, order, estimatedDeliveryMinutes, onPhoneClick, on
           cancelError={cancelError}
           canDirectCancel={canDirectCancel}
           canRequestCancel={canRequestCancel}
+          cancelReason={cancelReason}
+          onReasonChange={(e) => setCancelReason(e.target.value)}
           onClose={handleCloseModal}
           onRequestCancel={handleRequestCancel}
           onConfirmCancel={handleConfirmCancel}
@@ -484,7 +576,7 @@ export function OrderTrackingBanner({ branchId }) {
           const data = await res.json()
           if (!active) return
 
-          if (TERMINAL_STATUSES.includes(data.status)) {
+          if (data.status === 'DELIVERED') {
             removeActiveOrder(orderId)
             setOrderEntries(prev => prev.filter(e => e.orderId !== orderId))
             setOrdersData(prev => {
@@ -493,7 +585,17 @@ export function OrderTrackingBanner({ branchId }) {
               return next
             })
           } else {
-            setOrdersData(prev => ({ ...prev, [orderId]: data }))
+            let cancellationReason = null
+            let cancelledByStaff = false
+            if (data.status === 'CANCELLED') {
+              const hasCancellationRequested = data.history?.some(
+                h => h.toStatus === 'CANCELLATION_REQUESTED'
+              )
+              const cancelledEntry = data.history?.find(h => h.toStatus === 'CANCELLED')
+              cancelledByStaff = !hasCancellationRequested && (cancelledEntry?.cancelledByStaff ?? false)
+              cancellationReason = cancelledByStaff ? (cancelledEntry?.cancellationReason ?? null) : null
+            }
+            setOrdersData(prev => ({ ...prev, [orderId]: { ...data, cancellationReason, cancelledByStaff } }))
           }
         } catch {
           // ignore
@@ -531,8 +633,18 @@ export function OrderTrackingBanner({ branchId }) {
     anyModalOpenRef.current = isOpen
   }, [])
 
-  const handleOrderUpdate = useCallback((orderId, newStatus) => {
-    if (TERMINAL_STATUSES.includes(newStatus)) {
+  const handleDismissOrder = useCallback((orderId) => {
+    removeActiveOrder(orderId)
+    setOrderEntries(prev => prev.filter(e => e.orderId !== orderId))
+    setOrdersData(prev => {
+      const next = { ...prev }
+      delete next[orderId]
+      return next
+    })
+  }, [])
+
+  const handleOrderUpdate = useCallback((orderId, newStatus, reason = null) => {
+    if (newStatus === 'DELIVERED') {
       removeActiveOrder(orderId)
       setOrderEntries(prev => prev.filter(e => e.orderId !== orderId))
       setOrdersData(prev => {
@@ -540,6 +652,11 @@ export function OrderTrackingBanner({ branchId }) {
         delete next[orderId]
         return next
       })
+    } else if (newStatus === 'CANCELLED') {
+      setOrdersData(prev => ({
+        ...prev,
+        [orderId]: { ...(prev[orderId] ?? {}), status: 'CANCELLED', cancellationReason: reason, cancelledByStaff: false },
+      }))
     } else {
       setOrdersData(prev => ({
         ...prev,
@@ -585,6 +702,7 @@ export function OrderTrackingBanner({ branchId }) {
                   onPhoneClick={handlePhoneClick}
                   onOrderUpdate={handleOrderUpdate}
                   onModalChange={handleModalChange}
+                  onDismiss={handleDismissOrder}
                 />
               </div>
             ))}

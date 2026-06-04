@@ -42,6 +42,42 @@ const DEMO_ORDER_STATUS = {
   history: [],
 }
 
+// ── Helpers compartidos ───────────────────────────────────────
+
+const CANCEL_ORDER_ID = 'cancel-order-0000-0000-0000-000000000099'
+
+const STORED_BRANCH = JSON.stringify({
+  id: BRANCH_ID,
+  name: 'Puerto Madryn',
+  deliveryFee: 500,
+  serviceFee: 100,
+  phone: '2804000000',
+  estimatedDeliveryMinutes: 30,
+})
+
+function makeStatusResponse(status, cancellationReason = null, cancelledByStaff = false) {
+  const history = (cancellationReason || cancelledByStaff)
+    ? [{
+        toStatus: status,
+        cancellationReason,
+        cancelledByStaff,
+        changedAt: new Date().toISOString(),
+      }]
+    : []
+  return {
+    status,
+    orderType: 'DELIVERY',
+    subtotal: 2500,
+    deliveryFee: 500,
+    serviceFee: 100,
+    totalAmount: 3100,
+    deliveryAddress: 'Av. Roca 123',
+    history,
+  }
+}
+
+// ── Checkout original ─────────────────────────────────────────
+
 test.describe('US-06-F-04 · checkout en efectivo con seguimiento', () => {
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => {
@@ -110,5 +146,140 @@ test.describe('US-06-F-04 · checkout en efectivo con seguimiento', () => {
 
     // Después de 3 s se vuelve al menú; el banner de seguimiento muestra RECEIVED
     await expect(page.locator('[data-status="RECEIVED"]')).toBeVisible({ timeout: 8_000 })
+  })
+})
+
+// ── Cancelación desde el banner ───────────────────────────────
+
+test.describe('US-06-F · cancelación de pedido desde el banner', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(({ orderId, storedBranch }) => {
+      localStorage.clear()
+      sessionStorage.clear()
+      localStorage.setItem('laroka_preferred_branch', storedBranch)
+      localStorage.setItem('laroka_active_orders', JSON.stringify([
+        { orderId, branchId: 1 },
+      ]))
+    }, { orderId: CANCEL_ORDER_ID, storedBranch: STORED_BRANCH })
+
+    await page.route('**/branches', route =>
+      route.fulfill({ json: DEMO_BRANCHES })
+    )
+    await page.route(`**/branches/${BRANCH_ID}/menu`, route =>
+      route.fulfill({ json: [] })
+    )
+  })
+
+  test('cancelación directa sin motivo: POST enviado con reason null, banner muestra CANCELADO', async ({ page }) => {
+    let capturedBody = null
+
+    await page.route(`**/${CANCEL_ORDER_ID}/status`, route =>
+      route.fulfill({ json: makeStatusResponse('RECEIVED') })
+    )
+    await page.route(`**/${CANCEL_ORDER_ID}/cancel`, route => {
+      capturedBody = route.request().postDataJSON()
+      route.fulfill({ status: 204 })
+    })
+
+    await page.goto('/')
+    await expect(page.locator('[data-status="RECEIVED"]')).toBeVisible({ timeout: 10_000 })
+
+    await page.getByRole('button', { name: 'Ver detalle' }).click()
+    await page.getByRole('button', { name: 'Cancelar pedido' }).click()
+
+    // Textarea visible; reason es opcional, confirmar habilitado sin texto
+    await expect(page.locator('textarea')).toBeVisible()
+    const confirmBtn = page.getByRole('button', { name: 'Confirmar cancelación' })
+    await expect(confirmBtn).not.toBeDisabled()
+
+    await confirmBtn.click()
+
+    // Banner muestra CANCELADO
+    await expect(page.locator('[data-status="CANCELLED"]')).toBeVisible({ timeout: 5_000 })
+    // El body enviado no tiene reason
+    expect(capturedBody?.reason).toBeFalsy()
+  })
+
+  test('cancelación directa con motivo: reason enviado, banner muestra Entendido (cancelación de cliente)', async ({ page }) => {
+    const REASON = 'cambio de planes'
+    let capturedBody = null
+
+    await page.route(`**/${CANCEL_ORDER_ID}/status`, route =>
+      route.fulfill({ json: makeStatusResponse('RECEIVED') })
+    )
+    await page.route(`**/${CANCEL_ORDER_ID}/cancel`, route => {
+      capturedBody = route.request().postDataJSON()
+      route.fulfill({ status: 204 })
+    })
+
+    await page.goto('/')
+    await expect(page.locator('[data-status="RECEIVED"]')).toBeVisible({ timeout: 10_000 })
+
+    await page.getByRole('button', { name: 'Ver detalle' }).click()
+    await page.getByRole('button', { name: 'Cancelar pedido' }).click()
+    await page.locator('textarea').fill(REASON)
+    await page.getByRole('button', { name: 'Confirmar cancelación' }).click()
+
+    // El reason fue enviado
+    expect(capturedBody?.reason).toBe(REASON)
+
+    // Banner muestra CANCELADO con botón "Entendido" (cancelación iniciada por cliente)
+    await expect(page.locator('[data-status="CANCELLED"]')).toBeVisible({ timeout: 5_000 })
+    await expect(page.getByRole('button', { name: 'Entendido' })).toBeVisible()
+
+    // Entendido descarta el pedido del banner
+    await page.getByRole('button', { name: 'Entendido' }).click()
+    await expect(page.locator('[data-status="CANCELLED"]')).not.toBeVisible({ timeout: 3_000 })
+  })
+
+  test('solicitud de cancelación: Confirmar deshabilitado sin texto, habilitado al escribir', async ({ page }) => {
+    await page.route(`**/${CANCEL_ORDER_ID}/status`, route =>
+      route.fulfill({ json: makeStatusResponse('IN_PREPARATION') })
+    )
+    await page.route(`**/${CANCEL_ORDER_ID}/cancel`, route =>
+      route.fulfill({ status: 204 })
+    )
+
+    await page.goto('/')
+    await expect(page.locator('[data-status="IN_PREPARATION"]')).toBeVisible({ timeout: 10_000 })
+
+    await page.getByRole('button', { name: 'Ver detalle' }).click()
+    await page.getByRole('button', { name: 'Solicitar cancelación' }).click()
+
+    // Confirmar deshabilitado sin texto (motivo obligatorio para CANCELLATION_REQUESTED)
+    const confirmBtn = page.getByRole('button', { name: 'Confirmar solicitud' })
+    await expect(confirmBtn).toBeDisabled()
+
+    // Al ingresar texto se habilita
+    await page.locator('textarea').fill('ya no quiero el pedido')
+    await expect(confirmBtn).not.toBeDisabled()
+
+    await confirmBtn.click()
+
+    // Banner refleja CANCELLATION_REQUESTED
+    await expect(page.locator('[data-status="CANCELLATION_REQUESTED"]')).toBeVisible({ timeout: 5_000 })
+  })
+
+  test('banner con pedido CANCELLED por operador: modal muestra el motivo y Cerrar lo descarta', async ({ page }) => {
+    const REASON = 'sin stock disponible'
+
+    await page.route(`**/${CANCEL_ORDER_ID}/status`, route =>
+      route.fulfill({ json: makeStatusResponse('CANCELLED', REASON, true) })
+    )
+
+    await page.goto('/')
+    await expect(page.locator('[data-status="CANCELLED"]')).toBeVisible({ timeout: 10_000 })
+
+    // Botón "Ver motivo de cancelación" visible en el banner
+    const viewBtn = page.getByRole('button', { name: 'Ver motivo de cancelación' })
+    await expect(viewBtn).toBeVisible()
+    await viewBtn.click()
+
+    // Modal con el motivo
+    await expect(page.getByText(REASON)).toBeVisible()
+
+    // Cerrar descarta el pedido del banner
+    await page.getByRole('button', { name: 'Cerrar' }).click()
+    await expect(page.locator('[data-status="CANCELLED"]')).not.toBeVisible({ timeout: 3_000 })
   })
 })
