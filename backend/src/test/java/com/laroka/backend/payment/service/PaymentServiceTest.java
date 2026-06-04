@@ -98,7 +98,7 @@ class PaymentServiceTest {
                 .build();
 
         when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
-        when(paymentRepository.existsByOrderIdAndStatusIn(eq(orderId), any())).thenReturn(false);
+        when(paymentRepository.findByOrderIdAndStatusIn(eq(orderId), any())).thenReturn(Optional.empty());
         when(paymentGateway.createPreference(eq(orderId), any(), any()))
                 .thenReturn("https://mp.com/pay?pref_id=pref123");
         when(paymentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -106,7 +106,9 @@ class PaymentServiceTest {
         String link = service.initiatePayment(orderId, null);
 
         assertThat(link).isEqualTo("https://mp.com/pay?pref_id=pref123");
-        verify(paymentRepository).save(any(Payment.class));
+        ArgumentCaptor<Payment> captor = ArgumentCaptor.forClass(Payment.class);
+        verify(paymentRepository).save(captor.capture());
+        assertThat(captor.getValue().getPaymentLink()).isEqualTo("https://mp.com/pay?pref_id=pref123");
     }
 
     // --- processWebhook: merchant_order ignored ---

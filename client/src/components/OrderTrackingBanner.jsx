@@ -544,10 +544,19 @@ export function OrderTrackingBanner({ branchId }) {
 
   const reloadOrders = useCallback(() => {
     const fresh = readActiveOrders()
+    const freshIds = new Set(fresh.map(e => e.orderId))
     setOrderEntries(prev => {
-      const existingIds = new Set(prev.map(e => e.orderId))
-      const added = fresh.filter(e => !existingIds.has(e.orderId))
-      return added.length > 0 ? [...prev, ...added] : prev
+      const added = fresh.filter(e => !prev.some(p => p.orderId === e.orderId))
+      const kept = prev.filter(e => freshIds.has(e.orderId))
+      if (added.length === 0 && kept.length === prev.length) return prev
+      return [...kept, ...added]
+    })
+    setOrdersData(prev => {
+      const removed = Object.keys(prev).filter(id => !freshIds.has(id))
+      if (removed.length === 0) return prev
+      const next = { ...prev }
+      removed.forEach(id => delete next[id])
+      return next
     })
   }, [])
 

@@ -68,10 +68,20 @@ public class PaymentService {
             throw new BusinessException("El pedido no está en estado PENDING_PAYMENT");
         }
 
-        boolean alreadyActive = paymentRepository.existsByOrderIdAndStatusIn(
+        Optional<Payment> existingPayment = paymentRepository.findByOrderIdAndStatusIn(
                 orderId, List.of(PaymentStatus.PENDING, PaymentStatus.APPROVED));
-        if (alreadyActive) {
-            throw new BusinessException("Ya existe un pago activo para este pedido");
+        if (existingPayment.isPresent()) {
+            Payment existing = existingPayment.get();
+            if (existing.getPaymentLink() != null) {
+                log.info("initiatePayment: returning existing payment link — orderId={}", orderId);
+                return existing.getPaymentLink();
+            }
+            // Pago existente sin link almacenado (previo a V13): crear nueva preferencia y persistirla
+            log.warn("initiatePayment: existing payment without stored link, creating new preference — orderId={}", orderId);
+            String newLink = paymentGateway.createPreference(orderId, order.getTotalAmount(), backUrls);
+            existing.setPaymentLink(newLink);
+            paymentRepository.save(existing);
+            return newLink;
         }
 
         String paymentLink = paymentGateway.createPreference(orderId, order.getTotalAmount(), backUrls);
@@ -83,6 +93,7 @@ public class PaymentService {
                 .status(PaymentStatus.PENDING)
                 .method(PaymentMethod.MERCADOPAGO)
                 .mercadopagoPreferenceId(preferenceId)
+                .paymentLink(paymentLink)
                 .build();
 
         paymentRepository.save(payment);

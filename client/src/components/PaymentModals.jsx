@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { initiatePayment } from '../services/paymentsService'
+import { cancelOrder } from '../services/ordersService'
+import { removeActiveOrder } from '../utils/activeOrders'
 import styles from './PaymentModals.module.css'
 
 function XCircleIcon() {
@@ -64,6 +66,66 @@ export function FailureModal({ orderId, formData, cartItems, onClose }) {
         </button>
         <button className={styles.btnSecondary} onClick={onClose} disabled={retrying}>
           Probar otro método de pago
+        </button>
+      </div>
+    </div>
+  )
+}
+
+export function PendingPaymentModal({ orderId, onCancel }) {
+  const [loading, setLoading] = useState(null) // 'continue' | 'cancel'
+  const [error, setError] = useState(null)
+
+  const handleContinue = async () => {
+    setError(null)
+    setLoading('continue')
+    try {
+      const paymentLink = await initiatePayment(orderId)
+      window.location.href = paymentLink
+    } catch {
+      setError('No se pudo obtener el link de pago. Intentá nuevamente.')
+      setLoading(null)
+    }
+  }
+
+  const handleCancel = async () => {
+    setError(null)
+    setLoading('cancel')
+    try {
+      await cancelOrder(orderId, null)
+      removeActiveOrder(orderId)
+      sessionStorage.removeItem('laroka_checkout_recovery')
+      onCancel()
+    } catch {
+      setError('No se pudo cancelar el pedido. Intentá nuevamente.')
+      setLoading(null)
+    }
+  }
+
+  return (
+    <div className={styles.overlay} role="dialog" aria-modal="true" aria-labelledby="pending-payment-title">
+      <div className={styles.card}>
+        <div className={`${styles.iconWrapper} ${styles.iconAccent}`}>
+          <ClockIcon />
+        </div>
+        <h2 id="pending-payment-title" className={styles.title}>Tenés un pago pendiente</h2>
+        <p className={styles.message}>
+          Hay un pedido esperando ser pagado. Podés continuar con el pago o cancelarlo.
+        </p>
+        {error && <p className={styles.retryError}>{error}</p>}
+        <button
+          className={styles.btnPrimary}
+          onClick={handleContinue}
+          disabled={loading !== null}
+        >
+          {loading === 'continue' ? 'PROCESANDO...' : 'CONTINUAR PAGO'}
+        </button>
+        <button
+          className={styles.btnSecondary}
+          onClick={handleCancel}
+          disabled={loading !== null}
+        >
+          {loading === 'cancel' ? 'Cancelando...' : 'Cancelar pedido'}
         </button>
       </div>
     </div>

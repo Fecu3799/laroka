@@ -378,6 +378,9 @@
 
 .itemPrice {
   opacity: 0.7;
+  flex-shrink: 0;
+  text-align: right;
+  padding-left: 8px;
 }
 
 /* ── Totales ──────────────────────────────────────────────── */
@@ -459,7 +462,7 @@
   align-items: flex-end;
   justify-content: center;
   z-index: 200;
-  padding-bottom: env(safe-area-inset-bottom, 0);
+  padding: 0 16px env(safe-area-inset-bottom, 0);
 }
 
 .modalBox {

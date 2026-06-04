@@ -136,7 +136,7 @@ function BranchSwitchWarningModal({ onConfirm, onCancel }) {
   )
 }
 
-export function MenuScreen({ branchId, branchName, onSwitchBranch, paymentFailureRecovery = null, onPaymentFailureConsumed = () => {} }) {
+export function MenuScreen({ branchId, branchName, onSwitchBranch, paymentFailureRecovery = null, onPaymentFailureConsumed = () => {}, pendingPaymentRecovery = null, onPendingPaymentConsumed = () => {} }) {
   const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -144,7 +144,7 @@ export function MenuScreen({ branchId, branchName, onSwitchBranch, paymentFailur
   const [activeCategoryIndex, setActiveCategoryIndex] = useState(0)
   const [swipeDirection, setSwipeDirection] = useState('right')
   const [searchQuery, setSearchQuery] = useState('')
-  const [activeTab, setActiveTab] = useState(() => paymentFailureRecovery ? 'cart' : 'menu')
+  const [activeTab, setActiveTab] = useState(() => (paymentFailureRecovery || pendingPaymentRecovery) ? 'cart' : 'menu')
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [branches, setBranches] = useState([])
   const [selectedProduct, setSelectedProduct] = useState(null)
@@ -153,10 +153,13 @@ export function MenuScreen({ branchId, branchName, onSwitchBranch, paymentFailur
       ? { orderId: paymentFailureRecovery.orderId, formData: paymentFailureRecovery.formData }
       : null
   )
+  const [cartPendingData, setCartPendingData] = useState(() =>
+    pendingPaymentRecovery ? { orderId: pendingPaymentRecovery.orderId } : null
+  )
   const retryRef = useRef(null)
   const prevCategoryIndexRef = useRef(0)
   const { items, addItem, removeItem, updateQty, clearCart, count } = useCart(
-    paymentFailureRecovery?.items?.map(i => ({ ...i })) || []
+    (paymentFailureRecovery?.items ?? pendingPaymentRecovery?.items)?.map(i => ({ ...i })) || []
   )
   const [activeBranchIds, setActiveBranchIds] = useState(() => readActiveBranchIds())
   const [pendingBranch, setPendingBranch] = useState(null)
@@ -170,6 +173,12 @@ export function MenuScreen({ branchId, branchName, onSwitchBranch, paymentFailur
     onPaymentFailureConsumed()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paymentFailureRecovery])
+
+  useEffect(() => {
+    if (!pendingPaymentRecovery) return
+    onPendingPaymentConsumed()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingPaymentRecovery])
 
   const handleCartFailureConsumed = useCallback(() => {
     setCartFailureData(null)
@@ -377,6 +386,8 @@ export function MenuScreen({ branchId, branchName, onSwitchBranch, paymentFailur
             onAddExtra={addItem}
             paymentFailure={cartFailureData}
             onPaymentFailureConsumed={handleCartFailureConsumed}
+            pendingPayment={cartPendingData}
+            onPendingPaymentConsumed={() => setCartPendingData(null)}
           />
         ) : isProfileTab ? (
           <ComingSoon />
