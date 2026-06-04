@@ -361,6 +361,8 @@
   display: flex;
   flex-direction: column;
   gap: 5px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .itemRow {
@@ -374,6 +376,7 @@
 
 .itemQtyName {
   flex: 1;
+  min-width: 0;
 }
 
 .itemPrice {
@@ -392,6 +395,8 @@
   display: flex;
   flex-direction: column;
   gap: 5px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .totalRow {

@@ -149,14 +149,15 @@ function OrderDetailModal({
           style={{
             background: 'var(--bg-card-product, #1a1a1a)',
             borderRadius: '16px',
-            width: '100%', maxWidth: '440px', maxHeight: '80vh',
+            border: '1px solid rgba(255,255,255,0.08)',
+            width: '100%', maxWidth: 'min(430px, 100%)', maxHeight: '80vh',
             display: 'flex', flexDirection: 'column',
             overflow: 'hidden',
             animation: '_lrModalIn 200ms ease-out forwards',
           }}
         >
           {/* ── Scrollable body ──────────────────────────── */}
-          <div style={{ overflowY: 'auto', padding: '20px 20px 0', flex: 1 }}>
+          <div style={{ overflowY: 'auto', padding: '20px 20px 0', flex: 1, boxSizing: 'border-box', minWidth: 0 }}>
             {isDelivery && order.deliveryAddress && (
               <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)', marginBottom: '16px', marginTop: 0 }}>
                 {order.deliveryAddress}
@@ -234,6 +235,7 @@ function OrderDetailModal({
             padding: '16px 20px',
             borderTop: '1px solid rgba(255,255,255,0.08)',
             flexShrink: 0,
+            boxSizing: 'border-box',
           }}>
             {confirmingCancel ? (
               <>
