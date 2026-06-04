@@ -42,4 +42,5 @@ public class BackofficeOrderDetailDTO {
     private PaymentMethod paymentMethod;
     private LocalDateTime paidAt;
     private List<OrderStatusHistoryDTO> statusHistory;
+    private String cancellationReason;
 }

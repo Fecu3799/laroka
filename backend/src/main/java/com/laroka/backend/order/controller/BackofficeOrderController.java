@@ -116,7 +116,7 @@ public class BackofficeOrderController {
             @Valid @RequestBody UpdateOrderStatusRequestDTO dto,
             @AuthenticationPrincipal CustomUserDetails principal) {
 
-        orderService.transitionStatusForBackoffice(id, dto.getNextStatus(),
+        orderService.transitionStatusForBackoffice(id, dto.getNextStatus(), dto.getReason(),
                 principal.getBranchId(), principal.getUserId());
         return ResponseEntity.noContent().build();
     }

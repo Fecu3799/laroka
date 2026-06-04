@@ -45,4 +45,7 @@ public class OrderStatusHistory {
 
     @Column(name = "staff_user_id")
     private Integer staffUserId;
+
+    @Column(name = "cancellation_reason", length = 500)
+    private String cancellationReason;
 }
