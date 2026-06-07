@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { initiatePayment } from '../services/paymentsService'
 import { cancelOrder } from '../services/ordersService'
 import { removeActiveOrder } from '../utils/activeOrders'
@@ -75,6 +75,11 @@ export function FailureModal({ orderId, formData, cartItems, onClose }) {
 export function PendingPaymentModal({ orderId, onCancel }) {
   const [loading, setLoading] = useState(null) // 'continue' | 'cancel'
   const [error, setError] = useState(null)
+
+  useEffect(() => {
+    console.log('[MP-DEBUG] PendingPaymentModal mounted — orderId:', orderId)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleContinue = async () => {
     setError(null)
