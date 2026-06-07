@@ -162,6 +162,7 @@ export function CartScreen({ items, extras = [], onBack, onRemove, onUpdateQty, 
 
   const handleMpReturn = useCallback(async (orderId) => {
     if (!orderId) return
+    setMpReturnOrderId(null)
     try {
       const res = await fetch(`${API_BASE}/orders/${orderId}/status`)
       if (!res.ok) return
@@ -259,18 +260,26 @@ export function CartScreen({ items, extras = [], onBack, onRemove, onUpdateQty, 
 
   if (items.length === 0) {
     return (
-      <div className="cart-empty">
-        <div className="cart-empty-icon">
-          <EmptyCartIcon />
+      <>
+        {showPendingModal && pendingOrderId && (
+          <PendingPaymentModal
+            orderId={pendingOrderId}
+            onCancel={() => { setShowPendingModal(false); onPendingPaymentConsumed() }}
+          />
+        )}
+        <div className="cart-empty">
+          <div className="cart-empty-icon">
+            <EmptyCartIcon />
+          </div>
+          <h2 className="cart-empty-title">Tu carrito está vacío</h2>
+          <p className="cart-empty-desc">
+            Agregá productos desde el menú para armar tu pedido.
+          </p>
+          <button className="cart-back-to-menu-btn" onClick={onBack}>
+            Volver al menú
+          </button>
         </div>
-        <h2 className="cart-empty-title">Tu carrito está vacío</h2>
-        <p className="cart-empty-desc">
-          Agregá productos desde el menú para armar tu pedido.
-        </p>
-        <button className="cart-back-to-menu-btn" onClick={onBack}>
-          Volver al menú
-        </button>
-      </div>
+      </>
     )
   }
 
