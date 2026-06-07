@@ -116,7 +116,7 @@ export function CheckoutScreen({ onBack, onConfirm, items = [], initialData = nu
       try {
         const raw = sessionStorage.getItem('laroka_checkout_recovery')
         orderId = raw ? JSON.parse(raw)?.orderId ?? null : null
-      } catch {}
+      } catch { /* sessionStorage no disponible */ }
       setMpRedirecting(false)
       onMpReturn?.(orderId)
     }

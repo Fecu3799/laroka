@@ -173,7 +173,7 @@ export function CartScreen({ items, extras = [], onBack, onRemove, onUpdateQty, 
         onClear()
         setConfirmedOrderId(orderId)
       }
-    } catch {}
+    } catch { /* fetch fallido — usuario ve el checkout sin cambios */ }
   }, [onClear])
 
   const handleConfirm = async (formData) => {
