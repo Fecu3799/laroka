@@ -110,6 +110,7 @@ export function CheckoutScreen({ onBack, onConfirm, items = [], initialData = nu
 
   useEffect(() => {
     function handleVisibility() {
+      console.log('[MP-DEBUG] visibilitychange fired — state:', document.visibilityState, '| mpRedirecting:', mpRedirecting)
       if (document.visibilityState !== 'visible') return
       let orderId = null
       try {
@@ -122,6 +123,7 @@ export function CheckoutScreen({ onBack, onConfirm, items = [], initialData = nu
     }
     document.addEventListener('visibilitychange', handleVisibility)
     return () => document.removeEventListener('visibilitychange', handleVisibility)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onMpReturn])
 
   const handleConfirm = async () => {

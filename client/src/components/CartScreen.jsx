@@ -161,12 +161,14 @@ export function CartScreen({ items, extras = [], onBack, onRemove, onUpdateQty, 
 
 
   const handleMpReturn = useCallback(async (orderId) => {
+    console.log('[MP-DEBUG] handleMpReturn called — orderId:', orderId)
     if (!orderId) return
     setMpReturnOrderId(null)
     try {
       const res = await fetch(`${API_BASE}/orders/${orderId}/status`)
       if (!res.ok) return
       const data = await res.json()
+      console.log('[MP-DEBUG] order status response — status:', data.status)
       if (data.status === 'PENDING_PAYMENT') {
         setMpReturnOrderId(orderId)
       } else if (data.status && data.status !== 'CANCELLED') {
