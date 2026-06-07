@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { CheckoutScreen } from './CheckoutScreen'
 import { ConfirmationScreen } from './ConfirmationScreen'
 import { FailureModal, PendingPaymentModal } from './PaymentModals'
@@ -151,6 +151,7 @@ export function CartScreen({ items, extras = [], onBack, onRemove, onUpdateQty, 
   const [checkoutInitialData, setCheckoutInitialData] = useState(() => paymentFailure?.formData || null)
   const [showPendingModal, setShowPendingModal] = useState(() => !!pendingPayment)
   const [pendingOrderId] = useState(() => pendingPayment?.orderId || null)
+  const [mpReturnOrderId, setMpReturnOrderId] = useState(null)
 
   useEffect(() => {
     if (!paymentFailure) return
@@ -158,6 +159,22 @@ export function CartScreen({ items, extras = [], onBack, onRemove, onUpdateQty, 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paymentFailure])
 
+
+  const handleMpReturn = useCallback(async (orderId) => {
+    if (!orderId) return
+    try {
+      const res = await fetch(`${API_BASE}/orders/${orderId}/status`)
+      if (!res.ok) return
+      const data = await res.json()
+      if (data.status === 'PENDING_PAYMENT') {
+        setMpReturnOrderId(orderId)
+      } else if (data.status && data.status !== 'CANCELLED') {
+        sessionStorage.removeItem('laroka_checkout_recovery')
+        onClear()
+        setConfirmedOrderId(orderId)
+      }
+    } catch { /* fetch fallido — usuario ve el checkout sin cambios */ }
+  }, [onClear])
 
   const handleConfirm = async (formData) => {
     const payload = {
@@ -214,6 +231,7 @@ export function CartScreen({ items, extras = [], onBack, onRemove, onUpdateQty, 
           onBack={() => { setShowCheckout(false); setCheckoutInitialData(null) }}
           onConfirm={handleConfirm}
           initialData={checkoutInitialData}
+          onMpReturn={handleMpReturn}
         />
         {showFailureModal && (
           <FailureModal
@@ -221,6 +239,15 @@ export function CartScreen({ items, extras = [], onBack, onRemove, onUpdateQty, 
             formData={checkoutInitialData}
             cartItems={items}
             onClose={() => setShowFailureModal(false)}
+          />
+        )}
+        {mpReturnOrderId && (
+          <PendingPaymentModal
+            orderId={mpReturnOrderId}
+            onCancel={() => {
+              setMpReturnOrderId(null)
+              setShowCheckout(false)
+            }}
           />
         )}
       </>

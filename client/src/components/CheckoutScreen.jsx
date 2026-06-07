@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import styles from './CheckoutScreen.module.css'
 import { usePreferredBranch } from '../hooks/usePreferredBranch'
 
@@ -72,7 +72,7 @@ function MercadoPagoIcon() {
   )
 }
 
-export function CheckoutScreen({ onBack, onConfirm, items = [], initialData = null }) {
+export function CheckoutScreen({ onBack, onConfirm, items = [], initialData = null, onMpReturn = null }) {
   const { deliveryFee, serviceFee } = usePreferredBranch()
   const [orderType, setOrderType] = useState(initialData?.orderType || 'delivery')
   const [nombre, setNombre] = useState(initialData?.nombre || '')
@@ -107,6 +107,22 @@ export function CheckoutScreen({ onBack, onConfirm, items = [], initialData = nu
         setErrors({ nombre: '', telefono: '', direccion: '' })
       }
     : null
+
+  useEffect(() => {
+    if (!mpRedirecting) return
+    function handleVisibility() {
+      if (document.visibilityState !== 'visible') return
+      let orderId = null
+      try {
+        const raw = sessionStorage.getItem('laroka_checkout_recovery')
+        orderId = raw ? JSON.parse(raw)?.orderId ?? null : null
+      } catch { /* sessionStorage no disponible */ }
+      setMpRedirecting(false)
+      onMpReturn?.(orderId)
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
+  }, [mpRedirecting, onMpReturn])
 
   const handleConfirm = async () => {
     const newErrors = {
