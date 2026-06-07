@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { CheckoutScreen } from './CheckoutScreen'
 import { ConfirmationScreen } from './ConfirmationScreen'
-import { FailureModal } from './PaymentModals'
+import { FailureModal, PendingPaymentModal } from './PaymentModals'
 import { usePreferredBranch } from '../hooks/usePreferredBranch'
 import { addActiveOrder } from '../utils/activeOrders'
 import { initiatePayment } from '../services/paymentsService'
@@ -141,7 +141,7 @@ function ExtraCard({ extra, cartQty, onAdd }) {
   )
 }
 
-export function CartScreen({ items, extras = [], onBack, onRemove, onUpdateQty, onClear, onAddExtra, paymentFailure = null, onPaymentFailureConsumed = () => {} }) {
+export function CartScreen({ items, extras = [], onBack, onRemove, onUpdateQty, onClear, onAddExtra, paymentFailure = null, onPaymentFailureConsumed = () => {}, pendingPayment = null, onPendingPaymentConsumed = () => {} }) {
   const { preferredBranchId } = usePreferredBranch()
   const [confirmClear, setConfirmClear] = useState(false)
   const [showCheckout, setShowCheckout] = useState(() => !!paymentFailure)
@@ -149,12 +149,15 @@ export function CartScreen({ items, extras = [], onBack, onRemove, onUpdateQty, 
   const [showFailureModal, setShowFailureModal] = useState(() => !!paymentFailure)
   const [failureOrderId] = useState(() => paymentFailure?.orderId || null)
   const [checkoutInitialData, setCheckoutInitialData] = useState(() => paymentFailure?.formData || null)
+  const [showPendingModal, setShowPendingModal] = useState(() => !!pendingPayment)
+  const [pendingOrderId] = useState(() => pendingPayment?.orderId || null)
 
   useEffect(() => {
     if (!paymentFailure) return
     onPaymentFailureConsumed()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paymentFailure])
+
 
   const handleConfirm = async (formData) => {
     const payload = {
@@ -246,6 +249,12 @@ export function CartScreen({ items, extras = [], onBack, onRemove, onUpdateQty, 
 
   return (
     <div className="cart-content">
+      {showPendingModal && pendingOrderId && (
+        <PendingPaymentModal
+          orderId={pendingOrderId}
+          onCancel={() => { setShowPendingModal(false); onPendingPaymentConsumed() }}
+        />
+      )}
       <div className="cart-scroll-area">
         <div className="cart-counter">
           {count} producto{count !== 1 ? 's' : ''} en tu pedido

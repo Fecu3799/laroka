@@ -83,6 +83,7 @@ export function CheckoutScreen({ onBack, onConfirm, items = [], initialData = nu
   const [summaryOpen, setSummaryOpen] = useState(false)
   const [errors, setErrors] = useState({ nombre: '', telefono: '', direccion: '' })
   const [submitting, setSubmitting] = useState(false)
+  const [mpRedirecting, setMpRedirecting] = useState(false)
   const [mpError, setMpError] = useState(null)
 
   const isDelivery = orderType === 'delivery'
@@ -117,6 +118,7 @@ export function CheckoutScreen({ onBack, onConfirm, items = [], initialData = nu
     if (Object.values(newErrors).some(Boolean)) return
     setMpError(null)
     setSubmitting(true)
+    if (!isEfectivo) setMpRedirecting(true)
     try {
       await onConfirm({
         orderType,
@@ -128,6 +130,7 @@ export function CheckoutScreen({ onBack, onConfirm, items = [], initialData = nu
       })
     } catch {
       if (!isEfectivo) {
+        setMpRedirecting(false)
         setMpError('Hubo un error al iniciar el pago. Intentá nuevamente.')
       }
     } finally {
@@ -137,6 +140,12 @@ export function CheckoutScreen({ onBack, onConfirm, items = [], initialData = nu
 
   return (
     <div className={styles.screen}>
+      {mpRedirecting && (
+        <div className={styles.mpOverlay} aria-live="polite" aria-label="Redirigiendo a MercadoPago">
+          <div className={styles.mpSpinner} />
+          <span className={styles.mpOverlayText}>Redirigiendo a MercadoPago</span>
+        </div>
+      )}
       <div className={styles.scrollArea}>
         {/* Toggle Delivery / Retirar + botón volver */}
         <div className={styles.toggleRow}>
@@ -297,7 +306,7 @@ export function CheckoutScreen({ onBack, onConfirm, items = [], initialData = nu
         </div>
         <button
           className={styles.ctaBtn}
-          style={(!isFormValid || submitting) ? { opacity: 0.5, pointerEvents: 'none' } : undefined}
+          style={(!isFormValid || submitting || mpRedirecting) ? { opacity: 0.5, pointerEvents: 'none' } : undefined}
           onClick={handleConfirm}
         >
           <span className={styles.ctaBtnText}>

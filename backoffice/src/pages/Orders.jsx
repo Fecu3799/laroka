@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useOutletContext } from "react-router-dom";
 import useAuth from "../hooks/useAuth";
 import useOrders from "../hooks/useOrders";
 import useOrderDetail from "../hooks/useOrderDetail";
@@ -513,6 +514,7 @@ function PaymentStatusIcon({ status }) {
 
 export default function Orders() {
   const { token } = useAuth();
+  const { newOrderCount, cancelCount, resetCounts, setOpenOrderId } = useOutletContext();
   const {
     orders,
     loading,
@@ -538,6 +540,22 @@ export default function Orders() {
     return () =>
       window.removeEventListener("laroka:order-created", handleOrderCreated);
   }, [refresh]);
+
+  // ── Sync open panel ID to Layout ref ─────────────────────────
+  useEffect(() => { setOpenOrderId(selectedId) }, [selectedId, setOpenOrderId])
+
+  // ── SSE: update list + detail only when the panel is open for that order ───
+  useEffect(() => {
+    function handleOrderUpdated(e) {
+      const { orderId, type } = e.detail;
+      if (!selectedId || orderId !== selectedId) return;
+      if (type === 'CANCELLATION_REQUESTED') updateOrderInList(orderId, 'CANCELLATION_REQUESTED');
+      refetchDetail();
+    }
+    window.addEventListener("laroka:order-updated", handleOrderUpdated);
+    return () =>
+      window.removeEventListener("laroka:order-updated", handleOrderUpdated);
+  }, [selectedId, refetchDetail, updateOrderInList]);
 
   // ── Auto-clear selected if order leaves visible list ─────────
   useEffect(() => {
@@ -629,9 +647,23 @@ export default function Orders() {
           />
         </div>
 
-        <button className="orders-refresh-btn" type="button" onClick={refresh}>
+        <button
+          className={`orders-refresh-btn${(newOrderCount > 0 || cancelCount > 0) ? ' orders-refresh-btn--notify' : ''}`}
+          type="button"
+          onClick={() => { resetCounts(); refresh(); if (selectedId) refetchDetail(); }}
+        >
           <RefreshIcon />
           Actualizar lista
+          {(newOrderCount > 0 || cancelCount > 0) && (
+            <span className="orders-refresh-badges">
+              {newOrderCount > 0 && (
+                <span className="orders-refresh-badge orders-refresh-badge--received">{newOrderCount}</span>
+              )}
+              {cancelCount > 0 && (
+                <span className="orders-refresh-badge orders-refresh-badge--cancel">{cancelCount}</span>
+              )}
+            </span>
+          )}
         </button>
       </div>
 
@@ -919,10 +951,13 @@ function OrderDetail({
   const cfg = STATUS_CONFIG[order.status] ?? {};
   const payCfg = PAYMENT_BADGE_CONFIG[order.paymentStatus] ?? {};
   const next = getNextStatus(order.status, order.orderType);
+  const isTerminal = TERMINAL.has(order.status);
 
   const [paying, setPaying] = useState(false);
   const [actionLoading, setActionLoading] = useState(null);
   const [cancelRequestLoading, setCancelRequestLoading] = useState(null);
+  const [cancelConfirming, setCancelConfirming] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
 
   const canGoBack = goBackAllowed(order.status);
   const canCancel = cancelAllowed(order.status);
@@ -968,14 +1003,7 @@ function OrderDetail({
     }
   };
 
-  const cancelOrder = async (e) => {
-    e.stopPropagation();
-    if (
-      !window.confirm(
-        "¿Cancelar este pedido? Esta acción no se puede deshacer.",
-      )
-    )
-      return;
+  const handleCancelConfirm = async () => {
     setActionLoading("cancel");
     try {
       await apiFetch(`${API_URL}/backoffice/orders/${order.id}/status`, {
@@ -984,7 +1012,7 @@ function OrderDetail({
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ nextStatus: "CANCELLED" }),
+        body: JSON.stringify({ nextStatus: "CANCELLED", reason: cancelReason.trim() }),
       });
       onRefetch();
       onRefresh();
@@ -992,6 +1020,8 @@ function OrderDetail({
       /* empty */
     } finally {
       setActionLoading(null);
+      setCancelConfirming(false);
+      setCancelReason("");
     }
   };
 
@@ -1190,6 +1220,15 @@ function OrderDetail({
           </div>
         )}
 
+        {/* Motivo de cancelación */}
+        {(order.status === "CANCELLED" || order.status === "CANCELLATION_REQUESTED") &&
+          order.cancellationReason && (
+            <div className="detail-cancel-reason-block">
+              <div className="detail-overline">MOTIVO DE CANCELACIÓN</div>
+              <p className="detail-cancel-reason-text">{order.cancellationReason}</p>
+            </div>
+          )}
+
         {/* Bottom row: Historial + Actions */}
         <div className="detail-bottom-row">
           {/* Left: Historial */}
@@ -1290,14 +1329,19 @@ function OrderDetail({
                       ? "···"
                       : `Avanzar a ${STATUS_CONFIG[next]?.label} →`}
                   </button>
-                ) : (
+                ) : isTerminal ? (
                   <div className="detail-action-btn detail-action-advance--done">
                     Pedido finalizado
+                  </div>
+                ) : (
+                  <div className="detail-action-btn detail-action-advance--done">
+                    Esperando pago
                   </div>
                 )}
 
                 {order.paymentMethod === "CASH" &&
-                  order.paymentStatus !== "APPROVED" && (
+                  order.paymentStatus !== "APPROVED" &&
+                  !isTerminal && (
                     <button
                       className="detail-action-btn detail-action-pay"
                       type="button"
@@ -1308,7 +1352,7 @@ function OrderDetail({
                     </button>
                   )}
 
-                {canGoBack && (
+                {canGoBack && !cancelConfirming && (
                   <button
                     className="detail-action-btn detail-action-back"
                     type="button"
@@ -1326,20 +1370,45 @@ function OrderDetail({
                 )}
 
                 {canCancel && (
-                  <button
-                    className="detail-action-btn detail-action-cancel"
-                    type="button"
-                    onClick={cancelOrder}
-                    disabled={actionLoading === "cancel"}
-                  >
-                    {actionLoading === "cancel" ? (
-                      "···"
-                    ) : (
-                      <>
-                        <XCancelIcon /> Cancelar
-                      </>
-                    )}
-                  </button>
+                  cancelConfirming ? (
+                    <div className="detail-cancel-reason-form">
+                      <p className="detail-cancel-reason-label">Motivo de cancelación</p>
+                      <textarea
+                        className="detail-cancel-reason-input"
+                        value={cancelReason}
+                        onChange={(e) => setCancelReason(e.target.value)}
+                        placeholder="Ingresá el motivo..."
+                        rows={3}
+                      />
+                      <div className="detail-cancel-reason-actions">
+                        <button
+                          className="detail-action-btn detail-action-back"
+                          type="button"
+                          onClick={() => { setCancelConfirming(false); setCancelReason(""); }}
+                          disabled={actionLoading === "cancel"}
+                        >
+                          <ArrowLeftIcon /> Volver
+                        </button>
+                        <button
+                          className="detail-action-btn detail-action-cancel"
+                          type="button"
+                          onClick={handleCancelConfirm}
+                          disabled={!cancelReason.trim() || actionLoading === "cancel"}
+                        >
+                          {actionLoading === "cancel" ? "···" : "Confirmar"}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      className="detail-action-btn detail-action-cancel"
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); setCancelConfirming(true); }}
+                      disabled={actionLoading === "cancel"}
+                    >
+                      <XCancelIcon /> Cancelar
+                    </button>
+                  )
                 )}
               </>
             )}

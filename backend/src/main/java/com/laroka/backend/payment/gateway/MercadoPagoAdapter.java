@@ -171,6 +171,31 @@ public class MercadoPagoAdapter implements PaymentGateway {
     }
 
     @Override
+    public void refundPayment(String paymentId) {
+        log.info("refundPayment: paymentId={}", paymentId);
+
+        if (accessToken == null || accessToken.isBlank()) {
+            log.warn("refundPayment: accessToken not configured, skipping refund — paymentId={}", paymentId);
+            return;
+        }
+
+        String url = MP_PAYMENTS_URL + paymentId + "/refunds";
+        try {
+            restClient.post()
+                    .uri(url)
+                    .header("Authorization", "Bearer " + accessToken)
+                    .header("Content-Type", "application/json")
+                    .body(Map.of())
+                    .retrieve()
+                    .toBodilessEntity();
+            log.info("refundPayment: refund accepted by MercadoPago — paymentId={}", paymentId);
+        } catch (Exception e) {
+            log.error("refundPayment: error calling MercadoPago refund API — paymentId={}, error={}", paymentId, e.getMessage());
+            throw new BusinessException("Error al solicitar el reembolso en MercadoPago: " + e.getMessage());
+        }
+    }
+
+    @Override
     public void cancelQrCharge(String externalId) {
         log.info("cancelQrCharge: externalId={}", externalId);
 

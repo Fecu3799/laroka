@@ -14,3 +14,11 @@
 | Riesgo real | Bajo — solo afecta el proceso de build, no el código que llega al usuario |
 | Resolución  | Esperar actualización de `vite-plugin-pwa` que actualice `workbox-build`. No usar `npm audit fix --force` — instalaría una versión anterior del plugin y rompería la configuración PWA. |
 | Momento     | Resolver antes del lanzamiento a producción                             |
+
+## MP Webhook Signature Validation — Sandbox Only
+
+**Estado:** Workaround activo  
+**Variable:** `SKIP_WEBHOOK_SIGNATURE_VALIDATION=true` (solo en staging/sandbox)  
+**Descripción:** En modo sandbox, MercadoPago firma los webhooks con un secret que no coincide con el que expone en el panel de desarrolladores. El HMAC calculado nunca coincide aunque el secret, el mensaje y el algoritmo sean correctos. Verificado con SHA256 del secret y logs de ambos hashes.  
+**Impacto:** Solo afecta pruebas con credenciales TEST-. En producción con credenciales reales el webhook llega y se procesa correctamente.  
+**Workaround:** Flag `SKIP_WEBHOOK_SIGNATURE_VALIDATION=true` en Render para ambiente de pruebas. En producción esta variable debe estar en `false` o ausente.

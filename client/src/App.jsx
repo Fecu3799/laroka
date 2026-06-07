@@ -10,6 +10,7 @@ import { useTheme } from './hooks/useTheme'
 import './App.css'
 
 const SCREEN_EXIT_DURATION = 320
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080'
 
 function App() {
   const { preferredBranchId, preferredBranchName, saveBranch, clearBranch } = usePreferredBranch()
@@ -29,10 +30,31 @@ function App() {
   const exitTimerRef = useRef(null)
   const [paymentFailureRecovery, setPaymentFailureRecovery] = useState(null)
   const [paymentPendingModal, setPaymentPendingModal] = useState(false)
+  const [pendingPaymentData, setPendingPaymentData] = useState(null)
 
   useEffect(() => () => clearTimeout(exitTimerRef.current), [])
 
-  const handleSplashComplete = useCallback(() => {
+  const handleSplashComplete = useCallback(async () => {
+    const raw = sessionStorage.getItem('laroka_checkout_recovery')
+    if (raw && preferredBranchId) {
+      let recovery
+      try { recovery = JSON.parse(raw) } catch {
+        sessionStorage.removeItem('laroka_checkout_recovery')
+      }
+      if (recovery) {
+        try {
+          const r = await fetch(`${API_BASE}/orders/${recovery.orderId}/status`)
+          const data = r.ok ? await r.json() : null
+          if (data?.status === 'PENDING_PAYMENT') {
+            setPendingPaymentData(recovery)
+          } else {
+            sessionStorage.removeItem('laroka_checkout_recovery')
+          }
+        } catch {
+          sessionStorage.removeItem('laroka_checkout_recovery')
+        }
+      }
+    }
     setScreen(preferredBranchId ? 'menu' : 'selection')
   }, [preferredBranchId])
 
@@ -105,6 +127,8 @@ function App() {
           onSwitchBranch={handleSwitchBranch}
           paymentFailureRecovery={paymentFailureRecovery}
           onPaymentFailureConsumed={handlePaymentFailureConsumed}
+          pendingPaymentRecovery={pendingPaymentData}
+          onPendingPaymentConsumed={() => setPendingPaymentData(null)}
         />
         {paymentPendingModal && (
           <PendingModal onClose={() => setPaymentPendingModal(false)} />

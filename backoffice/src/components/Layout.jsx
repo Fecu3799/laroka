@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import logo from '../assets/logo.png'
 import useAuth from '../hooks/useAuth'
@@ -61,7 +61,10 @@ export default function Layout() {
   const [time, setTime] = useState(new Date())
   const [connectionStatus, setConnectionStatus] = useState('disconnected')
   const [newOrderCount, setNewOrderCount] = useState(0)
+  const [cancelCount, setCancelCount] = useState(0)
   const [newOrderModalOpen, setNewOrderModalOpen] = useState(false)
+  const openOrderIdRef = useRef(null)
+  const setOpenOrderId = useCallback(id => { openOrderIdRef.current = id }, [])
 
   function handleLogout() {
     logout()
@@ -107,7 +110,13 @@ export default function Layout() {
               if (line.startsWith('data:')) {
                 try {
                   const json = JSON.parse(line.slice(5).trim())
-                  if (json.type === 'NEW_ORDER') setNewOrderCount(prev => prev + 1)
+                  if (json.orderId) {
+                    window.dispatchEvent(new CustomEvent('laroka:order-updated', { detail: { orderId: json.orderId, type: json.type } }))
+                    if (json.orderId !== openOrderIdRef.current) {
+                      if (json.type === 'NEW_ORDER') setNewOrderCount(prev => prev + 1)
+                      else if (json.type === 'CANCELLATION_REQUESTED') setCancelCount(prev => prev + 1)
+                    }
+                  }
                 } catch { /* noop */ }
               }
             }
@@ -136,9 +145,7 @@ export default function Layout() {
     return () => clearInterval(id)
   }, [])
 
-  useEffect(() => {
-    if (location.pathname === '/orders') setNewOrderCount(0)
-  }, [location.pathname])
+  const resetCounts = useCallback(() => { setNewOrderCount(0); setCancelCount(0) }, [])
 
   const formattedTime = time.toLocaleTimeString('es-AR', {
     hour: '2-digit',
@@ -179,8 +186,8 @@ export default function Layout() {
                   {to === '/orders' ? (
                     <div style={{ position: 'relative' }}>
                       {icon}
-                      {newOrderCount > 0 && location.pathname !== '/orders' && (
-                        <span className="layout-nav-badge">{newOrderCount}</span>
+                      {(newOrderCount + cancelCount) > 0 && location.pathname !== '/orders' && (
+                        <span className="layout-nav-badge">{newOrderCount + cancelCount}</span>
                       )}
                     </div>
                   ) : icon}
@@ -244,7 +251,7 @@ export default function Layout() {
         </header>
 
         <main className="layout-main">
-          <Outlet />
+          <Outlet context={{ newOrderCount, cancelCount, resetCounts, setOpenOrderId }} />
         </main>
       </div>
 

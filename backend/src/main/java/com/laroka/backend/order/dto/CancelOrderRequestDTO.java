@@ -1,0 +1,13 @@
+package com.laroka.backend.order.dto;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class CancelOrderRequestDTO {
+
+    private String reason;
+}

@@ -412,7 +412,7 @@ class OrderServiceTest {
         when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
         when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        Order result = service.transitionStatusForBackoffice(orderId, OrderStatus.IN_PREPARATION, branch.getId(), 42);
+        Order result = service.transitionStatusForBackoffice(orderId, OrderStatus.IN_PREPARATION, null, branch.getId(), 42);
 
         assertThat(result.getStatus()).isEqualTo(OrderStatus.IN_PREPARATION);
         verify(historyRepository).save(any());
@@ -432,7 +432,7 @@ class OrderServiceTest {
         when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
         when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        Order result = service.transitionStatusForBackoffice(orderId, OrderStatus.READY_FOR_PICKUP, branch.getId(), 7);
+        Order result = service.transitionStatusForBackoffice(orderId, OrderStatus.READY_FOR_PICKUP, null, branch.getId(), 7);
 
         assertThat(result.getStatus()).isEqualTo(OrderStatus.READY_FOR_PICKUP);
         verify(historyRepository).save(any());
@@ -452,7 +452,7 @@ class OrderServiceTest {
         when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
 
         assertThatThrownBy(() ->
-                service.transitionStatusForBackoffice(orderId, OrderStatus.DELIVERED, branch.getId(), 5))
+                service.transitionStatusForBackoffice(orderId, OrderStatus.DELIVERED, null, branch.getId(), 5))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("inválida");
     }
@@ -472,7 +472,7 @@ class OrderServiceTest {
 
         int differentBranchId = 99;
         assertThatThrownBy(() ->
-                service.transitionStatusForBackoffice(orderId, OrderStatus.IN_PREPARATION, differentBranchId, 5))
+                service.transitionStatusForBackoffice(orderId, OrderStatus.IN_PREPARATION, null, differentBranchId, 5))
                 .isInstanceOf(AccessDeniedException.class);
     }
 
@@ -816,12 +816,13 @@ class OrderServiceTest {
                 .id(orderId)
                 .status(OrderStatus.RECEIVED)
                 .orderType(OrderType.DELIVERY)
+                .branch(branch(tenant()))
                 .build();
 
-        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
         when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        service.cancelOrder(orderId);
+        service.cancelOrder(orderId, null);
 
         assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
         verify(orderRepository).save(order);
@@ -831,16 +832,18 @@ class OrderServiceTest {
     @Test
     void cancelOrder_fromInPreparation_transitionsToCancellationRequested() {
         UUID orderId = UUID.randomUUID();
+        Branch branch = branch(tenant());
         Order order = Order.builder()
                 .id(orderId)
                 .status(OrderStatus.IN_PREPARATION)
                 .orderType(OrderType.DELIVERY)
+                .branch(branch)
                 .build();
 
-        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
         when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        service.cancelOrder(orderId);
+        service.cancelOrder(orderId, "Pedido en preparación");
 
         assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLATION_REQUESTED);
         verify(orderRepository).save(order);
@@ -856,9 +859,9 @@ class OrderServiceTest {
                 .orderType(OrderType.DELIVERY)
                 .build();
 
-        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
 
-        assertThatThrownBy(() -> service.cancelOrder(orderId))
+        assertThatThrownBy(() -> service.cancelOrder(orderId, null))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("El pedido no puede cancelarse en este estado");
     }
@@ -872,9 +875,9 @@ class OrderServiceTest {
                 .orderType(OrderType.TAKEAWAY)
                 .build();
 
-        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
 
-        assertThatThrownBy(() -> service.cancelOrder(orderId))
+        assertThatThrownBy(() -> service.cancelOrder(orderId, null))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("El pedido no puede cancelarse en este estado");
     }
@@ -882,9 +885,9 @@ class OrderServiceTest {
     @Test
     void cancelOrder_orderNotFound_throwsOrderNotFoundException() {
         UUID orderId = UUID.randomUUID();
-        when(orderRepository.findById(orderId)).thenReturn(Optional.empty());
+        when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.cancelOrder(orderId))
+        assertThatThrownBy(() -> service.cancelOrder(orderId, null))
                 .isInstanceOf(OrderNotFoundException.class);
     }
 
@@ -992,5 +995,180 @@ class OrderServiceTest {
 
         assertThatThrownBy(() -> service.resolveCancellationRequest(orderId, "APPROVE", 1, 10))
                 .isInstanceOf(OrderNotFoundException.class);
+    }
+
+    // --- cancelOrder: validación de reason ---
+
+    @Test
+    void cancelOrder_directCancel_withoutReason_succeeds() {
+        UUID orderId = UUID.randomUUID();
+        Order order = Order.builder()
+                .id(orderId)
+                .status(OrderStatus.RECEIVED)
+                .orderType(OrderType.DELIVERY)
+                .branch(branch(tenant()))
+                .build();
+
+        when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.cancelOrder(orderId, null);
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+    }
+
+    @Test
+    void cancelOrder_directCancel_withReason_persistsReasonInHistory() {
+        UUID orderId = UUID.randomUUID();
+        Order order = Order.builder()
+                .id(orderId)
+                .status(OrderStatus.RECEIVED)
+                .orderType(OrderType.DELIVERY)
+                .branch(branch(tenant()))
+                .build();
+
+        when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.cancelOrder(orderId, "me equivoqué");
+
+        ArgumentCaptor<OrderStatusHistory> captor = ArgumentCaptor.forClass(OrderStatusHistory.class);
+        verify(historyRepository).save(captor.capture());
+        assertThat(captor.getValue().getCancellationReason()).isEqualTo("me equivoqué");
+        assertThat(captor.getValue().getToStatus()).isEqualTo(OrderStatus.CANCELLED);
+    }
+
+    @Test
+    void cancelOrder_cancellationRequest_withReason_succeeds() {
+        UUID orderId = UUID.randomUUID();
+        Branch branch = branch(tenant());
+        Order order = Order.builder()
+                .id(orderId)
+                .status(OrderStatus.IN_PREPARATION)
+                .orderType(OrderType.DELIVERY)
+                .branch(branch)
+                .build();
+
+        when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.cancelOrder(orderId, "ya no quiero el pedido");
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLATION_REQUESTED);
+    }
+
+    @Test
+    void cancelOrder_cancellationRequest_withNullReason_throwsBusinessException() {
+        UUID orderId = UUID.randomUUID();
+        Order order = Order.builder()
+                .id(orderId)
+                .status(OrderStatus.IN_PREPARATION)
+                .orderType(OrderType.DELIVERY)
+                .branch(branch(tenant()))
+                .build();
+
+        when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
+
+        assertThatThrownBy(() -> service.cancelOrder(orderId, null))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("motivo de cancelación");
+    }
+
+    @Test
+    void cancelOrder_cancellationRequest_withBlankReason_throwsBusinessException() {
+        UUID orderId = UUID.randomUUID();
+        Order order = Order.builder()
+                .id(orderId)
+                .status(OrderStatus.IN_PREPARATION)
+                .orderType(OrderType.DELIVERY)
+                .branch(branch(tenant()))
+                .build();
+
+        when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
+
+        assertThatThrownBy(() -> service.cancelOrder(orderId, "   "))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("motivo de cancelación");
+    }
+
+    // --- transitionStatusForBackoffice: validación de reason al cancelar ---
+
+    @Test
+    void transitionStatusForBackoffice_cancel_withReason_persistsReasonInHistory() {
+        UUID orderId = UUID.randomUUID();
+        Branch branch = branch(tenant());
+        Order order = Order.builder()
+                .id(orderId)
+                .status(OrderStatus.RECEIVED)
+                .orderType(OrderType.DELIVERY)
+                .branch(branch)
+                .build();
+
+        when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.transitionStatusForBackoffice(orderId, OrderStatus.CANCELLED, "sin stock", branch.getId(), 5);
+
+        ArgumentCaptor<OrderStatusHistory> captor = ArgumentCaptor.forClass(OrderStatusHistory.class);
+        verify(historyRepository).save(captor.capture());
+        assertThat(captor.getValue().getCancellationReason()).isEqualTo("sin stock");
+        assertThat(captor.getValue().getToStatus()).isEqualTo(OrderStatus.CANCELLED);
+    }
+
+    @Test
+    void transitionStatusForBackoffice_cancel_withNullReason_throwsBusinessException() {
+        UUID orderId = UUID.randomUUID();
+        Branch branch = branch(tenant());
+        Order order = Order.builder()
+                .id(orderId)
+                .status(OrderStatus.RECEIVED)
+                .orderType(OrderType.DELIVERY)
+                .branch(branch)
+                .build();
+
+        when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
+
+        assertThatThrownBy(() ->
+                service.transitionStatusForBackoffice(orderId, OrderStatus.CANCELLED, null, branch.getId(), 5))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("motivo de cancelación");
+    }
+
+    @Test
+    void transitionStatusForBackoffice_cancel_withBlankReason_throwsBusinessException() {
+        UUID orderId = UUID.randomUUID();
+        Branch branch = branch(tenant());
+        Order order = Order.builder()
+                .id(orderId)
+                .status(OrderStatus.RECEIVED)
+                .orderType(OrderType.DELIVERY)
+                .branch(branch)
+                .build();
+
+        when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
+
+        assertThatThrownBy(() ->
+                service.transitionStatusForBackoffice(orderId, OrderStatus.CANCELLED, "  ", branch.getId(), 5))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("motivo de cancelación");
+    }
+
+    @Test
+    void transitionStatusForBackoffice_nonCancelTransition_reasonNotRequired() {
+        UUID orderId = UUID.randomUUID();
+        Branch branch = branch(tenant());
+        Order order = Order.builder()
+                .id(orderId)
+                .status(OrderStatus.RECEIVED)
+                .orderType(OrderType.DELIVERY)
+                .branch(branch)
+                .build();
+
+        when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Order result = service.transitionStatusForBackoffice(orderId, OrderStatus.IN_PREPARATION, null, branch.getId(), 5);
+
+        assertThat(result.getStatus()).isEqualTo(OrderStatus.IN_PREPARATION);
     }
 }

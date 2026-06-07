@@ -43,7 +43,7 @@ mercadopago:
 
 order:
   expiration-minutes: ${ORDER_EXPIRATION_MINUTES:30}
-  bypass-branch-hours: ${BYPASS_BRANCH_HOURS:false}
+  bypass-branch-hours: ${BYPASS_BRANCH_HOURS:true}
 
 r2:
   access-key: ${R2_ACCESS_KEY:}

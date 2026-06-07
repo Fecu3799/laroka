@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.laroka.backend.order.dto.CancelOrderRequestDTO;
 import com.laroka.backend.order.dto.CreateOrderRequestDTO;
 import com.laroka.backend.order.dto.CreateOrderResponseDTO;
 import com.laroka.backend.order.dto.OrderItemStatusDTO;
@@ -59,9 +60,12 @@ public class OrderController {
     }
 
     @PostMapping("/{id}/cancel")
-    @Operation(summary = "Cancel order", description = "Cancels an order. Only allowed when status is RECEIVED. Returns 422 if cancellation is not permitted.")
-    public ResponseEntity<Void> cancelOrder(@PathVariable UUID id) {
-        orderService.cancelOrder(id);
+    @Operation(summary = "Cancel order", description = "Cancels an order or submits a cancellation request. reason is optional for direct cancellation (RECEIVED), required when the order is IN_PREPARATION (results in CANCELLATION_REQUESTED). Returns 422 if cancellation is not permitted or reason is missing.")
+    public ResponseEntity<Void> cancelOrder(
+            @PathVariable UUID id,
+            @RequestBody(required = false) CancelOrderRequestDTO body) {
+        String reason = body != null ? body.getReason() : null;
+        orderService.cancelOrder(id, reason);
         return ResponseEntity.noContent().build();
     }
 

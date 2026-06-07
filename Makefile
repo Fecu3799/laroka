@@ -19,13 +19,13 @@ test-front:
 test-e2e:
 	cd client && npm run test:e2e && cd ../backoffice && npm run test:e2e
 
-lint:
-	make lint-back && make lint-front
+static-analysis:
+	make checkstyle && make lint
 
-lint-back:
+checkstyle:
 	cd backend && ./mvnw checkstyle:check
 
-lint-front:
+lint:
 	cd client && npm run lint && cd ../backoffice && npm run lint
 
 build:

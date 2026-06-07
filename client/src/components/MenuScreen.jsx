@@ -136,7 +136,7 @@ function BranchSwitchWarningModal({ onConfirm, onCancel }) {
   )
 }
 
-export function MenuScreen({ branchId, branchName, onSwitchBranch, paymentFailureRecovery = null, onPaymentFailureConsumed = () => {} }) {
+export function MenuScreen({ branchId, branchName, onSwitchBranch, paymentFailureRecovery = null, onPaymentFailureConsumed = () => {}, pendingPaymentRecovery = null, onPendingPaymentConsumed = () => {} }) {
   const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -144,7 +144,7 @@ export function MenuScreen({ branchId, branchName, onSwitchBranch, paymentFailur
   const [activeCategoryIndex, setActiveCategoryIndex] = useState(0)
   const [swipeDirection, setSwipeDirection] = useState('right')
   const [searchQuery, setSearchQuery] = useState('')
-  const [activeTab, setActiveTab] = useState(() => paymentFailureRecovery ? 'cart' : 'menu')
+  const [activeTab, setActiveTab] = useState(() => (paymentFailureRecovery || pendingPaymentRecovery) ? 'cart' : 'menu')
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [branches, setBranches] = useState([])
   const [selectedProduct, setSelectedProduct] = useState(null)
@@ -153,10 +153,13 @@ export function MenuScreen({ branchId, branchName, onSwitchBranch, paymentFailur
       ? { orderId: paymentFailureRecovery.orderId, formData: paymentFailureRecovery.formData }
       : null
   )
+  const [cartPendingData, setCartPendingData] = useState(() =>
+    pendingPaymentRecovery ? { orderId: pendingPaymentRecovery.orderId } : null
+  )
   const retryRef = useRef(null)
   const prevCategoryIndexRef = useRef(0)
   const { items, addItem, removeItem, updateQty, clearCart, count } = useCart(
-    paymentFailureRecovery?.items?.map(i => ({ ...i })) || []
+    (paymentFailureRecovery?.items ?? pendingPaymentRecovery?.items)?.map(i => ({ ...i })) || []
   )
   const [activeBranchIds, setActiveBranchIds] = useState(() => readActiveBranchIds())
   const [pendingBranch, setPendingBranch] = useState(null)
@@ -170,6 +173,12 @@ export function MenuScreen({ branchId, branchName, onSwitchBranch, paymentFailur
     onPaymentFailureConsumed()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paymentFailureRecovery])
+
+  useEffect(() => {
+    if (!pendingPaymentRecovery) return
+    onPendingPaymentConsumed()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingPaymentRecovery])
 
   const handleCartFailureConsumed = useCallback(() => {
     setCartFailureData(null)
@@ -329,12 +338,30 @@ export function MenuScreen({ branchId, branchName, onSwitchBranch, paymentFailur
             />
           </div>
         </header>
+      </div>
 
+      <main className={`menu-main${activeTab === 'cart' ? ' menu-main--cart' : ''}`}>
         <div style={isMenuTab ? undefined : { display: 'none' }}>
           <OrderTrackingBanner branchId={branchId} />
         </div>
 
-        {isMenuTab && (
+        {activeTab === 'cart' ? (
+          <CartScreen
+            items={items}
+            extras={drinks}
+            onBack={() => setActiveTab('menu')}
+            onRemove={removeItem}
+            onUpdateQty={updateQty}
+            onClear={clearCart}
+            onAddExtra={addItem}
+            paymentFailure={cartFailureData}
+            onPaymentFailureConsumed={handleCartFailureConsumed}
+            pendingPayment={cartPendingData}
+            onPendingPaymentConsumed={() => setCartPendingData(null)}
+          />
+        ) : isProfileTab ? (
+          <ComingSoon />
+        ) : (
           <>
             <div className="menu-search-wrapper">
               <label className="menu-search">
@@ -361,76 +388,60 @@ export function MenuScreen({ branchId, branchName, onSwitchBranch, paymentFailur
                 </button>
               ))}
             </nav>
-          </>
-        )}
-      </div>
 
-      <main className={`menu-main${activeTab === 'cart' ? ' menu-main--cart' : ''}`}>
-        {activeTab === 'cart' ? (
-          <CartScreen
-            items={items}
-            extras={drinks}
-            onBack={() => setActiveTab('menu')}
-            onRemove={removeItem}
-            onUpdateQty={updateQty}
-            onClear={clearCart}
-            onAddExtra={addItem}
-            paymentFailure={cartFailureData}
-            onPaymentFailureConsumed={handleCartFailureConsumed}
-          />
-        ) : isProfileTab ? (
-          <ComingSoon />
-        ) : loading ? (
-          <div className="menu-loading" role="status" aria-label="Cargando menú">
-            <div className="branch-spinner" />
-          </div>
-        ) : error ? (
-          <div className="menu-error" role="alert">
-            <p>{error}</p>
-            <button
-              className="branch-retry-btn"
-              onClick={() => retryRef.current?.()}
-            >
-              Reintentar
-            </button>
-          </div>
-        ) : currentProducts.length === 0 ? (
-          <div className="menu-empty">
-            <p>No se encontraron productos</p>
-          </div>
-        ) : (
-          <AnimatePresence mode="wait">
-            <Motion.ul
-              key={activeCategory}
-              className="menu-list"
-              role="list"
-              initial={{
-                opacity: 0,
-                x: swipeDirection === 'left' ? 80 : -80,
-              }}
-              animate={{
-                opacity: 1,
-                x: 0,
-              }}
-              exit={{
-                opacity: 0,
-                x: swipeDirection === 'left' ? -80 : 80,
-              }}
-              transition={{
-                duration: 0.32,
-                ease: [0.34, 1.56, 0.64, 1],
-              }}
-            >
-              {currentProducts.map(product => (
-                <ProductCard
-                  key={product.id}
-                  product={product}
-                  onSelect={handleSelectProduct}
-                  onAdd={p => addItem(p, 1)}
-                />
-              ))}
-            </Motion.ul>
-          </AnimatePresence>
+            {loading ? (
+              <div className="menu-loading" role="status" aria-label="Cargando menú">
+                <div className="branch-spinner" />
+              </div>
+            ) : error ? (
+              <div className="menu-error" role="alert">
+                <p>{error}</p>
+                <button
+                  className="branch-retry-btn"
+                  onClick={() => retryRef.current?.()}
+                >
+                  Reintentar
+                </button>
+              </div>
+            ) : currentProducts.length === 0 ? (
+              <div className="menu-empty">
+                <p>No se encontraron productos</p>
+              </div>
+            ) : (
+              <AnimatePresence mode="wait">
+                <Motion.ul
+                  key={activeCategory}
+                  className="menu-list"
+                  role="list"
+                  initial={{
+                    opacity: 0,
+                    x: swipeDirection === 'left' ? 80 : -80,
+                  }}
+                  animate={{
+                    opacity: 1,
+                    x: 0,
+                  }}
+                  exit={{
+                    opacity: 0,
+                    x: swipeDirection === 'left' ? -80 : 80,
+                  }}
+                  transition={{
+                    duration: 0.32,
+                    ease: [0.34, 1.56, 0.64, 1],
+                  }}
+                >
+                  {currentProducts.map(product => (
+                    <ProductCard
+                      key={product.id}
+                      product={product}
+                      onSelect={handleSelectProduct}
+                      onAdd={p => addItem(p, 1)}
+                    />
+                  ))}
+                </Motion.ul>
+              </AnimatePresence>
+            )}
+          </>
         )}
       </main>
 

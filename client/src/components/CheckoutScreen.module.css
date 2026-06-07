@@ -455,3 +455,41 @@
   text-align: center;
   line-height: 1.4;
 }
+
+/* ── MP redirect overlay ── */
+
+@keyframes mpSpin {
+  to { transform: rotate(360deg); }
+}
+
+.mpOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+}
+
+.mpSpinner {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 3px solid rgba(254, 205, 24, 0.2);
+  border-top-color: #FECD18;
+  animation: mpSpin 0.8s linear infinite;
+}
+
+.mpOverlayText {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: 1px;
+  color: rgba(255, 255, 255, 0.75);
+  text-transform: uppercase;
+}

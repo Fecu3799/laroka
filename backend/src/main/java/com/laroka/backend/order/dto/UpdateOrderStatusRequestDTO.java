@@ -14,4 +14,6 @@ public class UpdateOrderStatusRequestDTO {
 
     @NotNull(message = "nextStatus es obligatorio")
     private OrderStatus nextStatus;
+
+    private String reason;
 }

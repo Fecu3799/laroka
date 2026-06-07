@@ -96,7 +96,7 @@ public class OrderService {
     }
 
     @Transactional
-    public Order transitionStatusForBackoffice(UUID orderId, OrderStatus newStatus,
+    public Order transitionStatusForBackoffice(UUID orderId, OrderStatus newStatus, String reason,
                                                Integer branchId, Integer staffUserId) {
         Order order = orderRepository.findByIdWithBranch(orderId)
                 .orElseThrow(() -> {
@@ -117,10 +117,22 @@ public class OrderService {
                     + " para pedido de tipo " + order.getOrderType());
         }
 
+        if (newStatus == OrderStatus.CANCELLED && (reason == null || reason.isBlank())) {
+            throw new BusinessException("El motivo de cancelación es obligatorio");
+        }
+
+        if (newStatus == OrderStatus.DELIVERED) {
+            Payment payment = paymentRepository.findByOrderId(orderId).orElse(null);
+            if (payment == null || payment.getStatus() == PaymentStatus.PENDING) {
+                throw new BusinessException("El pedido no puede marcarse como entregado con pago pendiente");
+            }
+        }
+
         OrderStatus previous = order.getStatus();
         order.setStatus(newStatus);
         Order saved = orderRepository.save(order);
-        recordHistory(saved, previous, newStatus, staffUserId);
+        recordHistory(saved, previous, newStatus, staffUserId,
+                newStatus == OrderStatus.CANCELLED ? reason : null);
         log.info("Backoffice status transition | orderId={} from={} to={} staffUserId={}",
                 saved.getId(), previous, newStatus, staffUserId);
         return saved;
@@ -155,8 +167,8 @@ public class OrderService {
     }
 
     @Transactional
-    public void cancelOrder(UUID orderId) {
-        Order order = orderRepository.findById(orderId)
+    public void cancelOrder(UUID orderId, String reason) {
+        Order order = orderRepository.findByIdWithBranch(orderId)
                 .orElseThrow(() -> {
                     log.warn("Order not found | orderId={}", orderId);
                     return new OrderNotFoundException(orderId);
@@ -167,13 +179,22 @@ public class OrderService {
         }
 
         OrderStatus previous = order.getStatus();
-        OrderStatus next = previous == OrderStatus.RECEIVED
+        OrderStatus next = (previous == OrderStatus.RECEIVED || previous == OrderStatus.PENDING_PAYMENT)
                 ? OrderStatus.CANCELLED
                 : OrderStatus.CANCELLATION_REQUESTED;
+
+        if (next == OrderStatus.CANCELLATION_REQUESTED && (reason == null || reason.isBlank())) {
+            throw new BusinessException("El motivo de cancelación es obligatorio");
+        }
+
         order.setStatus(next);
         Order saved = orderRepository.save(order);
-        recordHistory(saved, previous, next);
+        recordHistory(saved, previous, next, null, reason);
         log.info("Order cancel flow | orderId={} from={} to={}", saved.getId(), previous, next);
+
+        if (next == OrderStatus.CANCELLATION_REQUESTED) {
+            notificationService.sendCancellationRequestEvent(saved.getBranch().getId(), saved.getId());
+        }
     }
 
     @Transactional
@@ -463,10 +484,15 @@ public class OrderService {
     }
 
     private void recordHistory(Order order, OrderStatus fromStatus, OrderStatus toStatus) {
-        recordHistory(order, fromStatus, toStatus, null);
+        recordHistory(order, fromStatus, toStatus, null, null);
     }
 
     private void recordHistory(Order order, OrderStatus fromStatus, OrderStatus toStatus, Integer staffUserId) {
+        recordHistory(order, fromStatus, toStatus, staffUserId, null);
+    }
+
+    private void recordHistory(Order order, OrderStatus fromStatus, OrderStatus toStatus,
+                                Integer staffUserId, String cancellationReason) {
         historyRepository.save(OrderStatusHistory.builder()
                 .id(UUID.randomUUID())
                 .order(order)
@@ -474,6 +500,7 @@ public class OrderService {
                 .toStatus(toStatus)
                 .changedAt(LocalDateTime.now())
                 .staffUserId(staffUserId)
+                .cancellationReason(cancellationReason)
                 .build());
     }
 }

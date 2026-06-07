@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, waitFor, act } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { OrderTrackingBanner } from '../components/OrderTrackingBanner'
 
 vi.mock('../hooks/usePreferredBranch', () => ({
@@ -80,18 +81,74 @@ describe('OrderTrackingBanner', () => {
     })
   })
 
-  it('removes order from banner after CANCELLED status', async () => {
+  it('muestra botón Entendido cuando la cancelación fue iniciada por el cliente', async () => {
     seedOrder('order-1', 1)
     mockStatus('order-1', {
       status: 'CANCELLED',
       orderType: 'DELIVERY',
-      history: [],
+      history: [{ toStatus: 'CANCELLED', cancelledByStaff: false, cancellationReason: null, changedAt: new Date().toISOString() }],
     })
 
-    const { container } = render(<OrderTrackingBanner branchId={1} />)
+    render(<OrderTrackingBanner branchId={1} />)
 
     await waitFor(() => {
-      expect(container).toBeEmptyDOMElement()
+      expect(screen.getByText('CANCELADO')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /entendido/i })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /ver motivo/i })).not.toBeInTheDocument()
+    })
+  })
+
+  it('muestra botón Ver motivo cuando la cancelación fue iniciada por el operador', async () => {
+    seedOrder('order-1', 1)
+    mockStatus('order-1', {
+      status: 'CANCELLED',
+      orderType: 'DELIVERY',
+      history: [{ toStatus: 'CANCELLED', cancelledByStaff: true, cancellationReason: 'sin stock', changedAt: new Date().toISOString() }],
+    })
+
+    render(<OrderTrackingBanner branchId={1} />)
+
+    await waitFor(() => {
+      expect(screen.getByText('CANCELADO')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /ver motivo de cancelación/i })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /entendido/i })).not.toBeInTheDocument()
+    })
+  })
+
+  it('cuando hay entrada CANCELLATION_REQUESTED, muestra Entendido aunque el operador aprobó', async () => {
+    seedOrder('order-1', 1)
+    mockStatus('order-1', {
+      status: 'CANCELLED',
+      orderType: 'DELIVERY',
+      history: [
+        { toStatus: 'CANCELLATION_REQUESTED', cancelledByStaff: false, changedAt: new Date().toISOString() },
+        { toStatus: 'CANCELLED', cancelledByStaff: true, cancellationReason: null, changedAt: new Date().toISOString() },
+      ],
+    })
+
+    render(<OrderTrackingBanner branchId={1} />)
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /entendido/i })).toBeInTheDocument()
+    })
+  })
+
+  it('modal de motivo muestra el cancellationReason del operador', async () => {
+    seedOrder('order-1', 1)
+    mockStatus('order-1', {
+      status: 'CANCELLED',
+      orderType: 'DELIVERY',
+      history: [{ toStatus: 'CANCELLED', cancelledByStaff: true, cancellationReason: 'sin stock disponible', changedAt: new Date().toISOString() }],
+    })
+
+    render(<OrderTrackingBanner branchId={1} />)
+
+    await waitFor(() => screen.getByText('CANCELADO'))
+
+    await userEvent.setup().click(screen.getByRole('button', { name: /ver motivo de cancelación/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText('sin stock disponible')).toBeInTheDocument()
     })
   })
 
@@ -169,9 +226,32 @@ describe('OrderTrackingBanner — status PENDING_PAYMENT', () => {
     expect(screen.queryByText(/llega en/i)).not.toBeInTheDocument()
   })
 
-  it('no renderiza el botón de detalles', async () => {
+  it('renderiza el botón Ver detalle', async () => {
     setup()
     await waitFor(() => screen.getByText('Pago en proceso'))
-    expect(screen.queryByRole('button', { name: /ver detalles/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /ver detalle/i })).toBeInTheDocument()
+  })
+
+  it('clicking Ver detalle abre el modal de detalle', async () => {
+    const user = userEvent.setup()
+    setup()
+    await waitFor(() => screen.getByText('Pago en proceso'))
+
+    await user.click(screen.getByRole('button', { name: /ver detalle/i }))
+
+    expect(screen.getByRole('button', { name: /cerrar/i })).toBeInTheDocument()
+  })
+
+  it('en el modal, clicking "Cancelar pedido" muestra la confirmación inline', async () => {
+    const user = userEvent.setup()
+    setup()
+    await waitFor(() => screen.getByText('Pago en proceso'))
+
+    await user.click(screen.getByRole('button', { name: /ver detalle/i }))
+    await screen.findByRole('button', { name: /cerrar/i })
+
+    await user.click(screen.getByRole('button', { name: /^cancelar pedido$/i }))
+
+    expect(screen.getByText(/el pedido será cancelado y no podrá reactivarse/i)).toBeInTheDocument()
   })
 })

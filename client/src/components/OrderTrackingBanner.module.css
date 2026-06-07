@@ -361,6 +361,8 @@
   display: flex;
   flex-direction: column;
   gap: 5px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .itemRow {
@@ -374,10 +376,14 @@
 
 .itemQtyName {
   flex: 1;
+  min-width: 0;
 }
 
 .itemPrice {
   opacity: 0.7;
+  flex-shrink: 0;
+  text-align: right;
+  padding-left: 8px;
 }
 
 /* ── Totales ──────────────────────────────────────────────── */
@@ -389,6 +395,8 @@
   display: flex;
   flex-direction: column;
   gap: 5px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .totalRow {
@@ -459,7 +467,7 @@
   align-items: flex-end;
   justify-content: center;
   z-index: 200;
-  padding-bottom: env(safe-area-inset-bottom, 0);
+  padding: 0 16px env(safe-area-inset-bottom, 0);
 }
 
 .modalBox {
@@ -570,4 +578,90 @@
   border-radius: 4px;
   background: var(--accent);
   opacity: 1;
+}
+
+/* ── Textarea motivo de cancelación ───────────────────────────── */
+
+.cancelReasonInput {
+  width: 100%;
+  box-sizing: border-box;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-family: 'Inria Sans', sans-serif;
+  font-size: 14px;
+  padding: 10px 12px;
+  resize: none;
+  outline: none;
+  transition: border-color 0.15s;
+  margin-bottom: 4px;
+}
+
+.cancelReasonInput::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.cancelReasonInput:focus {
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+/* ── Slide pedido cancelado ───────────────────────────────────── */
+
+.cancelledRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.viewReasonBtn {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.08);
+  border: 1px solid rgba(248, 113, 113, 0.25);
+  border-radius: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+.acknowledgeBtn {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.55);
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+/* ── Modal motivo de cancelación ──────────────────────────────── */
+
+.reasonModalBox {
+  background: var(--bg-card-product, #1a1a1a);
+  border-radius: 16px;
+  width: 100%;
+  max-width: 440px;
+  padding: 24px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: _lrModalIn 200ms ease-out forwards;
+}
+
+.reasonText {
+  font-family: 'Inria Sans', sans-serif;
+  font-size: 15px;
+  color: var(--text-primary);
+  margin: 0;
+  line-height: 1.6;
+  white-space: pre-wrap;
 }

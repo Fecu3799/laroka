@@ -11,13 +11,13 @@ export const STATUS_CONFIG = {
 
 export const STATUS_PRIORITY = {
   CANCELLATION_REQUESTED: 0,
-  RECEIVED:               1,
-  IN_PREPARATION:         2,
-  ON_THE_WAY:             3,
-  READY_FOR_PICKUP:       3,
-  DELIVERED:              4,
-  CANCELLED:              4,
-  PENDING_PAYMENT:        5,
+  PENDING_PAYMENT:        1,
+  RECEIVED:               2,
+  IN_PREPARATION:         3,
+  ON_THE_WAY:             4,
+  READY_FOR_PICKUP:       4,
+  DELIVERED:              5,
+  CANCELLED:              5,
 }
 
 export function sortOrders(orders) {
@@ -41,7 +41,7 @@ export function canGoBack(status) {
 }
 
 export function canCancel(status) {
-  return status === 'RECEIVED'
+  return status === 'PENDING_PAYMENT' || status === 'RECEIVED'
 }
 
 export function canConfirmOrder({ cartItems, orderType, deliveryAddress }) {

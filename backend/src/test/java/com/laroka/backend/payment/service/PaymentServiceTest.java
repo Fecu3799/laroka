@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -97,7 +98,7 @@ class PaymentServiceTest {
                 .build();
 
         when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
-        when(paymentRepository.existsByOrderIdAndStatusIn(eq(orderId), any())).thenReturn(false);
+        when(paymentRepository.findByOrderIdAndStatusIn(eq(orderId), any())).thenReturn(Optional.empty());
         when(paymentGateway.createPreference(eq(orderId), any(), any()))
                 .thenReturn("https://mp.com/pay?pref_id=pref123");
         when(paymentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -105,7 +106,9 @@ class PaymentServiceTest {
         String link = service.initiatePayment(orderId, null);
 
         assertThat(link).isEqualTo("https://mp.com/pay?pref_id=pref123");
-        verify(paymentRepository).save(any(Payment.class));
+        ArgumentCaptor<Payment> captor = ArgumentCaptor.forClass(Payment.class);
+        verify(paymentRepository).save(captor.capture());
+        assertThat(captor.getValue().getPaymentLink()).isEqualTo("https://mp.com/pay?pref_id=pref123");
     }
 
     // --- processWebhook: merchant_order ignored ---
@@ -212,6 +215,63 @@ class PaymentServiceTest {
         service.processWebhook(null, "req-redelivery", paymentId, event("payment", paymentId));
 
         assertThat(pendingWithMpId.getStatus()).isEqualTo(PaymentStatus.APPROVED);
+        verify(orderService, never()).transitionStatus(any(), any());
+        verify(notificationService, never()).sendNewOrderEvent(any(), any(), any());
+    }
+
+    // --- processWebhook: approved for CANCELLED order (race condition) ---
+
+    @Test
+    void processWebhook_approvedButOrderCancelled_initiatesRefundAndSetsStatusToRefunded() {
+        UUID orderId = UUID.randomUUID();
+        String paymentId = "mp-pay-cancelled-001";
+
+        when(paymentRepository.findByMercadopagoPaymentId(paymentId)).thenReturn(Optional.empty());
+        when(paymentGateway.fetchPayment(paymentId))
+                .thenReturn(new PaymentGateway.PaymentInfo("approved", orderId.toString()));
+
+        Payment pending = pendingPayment(orderId);
+        when(paymentRepository.findByOrderId(orderId)).thenReturn(Optional.of(pending));
+        when(paymentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        Branch branch = Branch.builder().id(1).name("Playa Unión").build();
+        Order order = Order.builder()
+                .id(orderId).status(OrderStatus.CANCELLED).branch(branch).build();
+        when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
+
+        service.processWebhook(null, null, paymentId, event("payment", paymentId));
+
+        verify(paymentGateway).refundPayment(paymentId);
+        assertThat(pending.getStatus()).isEqualTo(PaymentStatus.REFUNDED);
+        verify(orderService, never()).transitionStatus(any(), any());
+        verify(notificationService, never()).sendNewOrderEvent(any(), any(), any());
+    }
+
+    @Test
+    void processWebhook_approvedButOrderCancelled_refundFails_paymentRemainsApprovedAndTransitionSkipped() {
+        UUID orderId = UUID.randomUUID();
+        String paymentId = "mp-pay-cancelled-002";
+
+        when(paymentRepository.findByMercadopagoPaymentId(paymentId)).thenReturn(Optional.empty());
+        when(paymentGateway.fetchPayment(paymentId))
+                .thenReturn(new PaymentGateway.PaymentInfo("approved", orderId.toString()));
+
+        Payment pending = pendingPayment(orderId);
+        when(paymentRepository.findByOrderId(orderId)).thenReturn(Optional.of(pending));
+        when(paymentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        Branch branch = Branch.builder().id(1).name("Playa Unión").build();
+        Order order = Order.builder()
+                .id(orderId).status(OrderStatus.CANCELLED).branch(branch).build();
+        when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
+
+        doThrow(new RuntimeException("MP API unavailable")).when(paymentGateway).refundPayment(paymentId);
+
+        service.processWebhook(null, null, paymentId, event("payment", paymentId));
+
+        verify(paymentGateway).refundPayment(paymentId);
+        // payment stays APPROVED (not REFUNDED) so it remains visible for manual action
+        assertThat(pending.getStatus()).isEqualTo(PaymentStatus.APPROVED);
         verify(orderService, never()).transitionStatus(any(), any());
         verify(notificationService, never()).sendNewOrderEvent(any(), any(), any());
     }

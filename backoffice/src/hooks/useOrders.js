@@ -1,12 +1,10 @@
 import { useState, useCallback, useEffect } from 'react'
-
 const API_URL = import.meta.env.VITE_API_URL ?? ''
 
 export default function useOrders(token) {
   const [orders, setOrders]           = useState([])
   const [loading, setLoading]         = useState(true)
   const [error, setError]             = useState(null)
-  const [newOrderCount, setNewOrderCount] = useState(0)
   const [dismissedIds, setDismissedIds] = useState(() => {
     try {
       const stored = sessionStorage.getItem('laroka_dismissed_ids')
@@ -40,11 +38,8 @@ export default function useOrders(token) {
   }, [dismissedIds])
 
   const refresh = useCallback(() => {
-    setNewOrderCount(0)
     fetchOrders()
   }, [fetchOrders])
-
-  const incrementNewOrders = useCallback(() => setNewOrderCount(n => n + 1), [])
 
   const dismissOrder = useCallback((id) => {
     setDismissedIds(prev => new Set([...prev, id]))
@@ -58,5 +53,5 @@ export default function useOrders(token) {
     setOrders(prev => prev.map(o => o.id === id ? { ...o, paymentStatus } : o))
   }, [])
 
-  return { orders, loading, error, newOrderCount, refresh, incrementNewOrders, dismissOrder, dismissedIds, updateOrderInList, updatePaymentInList }
+  return { orders, loading, error, refresh, dismissOrder, dismissedIds, updateOrderInList, updatePaymentInList }
 }

@@ -18,4 +18,6 @@ public class OrderStatusHistoryDTO {
     private OrderStatus fromStatus;
     private OrderStatus toStatus;
     private LocalDateTime changedAt;
+    private String cancellationReason;
+    private boolean cancelledByStaff;
 }

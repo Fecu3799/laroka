@@ -101,6 +101,15 @@ public class OrderMapper {
     public BackofficeOrderDetailDTO toBackofficeDetailDTO(BackofficeOrderDetail detail) {
         Order order = detail.order();
         Payment payment = detail.payment();
+
+        String cancellationReason = detail.history().stream()
+                .filter(h -> (h.getToStatus() == com.laroka.backend.order.entity.OrderStatus.CANCELLED
+                        || h.getToStatus() == com.laroka.backend.order.entity.OrderStatus.CANCELLATION_REQUESTED)
+                        && h.getCancellationReason() != null)
+                .map(h -> h.getCancellationReason())
+                .findFirst()
+                .orElse(null);
+
         return BackofficeOrderDetailDTO.builder()
                 .id(order.getId())
                 .createdAt(order.getCreatedAt())
@@ -122,6 +131,7 @@ public class OrderMapper {
                 .paymentMethod(payment != null ? payment.getMethod() : null)
                 .paidAt(payment != null ? payment.getPaidAt() : null)
                 .statusHistory(detail.history().stream().map(this::toHistoryDTO).toList())
+                .cancellationReason(cancellationReason)
                 .build();
     }
 
@@ -160,6 +170,8 @@ public class OrderMapper {
                 .fromStatus(h.getFromStatus())
                 .toStatus(h.getToStatus())
                 .changedAt(h.getChangedAt())
+                .cancellationReason(h.getCancellationReason())
+                .cancelledByStaff(h.getStaffUserId() != null)
                 .build();
     }
 }
