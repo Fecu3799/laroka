@@ -109,7 +109,6 @@ export function CheckoutScreen({ onBack, onConfirm, items = [], initialData = nu
     : null
 
   useEffect(() => {
-    if (!mpRedirecting) return
     function handleVisibility() {
       if (document.visibilityState !== 'visible') return
       let orderId = null
@@ -117,12 +116,13 @@ export function CheckoutScreen({ onBack, onConfirm, items = [], initialData = nu
         const raw = sessionStorage.getItem('laroka_checkout_recovery')
         orderId = raw ? JSON.parse(raw)?.orderId ?? null : null
       } catch { /* sessionStorage no disponible */ }
+      if (!orderId) return
       setMpRedirecting(false)
       onMpReturn?.(orderId)
     }
     document.addEventListener('visibilitychange', handleVisibility)
     return () => document.removeEventListener('visibilitychange', handleVisibility)
-  }, [mpRedirecting, onMpReturn])
+  }, [onMpReturn])
 
   const handleConfirm = async () => {
     const newErrors = {
