@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { usePreferredBranch } from '../hooks/usePreferredBranch'
 import { readActiveOrders, removeActiveOrder } from '../utils/activeOrders'
 import { cancelOrder } from '../services/ordersService'
+import { initiatePayment } from '../services/paymentsService'
 import styles from './OrderTrackingBanner.module.css'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080'
@@ -331,6 +332,7 @@ function OrderSlide({ orderId, order, estimatedDeliveryMinutes, onPhoneClick, on
 
   const [cancelling, setCancelling] = useState(false)
   const [cancelError, setCancelError] = useState(null)
+  const [retrying, setRetrying] = useState(false)
 
   const canDirectCancel = order?.status === 'RECEIVED' || order?.status === 'PENDING_PAYMENT'
   const canRequestCancel = order?.status === 'IN_PREPARATION'
@@ -374,6 +376,16 @@ function OrderSlide({ orderId, order, estimatedDeliveryMinutes, onPhoneClick, on
     setConfirmingCancel(false)
     setCancelError(null)
     setCancelReason('')
+  }
+
+  const handleRetryPay = async () => {
+    setRetrying(true)
+    try {
+      const paymentLink = await initiatePayment(orderId)
+      window.location.href = paymentLink
+    } catch {
+      setRetrying(false)
+    }
   }
 
   const handleConfirmCancel = async () => {
@@ -502,6 +514,16 @@ function OrderSlide({ orderId, order, estimatedDeliveryMinutes, onPhoneClick, on
             </div>
             <span className={styles.progressEmoji} aria-hidden="true">🏠</span>
           </div>
+        )}
+
+        {isPendingPayment && (
+          <button
+            className={styles.retryPayBtn}
+            onClick={handleRetryPay}
+            disabled={retrying}
+          >
+            {retrying ? 'Redirigiendo...' : 'Reintentar pago'}
+          </button>
         )}
 
         {/* stopPropagation on touch prevents ghost-click on portal modal backdrop */}

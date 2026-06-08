@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { CheckoutScreen } from './CheckoutScreen'
 import { ConfirmationScreen } from './ConfirmationScreen'
-import { FailureModal, PendingPaymentModal } from './PaymentModals'
+import { PendingPaymentModal } from './PaymentModals'
 import { usePreferredBranch } from '../hooks/usePreferredBranch'
 import { addActiveOrder } from '../utils/activeOrders'
 import { initiatePayment } from '../services/paymentsService'
@@ -236,12 +236,10 @@ export function CartScreen({ items, extras = [], onBack, onRemove, onUpdateQty, 
           initialData={checkoutInitialData}
           onMpReturn={handleMpReturn}
         />
-        {showFailureModal && (
-          <FailureModal
+        {showFailureModal && failureOrderId && (
+          <PendingPaymentModal
             orderId={failureOrderId}
-            formData={checkoutInitialData}
-            cartItems={items}
-            onClose={() => setShowFailureModal(false)}
+            onCancel={() => { setShowFailureModal(false); setShowCheckout(false) }}
           />
         )}
         {mpReturnOrderId && (

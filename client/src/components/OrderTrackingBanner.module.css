@@ -422,6 +422,27 @@
   color: var(--accent);
 }
 
+/* ── Botón reintentar pago ────────────────────────────────── */
+
+.retryPayBtn {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.06em;
+  color: var(--bg-primary);
+  background: var(--accent);
+  border: none;
+  border-radius: 8px;
+  padding: 10px;
+  cursor: pointer;
+  width: 100%;
+}
+
+.retryPayBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* ── Botón cancelar ───────────────────────────────────────── */
 
 .cancelBtn {
