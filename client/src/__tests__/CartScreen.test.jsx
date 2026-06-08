@@ -107,10 +107,10 @@ describe('CartScreen — paymentFailure recovery', () => {
     expect(screen.getByText('TUS DATOS')).toBeInTheDocument()
   })
 
-  it('muestra FailureModal desde el primer render cuando paymentFailure está presente', () => {
+  it('muestra PendingPaymentModal desde el primer render cuando paymentFailure está presente', () => {
     renderCart(ITEMS, { paymentFailure: FAILURE_DATA })
     expect(screen.getByRole('dialog')).toBeInTheDocument()
-    expect(screen.getByText('Pago rechazado')).toBeInTheDocument()
+    expect(screen.getByText('Tenés un pago pendiente')).toBeInTheDocument()
   })
 
   it('persiste laroka_checkout_recovery en sessionStorage al confirmar con MercadoPago', async () => {
