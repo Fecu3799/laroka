@@ -77,7 +77,7 @@ export function PendingPaymentModal({ orderId, onCancel }) {
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    console.log('[MP-DEBUG] PendingPaymentModal mounted — orderId:', orderId)
+    if (import.meta.env.VITE_DEV_MP_DEBUG_LOGS === 'true') console.log('[MP-DEBUG] PendingPaymentModal mounted — orderId:', orderId)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

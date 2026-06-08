@@ -110,7 +110,7 @@ export function CheckoutScreen({ onBack, onConfirm, items = [], initialData = nu
 
   useEffect(() => {
     function handleVisibility() {
-      console.log('[MP-DEBUG] visibilitychange fired — state:', document.visibilityState, '| mpRedirecting:', mpRedirecting)
+      if (import.meta.env.VITE_DEV_MP_DEBUG_LOGS === 'true') console.log('[MP-DEBUG] visibilitychange fired — state:', document.visibilityState, '| mpRedirecting:', mpRedirecting)
       if (document.visibilityState !== 'visible') return
       let orderId = null
       try {

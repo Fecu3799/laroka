@@ -23,3 +23,6 @@ jwt:
 
 cors:
   allowed-origins: http://localhost:5173
+
+order:
+  bypass-branch-hours: true
