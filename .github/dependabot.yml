@@ -1,0 +1,37 @@
+version: 2
+updates:
+  - package-ecosystem: "maven"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      timezone: "America/Argentina/Buenos_Aires"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+
+  - package-ecosystem: "npm"
+    directory: "/client"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      timezone: "America/Argentina/Buenos_Aires"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+    ignore:
+      - dependency-name: "*"
+        applies-to: development
+
+  - package-ecosystem: "npm"
+    directory: "/backoffice"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      timezone: "America/Argentina/Buenos_Aires"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+    ignore:
+      - dependency-name: "*"
+        applies-to: development
