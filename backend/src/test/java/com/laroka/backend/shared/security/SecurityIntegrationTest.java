@@ -52,6 +52,9 @@ class SecurityIntegrationTest {
 	private AuthService authService;
 
 	@MockitoBean
+	private TokenBlacklist tokenBlacklist;
+
+	@MockitoBean
 	private StaffUserService staffUserService;
 
 	@MockitoBean

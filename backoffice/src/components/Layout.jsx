@@ -67,7 +67,7 @@ export default function Layout() {
   const setOpenOrderId = useCallback(id => { openOrderIdRef.current = id }, [])
 
   function handleLogout() {
-    logout()
+    logout(token)
     navigate('/login', { replace: true })
   }
 
