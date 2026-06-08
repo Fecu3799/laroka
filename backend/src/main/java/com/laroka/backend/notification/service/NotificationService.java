@@ -11,6 +11,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import com.laroka.backend.order.dto.BackofficeOrderResponseDTO;
+
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -51,6 +53,26 @@ public class NotificationService {
                     data.put("branchId", branchId);
                     data.put("createdAt", createdAt.toString());
                     entry.emitter().send(SseEmitter.event().name("new-order").data(data));
+                } catch (Exception e) {
+                    log.warn("SSE send failed, removing dead emitter | branchId={}", branchId);
+                    dead.add(entry);
+                }
+            }
+        }
+        emitters.removeAll(dead);
+    }
+
+    public void sendOrderUpdatedEvent(Integer branchId, BackofficeOrderResponseDTO orderDto) {
+        log.debug("SSE order-updated | branchId={} orderId={} status={}", branchId, orderDto.getId(), orderDto.getStatus());
+        List<EmitterEntry> dead = new ArrayList<>();
+        for (EmitterEntry entry : emitters) {
+            if (entry.branchId().equals(branchId)) {
+                try {
+                    Map<String, Object> data = new LinkedHashMap<>();
+                    data.put("type", "ORDER_UPDATED");
+                    data.put("branchId", branchId);
+                    data.put("order", orderDto);
+                    entry.emitter().send(SseEmitter.event().name("order-updated").data(data));
                 } catch (Exception e) {
                     log.warn("SSE send failed, removing dead emitter | branchId={}", branchId);
                     dead.add(entry);

@@ -139,6 +139,7 @@ public class OrderMapper {
         return BackofficeOrderResponseDTO.builder()
                 .id(order.getId())
                 .createdAt(order.getCreatedAt())
+                .updatedAt(order.getUpdatedAt())
                 .status(order.getStatus())
                 .subtotal(order.getSubtotal())
                 .deliveryFee(order.getDeliveryFee())

@@ -110,9 +110,12 @@ export default function Layout() {
               if (line.startsWith('data:')) {
                 try {
                   const json = JSON.parse(line.slice(5).trim())
-                  if (json.orderId) {
-                    window.dispatchEvent(new CustomEvent('laroka:order-updated', { detail: { orderId: json.orderId, type: json.type } }))
-                    if (json.orderId !== openOrderIdRef.current) {
+                  const orderId = json.orderId ?? json.order?.id
+                  if (orderId) {
+                    window.dispatchEvent(new CustomEvent('laroka:order-updated', {
+                      detail: { orderId, type: json.type, order: json.order ?? null },
+                    }))
+                    if (orderId !== openOrderIdRef.current) {
                       if (json.type === 'NEW_ORDER') setNewOrderCount(prev => prev + 1)
                       else if (json.type === 'CANCELLATION_REQUESTED') setCancelCount(prev => prev + 1)
                     }

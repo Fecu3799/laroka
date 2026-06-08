@@ -1,6 +1,22 @@
 import { renderHook, act, waitFor } from '@testing-library/react'
 import useOrders from '../hooks/useOrders'
 
+const ORDER_A = {
+  id: 'order-a',
+  status: 'RECEIVED',
+  paymentStatus: 'PENDING',
+  customerName: 'Juan',
+  items: [],
+}
+
+const ORDER_B = {
+  id: 'order-b',
+  status: 'IN_PREPARATION',
+  paymentStatus: 'APPROVED',
+  customerName: 'María',
+  items: [],
+}
+
 beforeEach(() => {
   sessionStorage.clear()
   global.fetch = vi.fn().mockResolvedValue({
@@ -64,4 +80,42 @@ test('dismissedIds se inicializa desde sessionStorage', async () => {
   await waitFor(() => expect(result.current.loading).toBe(false))
 
   expect(result.current.dismissedIds.has('stored-order')).toBe(true)
+})
+
+// ── replaceOrderInList ────────────────────────────────────────────
+
+describe('replaceOrderInList', () => {
+  test('actualiza el item correcto sin modificar los demás', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [ORDER_A, ORDER_B],
+    })
+
+    const { result } = renderHook(() => useOrders('test-token'))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.orders).toHaveLength(2)
+
+    const updatedA = { ...ORDER_A, status: 'IN_PREPARATION' }
+    act(() => { result.current.replaceOrderInList(updatedA) })
+
+    expect(result.current.orders[0].status).toBe('IN_PREPARATION')
+    expect(result.current.orders[1]).toEqual(ORDER_B)
+  })
+
+  test('agrega el pedido al inicio si no existe en la lista', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [ORDER_A],
+    })
+
+    const { result } = renderHook(() => useOrders('test-token'))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    const newOrder = { id: 'order-new', status: 'RECEIVED', customerName: 'Carlos', items: [] }
+    act(() => { result.current.replaceOrderInList(newOrder) })
+
+    expect(result.current.orders).toHaveLength(2)
+    expect(result.current.orders[0].id).toBe('order-new')
+    expect(result.current.orders[1]).toEqual(ORDER_A)
+  })
 })

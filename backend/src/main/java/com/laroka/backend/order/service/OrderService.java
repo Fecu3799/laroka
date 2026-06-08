@@ -356,6 +356,17 @@ public class OrderService {
     }
 
     @Transactional(readOnly = true)
+    public BackofficeOrderRow findOrderRowById(UUID orderId) {
+        Order order = orderRepository.findByIdWithDetails(orderId)
+                .orElseThrow(() -> {
+                    log.warn("Order not found | orderId={}", orderId);
+                    return new OrderNotFoundException(orderId);
+                });
+        Payment payment = paymentRepository.findByOrderId(orderId).orElse(null);
+        return new BackofficeOrderRow(order, payment);
+    }
+
+    @Transactional(readOnly = true)
     public List<OrderItem> findItemsByOrderId(UUID orderId) {
         if (!orderRepository.existsById(orderId)) {
             log.warn("Order not found | orderId={}", orderId);
