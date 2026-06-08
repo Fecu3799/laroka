@@ -42,6 +42,7 @@ export default function Login() {
 
       const data = await res.json()
       localStorage.setItem('laroka_token', data.token)
+      if (data.refreshToken) localStorage.setItem('laroka_refresh_token', data.refreshToken)
       navigate('/orders', { replace: true })
     } catch {
       setError('Error al conectar. Intentá de nuevo.')
