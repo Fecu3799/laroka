@@ -43,7 +43,10 @@ mercadopago:
 
 order:
   expiration-minutes: ${ORDER_EXPIRATION_MINUTES:30}
-  bypass-branch-hours: ${BYPASS_BRANCH_HOURS:true}
+  bypass-branch-hours: ${APP_DEV_BYPASS_BRANCH_HOURS:${APP_DEV_MODE:false}}
+
+debug:
+  skip-webhook-signature-validation: ${APP_DEV_SKIP_WEBHOOK_VALIDATION:${APP_DEV_MODE:false}}
 
 r2:
   access-key: ${R2_ACCESS_KEY:}
@@ -51,9 +54,12 @@ r2:
   bucket-name: ${R2_BUCKET_NAME:laroka-dev}
   endpoint: ${R2_ENDPOINT:}
 
+swagger:
+  enabled: ${APP_DEV_SWAGGER_ENABLED:${APP_DEV_MODE:false}}
+
 springdoc:
   api-docs:
-    enabled: ${SWAGGER_ENABLED:false}
+    enabled: ${APP_DEV_SWAGGER_ENABLED:${APP_DEV_MODE:false}}
   swagger-ui:
-    enabled: ${SWAGGER_ENABLED:false}
+    enabled: ${APP_DEV_SWAGGER_ENABLED:${APP_DEV_MODE:false}}
     path: /swagger-ui.html

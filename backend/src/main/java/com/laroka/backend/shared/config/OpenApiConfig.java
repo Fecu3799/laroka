@@ -11,7 +11,7 @@ import io.swagger.v3.oas.models.info.Info;
 public class OpenApiConfig {
 
 	@Bean
-	@ConditionalOnProperty(name = "swagger.enabled", havingValue = "true", matchIfMissing = true)
+	@ConditionalOnProperty(name = "swagger.enabled", havingValue = "true", matchIfMissing = false)
 	public OpenAPI larokaOpenAPI() {
 		return new OpenAPI()
 			.info(new Info()
