@@ -64,6 +64,10 @@ rate:
       max-requests: ${RATE_LIMIT_LOGIN_MAX_REQUESTS:10}
       window-seconds: ${RATE_LIMIT_LOGIN_WINDOW_SECONDS:60}
 
+cache:
+  menu:
+    ttl-seconds: ${CACHE_MENU_TTL_SECONDS:600}
+
 swagger:
   enabled: ${APP_DEV_SWAGGER_ENABLED:${APP_DEV_MODE:false}}
 
