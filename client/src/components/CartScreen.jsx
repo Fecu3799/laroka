@@ -196,6 +196,7 @@ export function CartScreen({ items, extras = [], onBack, onRemove, onUpdateQty, 
       body: JSON.stringify(payload),
     })
     const data = await res.json()
+    onClear()
 
     if (formData.paymentMethod === 'MERCADOPAGO') {
       addActiveOrder(data.orderId, preferredBranchId)
@@ -218,7 +219,6 @@ export function CartScreen({ items, extras = [], onBack, onRemove, onUpdateQty, 
       return
     }
 
-    onClear()
     setConfirmedOrderId(data.orderId)
   }
 

@@ -43,7 +43,10 @@ export function useCart(initialItems = []) {
     )
   }, [])
 
-  const clearCart = useCallback(() => setItems([]), [])
+  const clearCart = useCallback(() => {
+    localStorage.setItem(CART_KEY, JSON.stringify([]))
+    setItems([])
+  }, [])
 
   const total = items.reduce((sum, i) => sum + i.price * i.qty, 0)
   const count = items.reduce((sum, i) => sum + i.qty, 0)
