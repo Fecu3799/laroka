@@ -545,17 +545,19 @@ export default function Orders() {
   // ── Sync open panel ID to Layout ref ─────────────────────────
   useEffect(() => { setOpenOrderId(selectedId) }, [selectedId, setOpenOrderId])
 
-  // ── SSE: si el panel está abierto para ese pedido, actualiza lista + detalle ─
+  // ── SSE: actualiza lista en tiempo real; refresca detalle si el panel está abierto ─
   useEffect(() => {
     function handleOrderUpdated(e) {
       const { orderId, type, order } = e.detail;
-      if (!selectedId || orderId !== selectedId) return;
       if (type === 'ORDER_UPDATED' && order) {
         replaceOrderInList(order);
+        if (selectedId === orderId) refetchDetail();
       } else if (type === 'CANCELLATION_REQUESTED') {
-        updateOrderInList(orderId, 'CANCELLATION_REQUESTED');
+        if (selectedId && orderId === selectedId) {
+          updateOrderInList(orderId, 'CANCELLATION_REQUESTED');
+          refetchDetail();
+        }
       }
-      refetchDetail();
     }
     window.addEventListener("laroka:order-updated", handleOrderUpdated);
     return () =>
