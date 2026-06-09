@@ -1017,6 +1017,9 @@ class OrderServiceTest {
 
         when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
         when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(orderRepository.findByIdWithDetails(orderId)).thenReturn(Optional.of(order));
+        when(paymentRepository.findByOrderId(orderId)).thenReturn(Optional.empty());
+        when(orderMapper.toBackofficeResponseDTO(any(), any())).thenReturn(new BackofficeOrderResponseDTO());
 
         service.cancelOrder(orderId, null);
 
@@ -1035,6 +1038,9 @@ class OrderServiceTest {
 
         when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
         when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(orderRepository.findByIdWithDetails(orderId)).thenReturn(Optional.of(order));
+        when(paymentRepository.findByOrderId(orderId)).thenReturn(Optional.empty());
+        when(orderMapper.toBackofficeResponseDTO(any(), any())).thenReturn(new BackofficeOrderResponseDTO());
 
         service.cancelOrder(orderId, "me equivoqué");
 
