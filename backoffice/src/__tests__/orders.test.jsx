@@ -77,6 +77,7 @@ const DEFAULT_HOOK = {
   dismissedIds: new Set(),
   updateOrderInList: vi.fn(),
   updatePaymentInList: vi.fn(),
+  replaceOrderInList: vi.fn(),
 }
 
 // ── Helpers ───────────────────────────────────────────────────

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
-import { initiatePayment } from '../services/paymentsService'
-import { cancelOrder } from '../services/ordersService'
-import { removeActiveOrder } from '../utils/activeOrders'
+import { initiatePayment } from '../../services/paymentsService'
+import { cancelOrder } from '../../services/ordersService'
+import { removeActiveOrder } from '../../utils/activeOrders'
 import styles from './PaymentModals.module.css'
 
 function XCircleIcon() {

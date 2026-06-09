@@ -20,7 +20,9 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.laroka.backend.auth.controller.AuthController;
+import com.laroka.backend.auth.repository.RefreshTokenRepository;
 import com.laroka.backend.auth.service.AuthService;
+import com.laroka.backend.auth.service.LoginTokens;
 import com.laroka.backend.branch.entity.Branch;
 import com.laroka.backend.staffuser.controller.StaffUserController;
 import com.laroka.backend.staffuser.dto.StaffUserResponseDTO;
@@ -50,6 +52,12 @@ class SecurityIntegrationTest {
 
 	@MockitoBean
 	private AuthService authService;
+
+	@MockitoBean
+	private TokenBlacklist tokenBlacklist;
+
+	@MockitoBean
+	private RefreshTokenRepository refreshTokenRepository;
 
 	@MockitoBean
 	private StaffUserService staffUserService;
@@ -143,13 +151,15 @@ class SecurityIntegrationTest {
 
 	@Test
 	void loginEndpoint_noToken_isPublicReturns200() throws Exception {
-		when(authService.login(anyString(), anyString())).thenReturn("mocked.jwt.token");
+		when(authService.login(anyString(), anyString()))
+			.thenReturn(new LoginTokens("mocked.jwt.token", "mocked-refresh-token"));
 
 		mockMvc.perform(post("/auth/login")
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("{\"email\":\"admin@laroka.com\",\"password\":\"admin123\"}"))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.token").value("mocked.jwt.token"));
+			.andExpect(jsonPath("$.token").value("mocked.jwt.token"))
+			.andExpect(jsonPath("$.refreshToken").value("mocked-refresh-token"));
 	}
 
 	// --- smoke: GET /branches/** es público (no se bloquea por seguridad) ---

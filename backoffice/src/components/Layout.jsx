@@ -67,7 +67,7 @@ export default function Layout() {
   const setOpenOrderId = useCallback(id => { openOrderIdRef.current = id }, [])
 
   function handleLogout() {
-    logout()
+    logout(token)
     navigate('/login', { replace: true })
   }
 
@@ -110,10 +110,13 @@ export default function Layout() {
               if (line.startsWith('data:')) {
                 try {
                   const json = JSON.parse(line.slice(5).trim())
-                  if (json.orderId) {
-                    window.dispatchEvent(new CustomEvent('laroka:order-updated', { detail: { orderId: json.orderId, type: json.type } }))
-                    if (json.orderId !== openOrderIdRef.current) {
-                      if (json.type === 'NEW_ORDER') setNewOrderCount(prev => prev + 1)
+                  const orderId = json.orderId ?? json.order?.id
+                  if (orderId) {
+                    window.dispatchEvent(new CustomEvent('laroka:order-updated', {
+                      detail: { orderId, type: json.type, order: json.order ?? null },
+                    }))
+                    if (orderId !== openOrderIdRef.current) {
+                      if (json.type === 'NEW_ORDER' && json.origin !== 'BACKOFFICE') setNewOrderCount(prev => prev + 1)
                       else if (json.type === 'CANCELLATION_REQUESTED') setCancelCount(prev => prev + 1)
                     }
                   }

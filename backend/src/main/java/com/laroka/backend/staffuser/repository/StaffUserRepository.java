@@ -16,4 +16,7 @@ public interface StaffUserRepository extends JpaRepository<StaffUser, Integer> {
 
 	@Query("SELECT u FROM StaffUser u JOIN FETCH u.branch b JOIN FETCH b.tenant WHERE u.email = :email")
 	Optional<StaffUser> findByEmailWithBranchAndTenant(@Param("email") String email);
+
+	@Query("SELECT u FROM StaffUser u JOIN FETCH u.branch b JOIN FETCH b.tenant WHERE u.id = :id")
+	Optional<StaffUser> findByIdWithBranchAndTenant(@Param("id") Integer id);
 }

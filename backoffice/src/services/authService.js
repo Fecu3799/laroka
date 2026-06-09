@@ -8,6 +8,18 @@ export async function login(email, password) {
   })
 }
 
-export function logout() {
+export function logout(token) {
+  const refreshToken = localStorage.getItem('laroka_refresh_token')
+  if (token) {
+    fetch(`${API_URL}/auth/logout`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ refreshToken }),
+    }).catch(() => {})
+  }
   localStorage.removeItem('laroka_token')
+  localStorage.removeItem('laroka_refresh_token')
 }

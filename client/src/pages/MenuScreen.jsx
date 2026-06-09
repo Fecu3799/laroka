@@ -1,29 +1,13 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { motion as Motion, AnimatePresence } from 'framer-motion'
-import { LaRokaLogo } from './LaRokaLogo'
-import { BottomNav } from './BottomNav'
-import { BranchDropdown } from './BranchDropdown'
+import { LaRokaLogo } from '../components/LaRokaLogo'
+import { BottomNav } from '../components/BottomNav'
 import { ProductDetailScreen } from './ProductDetailScreen'
 import { CartScreen } from './CartScreen'
-import { OrderTrackingBanner } from './OrderTrackingBanner'
+import { OrderTrackingBanner } from '../features/order/OrderTrackingBanner'
 import { useCart } from '../hooks/useCart'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080'
-
-function readActiveBranchIds() {
-  try {
-    const raw = localStorage.getItem('laroka_active_orders')
-    if (!raw) return new Set()
-    const entries = JSON.parse(raw)
-    return new Set(
-      entries
-        .map(e => (typeof e === 'object' && e ? e.branchId : null))
-        .filter(id => id != null)
-    )
-  } catch {
-    return new Set()
-  }
-}
 
 function formatPrice(price) {
   return `$${Number(price).toLocaleString('es-AR')}`
@@ -34,14 +18,6 @@ function SearchIcon() {
     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true" className="menu-search-icon">
       <circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth="2.2"/>
       <path d="M21 21l-4.35-4.35" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"/>
-    </svg>
-  )
-}
-
-function ChevronDown() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   )
 }
@@ -136,17 +112,14 @@ function BranchSwitchWarningModal({ onConfirm, onCancel }) {
   )
 }
 
-export function MenuScreen({ branchId, branchName, onSwitchBranch, paymentFailureRecovery = null, onPaymentFailureConsumed = () => {}, pendingPaymentRecovery = null, onPendingPaymentConsumed = () => {} }) {
+export function MenuScreen({ branchId, branchName, onChangeBranch, paymentFailureRecovery = null, onPaymentFailureConsumed = () => {}, pendingPaymentRecovery = null, onPendingPaymentConsumed = () => {} }) {
   const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [activeCategory, setActiveCategory] = useState(null)
   const [activeCategoryIndex, setActiveCategoryIndex] = useState(0)
-  const [swipeDirection, setSwipeDirection] = useState('right')
   const [searchQuery, setSearchQuery] = useState('')
   const [activeTab, setActiveTab] = useState(() => (paymentFailureRecovery || pendingPaymentRecovery) ? 'cart' : 'menu')
-  const [drawerOpen, setDrawerOpen] = useState(false)
-  const [branches, setBranches] = useState([])
   const [selectedProduct, setSelectedProduct] = useState(null)
   const [cartFailureData, setCartFailureData] = useState(() =>
     paymentFailureRecovery
@@ -156,17 +129,22 @@ export function MenuScreen({ branchId, branchName, onSwitchBranch, paymentFailur
   const [cartPendingData, setCartPendingData] = useState(() =>
     pendingPaymentRecovery ? { orderId: pendingPaymentRecovery.orderId } : null
   )
+  const [showSwitchWarning, setShowSwitchWarning] = useState(false)
+
   const retryRef = useRef(null)
-  const prevCategoryIndexRef = useRef(0)
+  const swipeContainerRef = useRef(null)
+  const trackRef = useRef(null)
+  const activeCategoryIndexRef = useRef(0)
+  const gestureRef = useRef({ active: false, startX: 0, startY: 0, direction: null })
+
   const { items, addItem, removeItem, updateQty, clearCart, count } = useCart(
     (paymentFailureRecovery?.items ?? pendingPaymentRecovery?.items)?.map(i => ({ ...i })) || []
   )
-  const [activeBranchIds, setActiveBranchIds] = useState(() => readActiveBranchIds())
-  const [pendingBranch, setPendingBranch] = useState(null)
 
-  const syncActiveBranchIds = useCallback(() => {
-    setActiveBranchIds(readActiveBranchIds())
-  }, [])
+  // Keep ref in sync after every render (same pattern as OrderTrackingBanner)
+  useEffect(() => {
+    activeCategoryIndexRef.current = activeCategoryIndex
+  })
 
   useEffect(() => {
     if (!paymentFailureRecovery) return
@@ -183,15 +161,6 @@ export function MenuScreen({ branchId, branchName, onSwitchBranch, paymentFailur
   const handleCartFailureConsumed = useCallback(() => {
     setCartFailureData(null)
   }, [])
-
-  useEffect(() => {
-    window.addEventListener('laroka_orders_updated', syncActiveBranchIds)
-    window.addEventListener('storage', syncActiveBranchIds)
-    return () => {
-      window.removeEventListener('laroka_orders_updated', syncActiveBranchIds)
-      window.removeEventListener('storage', syncActiveBranchIds)
-    }
-  }, [syncActiveBranchIds])
 
   const handleSelectProduct = useCallback((product) => {
     const cat = categories.find(c => c.products.some(p => p.id === product.id))
@@ -220,7 +189,6 @@ export function MenuScreen({ branchId, branchName, onSwitchBranch, paymentFailur
           if (data.length > 0) {
             setActiveCategory(data[0].categoryId)
             setActiveCategoryIndex(0)
-            prevCategoryIndexRef.current = 0
           }
         }
       } catch (err) {
@@ -249,93 +217,112 @@ export function MenuScreen({ branchId, branchName, onSwitchBranch, paymentFailur
 
   const handleCategoryChange = (categoryId) => {
     const newIndex = categories.findIndex(c => c.categoryId === categoryId)
-    if (newIndex !== activeCategoryIndex) {
-      setSwipeDirection(newIndex > activeCategoryIndex ? 'left' : 'right')
+    if (newIndex !== -1 && newIndex !== activeCategoryIndex) {
       setActiveCategoryIndex(newIndex)
       setActiveCategory(categoryId)
-      prevCategoryIndexRef.current = newIndex
+      if (trackRef.current && categories.length > 0) {
+        trackRef.current.style.transition = 'transform 0.3s ease-out'
+        trackRef.current.style.transform = `translateX(${-(newIndex / categories.length) * 100}%)`
+      }
     }
   }
 
   const isMenuTab = activeTab === 'menu'
   const isProfileTab = activeTab === 'profile'
 
-  const hasCurrentBranchOrder = branchId != null && activeBranchIds.has(branchId)
-  const hasOtherBranchOrder = !hasCurrentBranchOrder && activeBranchIds.size > 0
+  const handleChangeBranchClick = useCallback(() => {
+    if (count > 0) setShowSwitchWarning(true)
+    else onChangeBranch()
+  }, [count, onChangeBranch])
 
-  useEffect(() => {
-    if (!drawerOpen) return
-    let cancelled = false
-    const load = async () => {
-      try {
-        const res = await fetch(`${API_BASE}/branches`)
-        if (!res.ok) throw new Error('Error')
-        const data = await res.json()
-        if (!cancelled) setBranches(data)
-      } catch {
-        if (!cancelled) setBranches([])
-      }
+  const handleConfirmBranchSwitch = useCallback(() => {
+    clearCart()
+    onChangeBranch()
+  }, [clearCart, onChangeBranch])
+
+  const handleCancelBranchSwitch = useCallback(() => {
+    setShowSwitchWarning(false)
+  }, [])
+
+  function handleGestureDown(e) {
+    if (e.pointerType === 'mouse') return
+    gestureRef.current = { active: true, startX: e.clientX, startY: e.clientY, direction: null }
+  }
+
+  function handleGestureMove(e) {
+    const g = gestureRef.current
+    if (!g.active) return
+    const dx = e.clientX - g.startX
+    const dy = e.clientY - g.startY
+    if (g.direction === null) {
+      if (Math.abs(dx) < 5 && Math.abs(dy) < 5) return
+      g.direction = Math.abs(dy) > Math.abs(dx) ? 'vertical' : 'horizontal'
+      if (g.direction === 'vertical') { g.active = false; return }
+      e.currentTarget.setPointerCapture(e.pointerId)
     }
-    load()
-    return () => { cancelled = true }
-  }, [drawerOpen])
+    if (g.direction !== 'horizontal') return
+    const track = trackRef.current
+    const outer = swipeContainerRef.current
+    if (!track || !outer) return
+    const n = categories.length
+    if (n === 0) return
+    const idx = activeCategoryIndexRef.current
+    const blocked = (dx < 0 && idx >= n - 1) || (dx > 0 && idx <= 0)
+    const clamped = blocked ? 0 : dx
+    const outerWidth = outer.offsetWidth
+    const totalOffsetPx = -idx * outerWidth + clamped
+    const totalPercent = (totalOffsetPx / (n * outerWidth)) * 100
+    track.style.transition = 'none'
+    track.style.transform = `translateX(${totalPercent}%)`
+  }
 
-  const handleSelectBranchFromDrawer = (newBranchId) => {
-    if (newBranchId !== branchId) {
-      const branch = branches.find(b => b.id === newBranchId)
-      if (branch) {
-        if (count > 0) {
-          setPendingBranch(branch)
-        } else {
-          onSwitchBranch(branch)
-        }
-      }
+  function handleGestureUp(e) {
+    const g = gestureRef.current
+    if (!g.active || g.direction !== 'horizontal') { g.active = false; return }
+    g.active = false
+    const track = trackRef.current
+    if (!track) return
+    const dx = e.clientX - g.startX
+    const n = categories.length
+    const idx = activeCategoryIndexRef.current
+    let newIndex = idx
+    if (dx < 0 && idx < n - 1) newIndex = idx + 1
+    else if (dx > 0 && idx > 0) newIndex = idx - 1
+    const targetPercent = -(newIndex / n) * 100
+    track.style.transition = 'transform 0.3s ease-out'
+    track.style.transform = `translateX(${targetPercent}%)`
+    if (newIndex !== idx) {
+      setActiveCategoryIndex(newIndex)
+      setActiveCategory(categories[newIndex].categoryId)
     }
   }
 
-  const handleConfirmBranchSwitch = useCallback(() => {
-    if (!pendingBranch) return
-    clearCart()
-    onSwitchBranch(pendingBranch)
-    setPendingBranch(null)
-  }, [pendingBranch, clearCart, onSwitchBranch])
-
-  const handleCancelBranchSwitch = useCallback(() => {
-    setPendingBranch(null)
-  }, [])
+  function handleGestureCancel() {
+    const g = gestureRef.current
+    if (!g.active) return
+    g.active = false
+    const track = trackRef.current
+    if (!track) return
+    const n = categories.length
+    const idx = activeCategoryIndexRef.current
+    track.style.transition = 'transform 0.3s ease-out'
+    track.style.transform = `translateX(${-(idx / n) * 100}%)`
+  }
 
   return (
     <div className="menu-screen">
       <div className="menu-header-area">
         <header className="menu-header">
           <LaRokaLogo className="menu-logo" />
-          <div className="menu-branch-selector-wrapper">
+          <div className="menu-branch-info">
             <button
-              className={`menu-branch-selector${drawerOpen ? ' menu-branch-selector--open' : ''}`}
-              onClick={(e) => {
-                e.stopPropagation()
-                setDrawerOpen(!drawerOpen)
-              }}
-              aria-label="Cambiar sucursal"
-              aria-expanded={drawerOpen}
+              className="menu-change-branch-btn"
+              type="button"
+              onClick={handleChangeBranchClick}
             >
-              <span className="menu-branch-label">
-                {hasOtherBranchOrder && <span className="branch-active-dot" aria-hidden="true" />}
-                Sucursal <ChevronDown />
-              </span>
-              <span className="menu-branch-name">
-                {hasCurrentBranchOrder && <span className="branch-active-dot" aria-hidden="true" />}
-                {branchName || '—'}
-              </span>
+              Cambiar sucursal
             </button>
-            <BranchDropdown
-              isOpen={drawerOpen}
-              branches={branches}
-              currentBranchId={branchId}
-              onClose={() => setDrawerOpen(false)}
-              onSelectBranch={handleSelectBranchFromDrawer}
-              activeBranchIds={activeBranchIds}
-            />
+            <span className="menu-branch-name">{branchName || '—'}</span>
           </div>
         </header>
       </div>
@@ -403,33 +390,13 @@ export function MenuScreen({ branchId, branchName, onSwitchBranch, paymentFailur
                   Reintentar
                 </button>
               </div>
-            ) : currentProducts.length === 0 ? (
-              <div className="menu-empty">
-                <p>No se encontraron productos</p>
-              </div>
-            ) : (
-              <AnimatePresence mode="wait">
-                <Motion.ul
-                  key={activeCategory}
-                  className="menu-list"
-                  role="list"
-                  initial={{
-                    opacity: 0,
-                    x: swipeDirection === 'left' ? 80 : -80,
-                  }}
-                  animate={{
-                    opacity: 1,
-                    x: 0,
-                  }}
-                  exit={{
-                    opacity: 0,
-                    x: swipeDirection === 'left' ? -80 : 80,
-                  }}
-                  transition={{
-                    duration: 0.32,
-                    ease: [0.34, 1.56, 0.64, 1],
-                  }}
-                >
+            ) : searchQuery.trim() ? (
+              currentProducts.length === 0 ? (
+                <div className="menu-empty">
+                  <p>No se encontraron productos</p>
+                </div>
+              ) : (
+                <ul className="menu-list" role="list">
                   {currentProducts.map(product => (
                     <ProductCard
                       key={product.id}
@@ -438,8 +405,51 @@ export function MenuScreen({ branchId, branchName, onSwitchBranch, paymentFailur
                       onAdd={p => addItem(p, 1)}
                     />
                   ))}
-                </Motion.ul>
-              </AnimatePresence>
+                </ul>
+              )
+            ) : (
+              <div
+                ref={swipeContainerRef}
+                className="menu-swipe-outer"
+                onPointerDown={handleGestureDown}
+                onPointerMove={handleGestureMove}
+                onPointerUp={handleGestureUp}
+                onPointerCancel={handleGestureCancel}
+              >
+                <div
+                  ref={trackRef}
+                  className="menu-swipe-track"
+                  style={{
+                    width: `${categories.length * 100}%`,
+                    transform: `translateX(${categories.length > 0 ? -(activeCategoryIndex / categories.length) * 100 : 0}%)`,
+                  }}
+                >
+                  {categories.map(cat => (
+                    <div
+                      key={cat.categoryId}
+                      className="menu-swipe-slide"
+                      style={{ width: `${100 / categories.length}%` }}
+                    >
+                      {cat.products.length === 0 ? (
+                        <div className="menu-empty">
+                          <p>No se encontraron productos</p>
+                        </div>
+                      ) : (
+                        <ul className="menu-list" role="list">
+                          {cat.products.map(product => (
+                            <ProductCard
+                              key={product.id}
+                              product={product}
+                              onSelect={handleSelectProduct}
+                              onAdd={p => addItem(p, 1)}
+                            />
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
           </>
         )}
@@ -466,7 +476,7 @@ export function MenuScreen({ branchId, branchName, onSwitchBranch, paymentFailur
         )}
       </AnimatePresence>
 
-      {pendingBranch && (
+      {showSwitchWarning && (
         <BranchSwitchWarningModal
           onConfirm={handleConfirmBranchSwitch}
           onCancel={handleCancelBranchSwitch}

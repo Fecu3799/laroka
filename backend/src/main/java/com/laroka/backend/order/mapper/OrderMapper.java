@@ -33,7 +33,7 @@ public class OrderMapper {
                 .notes(dto.getNotes())
                 .customerName(dto.getCustomerName())
                 .customerPhone(dto.getCustomerPhone())
-                .origin(OrderOrigin.CLIENT)
+                .origin(dto.getOrigin() != null ? dto.getOrigin() : OrderOrigin.CLIENT)
                 .build();
     }
 
@@ -139,6 +139,7 @@ public class OrderMapper {
         return BackofficeOrderResponseDTO.builder()
                 .id(order.getId())
                 .createdAt(order.getCreatedAt())
+                .updatedAt(order.getUpdatedAt())
                 .status(order.getStatus())
                 .subtotal(order.getSubtotal())
                 .deliveryFee(order.getDeliveryFee())

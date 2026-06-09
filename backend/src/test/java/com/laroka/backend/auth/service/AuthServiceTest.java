@@ -2,6 +2,7 @@ package com.laroka.backend.auth.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 import java.util.Optional;
@@ -14,6 +15,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import com.laroka.backend.auth.exception.InvalidCredentialsException;
+import com.laroka.backend.auth.repository.RefreshTokenRepository;
 import com.laroka.backend.branch.entity.Branch;
 import com.laroka.backend.shared.security.JwtService;
 import com.laroka.backend.staffuser.entity.StaffUser;
@@ -27,6 +29,7 @@ class AuthServiceTest {
 	@Mock private StaffUserRepository staffUserRepository;
 	@Mock private PasswordEncoder passwordEncoder;
 	@Mock private JwtService jwtService;
+	@Mock private RefreshTokenRepository refreshTokenRepository;
 
 	@InjectMocks
 	private AuthService authService;
@@ -45,15 +48,17 @@ class AuthServiceTest {
 	}
 
 	@Test
-	void login_validCredentials_returnsToken() {
+	void login_validCredentials_returnsBothTokens() {
 		StaffUser user = staffUser();
 		when(staffUserRepository.findByEmailWithBranchAndTenant("admin@laroka.com")).thenReturn(Optional.of(user));
 		when(passwordEncoder.matches("admin123", user.getPasswordHash())).thenReturn(true);
 		when(jwtService.generateToken(user)).thenReturn("jwt.token.here");
+		when(refreshTokenRepository.save(any())).thenReturn(null);
 
-		String token = authService.login("admin@laroka.com", "admin123");
+		LoginTokens tokens = authService.login("admin@laroka.com", "admin123");
 
-		assertThat(token).isEqualTo("jwt.token.here");
+		assertThat(tokens.accessToken()).isEqualTo("jwt.token.here");
+		assertThat(tokens.refreshToken()).isNotBlank();
 	}
 
 	@Test

@@ -2,6 +2,8 @@ package com.laroka.backend.catalog.service;
 
 import java.util.List;
 
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import com.laroka.backend.branch.exception.BranchNotFoundException;
@@ -37,6 +39,7 @@ public class ProductService {
 			.orElseThrow(() -> new ProductNotFoundException(id));
 	}
 
+	@Cacheable(value = "menu", key = "#branchId")
 	public List<BranchProduct> getMenuForBranch(Integer branchId) {
 		validateBranchExists(branchId);
 		return branchProductRepository.findByBranchIdAndAvailableTrue(branchId);
@@ -81,6 +84,7 @@ public class ProductService {
 		repository.delete(findById(id));
 	}
 
+	@CacheEvict(value = "menu", key = "#branchId")
 	public Product updateAvailability(Integer productId, Boolean available, Integer branchId) {
 		if (branchId == null) {
 			throw new BusinessException("Branch ID is required to update product availability");

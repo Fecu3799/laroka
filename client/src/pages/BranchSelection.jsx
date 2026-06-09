@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { LaRokaLogo } from './LaRokaLogo'
+import { LaRokaLogo } from '../components/LaRokaLogo'
 import heroPizzaImg from '../assets/hero-pizza.webp'
 import playaImg from '../assets/cities/playa.webp'
 import madrynImg from '../assets/cities/madryn.webp'
@@ -63,6 +63,8 @@ export function BranchSelection({ onSelect }) {
   const [slidingId, setSlidingId] = useState(null)
   const retryRef = useRef(null)
   const slideTimerRef = useRef(null)
+  const dragRef = useRef({ active: false, startX: 0, labelEl: null, maxPx: 0, hasDragged: false, branch: null })
+  const dragSuppressClickRef = useRef(false)
 
   const retry = useCallback(() => retryRef.current?.(), [])
 
@@ -76,6 +78,54 @@ export function BranchSelection({ onSelect }) {
   }, [slidingId, onSelect])
 
   useEffect(() => () => clearTimeout(slideTimerRef.current), [])
+
+  function handlePointerDown(e, branch) {
+    if (slidingId) return
+    const labelEl = e.currentTarget.querySelector('.branch-label')
+    if (!labelEl) return
+    dragRef.current = {
+      active: true, startX: e.clientX, labelEl,
+      maxPx: labelEl.offsetWidth * 0.5385,
+      hasDragged: false, branch,
+    }
+    e.currentTarget.setPointerCapture(e.pointerId)
+  }
+
+  function handlePointerMove(e) {
+    const d = dragRef.current
+    if (!d.active) return
+    const dx = e.clientX - d.startX
+    if (dx < 8) return
+    d.hasDragged = true
+    d.labelEl.style.transition = 'none'
+    d.labelEl.style.transform = `translateX(${Math.min(dx, d.maxPx)}px)`
+  }
+
+  function handlePointerUp() {
+    const d = dragRef.current
+    if (!d.active) return
+    d.active = false
+    if (!d.hasDragged) {
+      d.labelEl.style.transition = ''
+      d.labelEl.style.transform = ''
+      return
+    }
+    dragSuppressClickRef.current = true
+    d.labelEl.style.transition = 'transform 0.2s ease-out'
+    d.labelEl.style.transform = `translateX(${d.maxPx}px)`
+    setSlidingId(d.branch.id)
+    prefetchMenuImages(d.branch.id)
+    slideTimerRef.current = setTimeout(() => onSelect(d.branch), 200)
+  }
+
+  function handlePointerCancel() {
+    const d = dragRef.current
+    if (!d.active) return
+    d.active = false
+    d.labelEl.style.transition = 'transform 0.2s ease-out'
+    d.labelEl.style.transform = 'translateX(0)'
+    setTimeout(() => { d.labelEl.style.transition = ''; d.labelEl.style.transform = '' }, 200)
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -129,7 +179,14 @@ export function BranchSelection({ onSelect }) {
               <li key={branch.id}>
                 <button
                   className={`branch-btn${slidingId === branch.id ? ' branch-btn--sliding' : ''}`}
-                  onClick={() => handleBranchClick(branch.id, branch.name, branch.deliveryFee, branch.serviceFee, branch.phone, branch.estimatedDeliveryMinutes)}
+                  onClick={() => {
+                    if (dragSuppressClickRef.current) { dragSuppressClickRef.current = false; return }
+                    handleBranchClick(branch.id, branch.name, branch.deliveryFee, branch.serviceFee, branch.phone, branch.estimatedDeliveryMinutes)
+                  }}
+                  onPointerDown={(e) => handlePointerDown(e, branch)}
+                  onPointerMove={handlePointerMove}
+                  onPointerUp={handlePointerUp}
+                  onPointerCancel={handlePointerCancel}
                   aria-label={`Seleccionar sucursal ${branch.name}`}
                 >
                   <CityThumb index={index} name={branch.name} />

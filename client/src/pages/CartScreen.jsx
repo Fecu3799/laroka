@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { CheckoutScreen } from './CheckoutScreen'
 import { ConfirmationScreen } from './ConfirmationScreen'
-import { PendingPaymentModal } from './PaymentModals'
+import { PendingPaymentModal } from '../features/payment/PaymentModals'
 import { usePreferredBranch } from '../hooks/usePreferredBranch'
 import { addActiveOrder } from '../utils/activeOrders'
 import { initiatePayment } from '../services/paymentsService'

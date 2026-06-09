@@ -53,5 +53,13 @@ export default function useOrders(token) {
     setOrders(prev => prev.map(o => o.id === id ? { ...o, paymentStatus } : o))
   }, [])
 
-  return { orders, loading, error, refresh, dismissOrder, dismissedIds, updateOrderInList, updatePaymentInList }
+  const replaceOrderInList = useCallback((order) => {
+    setOrders(prev => {
+      const idx = prev.findIndex(o => o.id === order.id)
+      if (idx === -1) return [order, ...prev]
+      return prev.map(o => o.id === order.id ? order : o)
+    })
+  }, [])
+
+  return { orders, loading, error, refresh, dismissOrder, dismissedIds, updateOrderInList, updatePaymentInList, replaceOrderInList }
 }

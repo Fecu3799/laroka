@@ -45,6 +45,7 @@ import com.laroka.backend.order.entity.PaymentMethod;
 import com.laroka.backend.order.exception.OrderNotFoundException;
 import com.laroka.backend.order.repository.OrderItemRepository;
 import com.laroka.backend.order.repository.OrderRepository;
+import com.laroka.backend.order.mapper.OrderMapper;
 import com.laroka.backend.order.repository.OrderStatusHistoryRepository;
 import com.laroka.backend.shared.exception.BusinessException;
 
@@ -69,6 +70,7 @@ public class OrderService {
     private final IdempotencyStore idempotencyStore;
     private final PaymentRepository paymentRepository;
     private final NotificationService notificationService;
+    private final OrderMapper orderMapper;
 
     @Transactional
     public OrderCreationResult createOrder(Order order, List<OrderItem> items,
@@ -194,6 +196,11 @@ public class OrderService {
 
         if (next == OrderStatus.CANCELLATION_REQUESTED) {
             notificationService.sendCancellationRequestEvent(saved.getBranch().getId(), saved.getId());
+        }
+        if (next == OrderStatus.CANCELLED) {
+            BackofficeOrderRow row = findOrderRowById(saved.getId());
+            notificationService.sendOrderUpdatedEvent(saved.getBranch().getId(),
+                    orderMapper.toBackofficeResponseDTO(row.order(), row.payment()));
         }
     }
 
@@ -356,6 +363,17 @@ public class OrderService {
     }
 
     @Transactional(readOnly = true)
+    public BackofficeOrderRow findOrderRowById(UUID orderId) {
+        Order order = orderRepository.findByIdWithDetails(orderId)
+                .orElseThrow(() -> {
+                    log.warn("Order not found | orderId={}", orderId);
+                    return new OrderNotFoundException(orderId);
+                });
+        Payment payment = paymentRepository.findByOrderId(orderId).orElse(null);
+        return new BackofficeOrderRow(order, payment);
+    }
+
+    @Transactional(readOnly = true)
     public List<OrderItem> findItemsByOrderId(UUID orderId) {
         if (!orderRepository.existsById(orderId)) {
             log.warn("Order not found | orderId={}", orderId);
@@ -462,7 +480,7 @@ public class OrderService {
             idempotencyStore.put(idempotencyKey, result);
         }
 
-        notificationService.sendNewOrderEvent(result.getBranch().getId(), result.getId(), result.getCreatedAt());
+        notificationService.sendNewOrderEvent(result.getBranch().getId(), result.getId(), result.getCreatedAt(), result.getOrigin());
 
         return new OrderCreationResult(result, false);
     }

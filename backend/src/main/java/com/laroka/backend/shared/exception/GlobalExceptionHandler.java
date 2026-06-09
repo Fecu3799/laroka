@@ -19,6 +19,7 @@ import org.springframework.web.context.request.async.AsyncRequestTimeoutExceptio
 import org.springframework.web.servlet.NoHandlerFoundException;
 
 import com.laroka.backend.auth.exception.InvalidCredentialsException;
+import com.laroka.backend.auth.exception.RefreshTokenInvalidException;
 
 @Slf4j
 @ControllerAdvice
@@ -33,6 +34,12 @@ public class GlobalExceptionHandler {
 	@ExceptionHandler(InvalidCredentialsException.class)
 	public ResponseEntity<Map<String, Object>> handleInvalidCredentials(
 			InvalidCredentialsException ex, HttpServletRequest request) {
+		return buildResponse(HttpStatus.UNAUTHORIZED, ex.getMessage(), null, request);
+	}
+
+	@ExceptionHandler(RefreshTokenInvalidException.class)
+	public ResponseEntity<Map<String, Object>> handleRefreshTokenInvalid(
+			RefreshTokenInvalidException ex, HttpServletRequest request) {
 		return buildResponse(HttpStatus.UNAUTHORIZED, ex.getMessage(), null, request);
 	}
 

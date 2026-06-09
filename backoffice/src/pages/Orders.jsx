@@ -524,6 +524,7 @@ export default function Orders() {
     dismissedIds,
     updateOrderInList,
     updatePaymentInList,
+    replaceOrderInList,
   } = useOrders(token);
 
   const [activeTab, setActiveTab] = useState("ALL");
@@ -544,18 +545,24 @@ export default function Orders() {
   // ── Sync open panel ID to Layout ref ─────────────────────────
   useEffect(() => { setOpenOrderId(selectedId) }, [selectedId, setOpenOrderId])
 
-  // ── SSE: update list + detail only when the panel is open for that order ───
+  // ── SSE: actualiza lista en tiempo real; refresca detalle si el panel está abierto ─
   useEffect(() => {
     function handleOrderUpdated(e) {
-      const { orderId, type } = e.detail;
-      if (!selectedId || orderId !== selectedId) return;
-      if (type === 'CANCELLATION_REQUESTED') updateOrderInList(orderId, 'CANCELLATION_REQUESTED');
-      refetchDetail();
+      const { orderId, type, order } = e.detail;
+      if (type === 'ORDER_UPDATED' && order) {
+        replaceOrderInList(order);
+        if (selectedId === orderId) refetchDetail();
+      } else if (type === 'CANCELLATION_REQUESTED') {
+        if (selectedId && orderId === selectedId) {
+          updateOrderInList(orderId, 'CANCELLATION_REQUESTED');
+          refetchDetail();
+        }
+      }
     }
     window.addEventListener("laroka:order-updated", handleOrderUpdated);
     return () =>
       window.removeEventListener("laroka:order-updated", handleOrderUpdated);
-  }, [selectedId, refetchDetail, updateOrderInList]);
+  }, [selectedId, refetchDetail, updateOrderInList, replaceOrderInList]);
 
   // ── Auto-clear selected if order leaves visible list ─────────
   useEffect(() => {
@@ -1130,7 +1137,7 @@ function OrderDetail({
           <div className="detail-block detail-block--origin">
             <div className="detail-overline">ORIGEN</div>
             <div className="detail-origin-name">
-              {order.origin === "CLIENT" ? "App Roka" : "Manual"}
+              {order.origin === "CLIENT" ? "App Roka" : "Local"}
             </div>
             <div className="detail-origin-time">
               {formatDateTime(order.createdAt)}

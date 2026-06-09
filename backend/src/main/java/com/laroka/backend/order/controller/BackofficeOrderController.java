@@ -31,6 +31,7 @@ import com.laroka.backend.order.service.OrderService;
 import com.laroka.backend.payment.dto.PaymentStatusResponseDTO;
 import com.laroka.backend.payment.entity.Payment;
 import com.laroka.backend.payment.service.PaymentService;
+import com.laroka.backend.notification.service.NotificationService;
 import com.laroka.backend.shared.exception.BusinessException;
 import com.laroka.backend.shared.security.CustomUserDetails;
 
@@ -48,6 +49,7 @@ public class BackofficeOrderController {
     private final OrderService orderService;
     private final OrderMapper orderMapper;
     private final PaymentService paymentService;
+    private final NotificationService notificationService;
 
     @GetMapping
     @Operation(summary = "Get active orders",
@@ -118,6 +120,9 @@ public class BackofficeOrderController {
 
         orderService.transitionStatusForBackoffice(id, dto.getNextStatus(), dto.getReason(),
                 principal.getBranchId(), principal.getUserId());
+        BackofficeOrderRow updatedRow = orderService.findOrderRowById(id);
+        notificationService.sendOrderUpdatedEvent(principal.getBranchId(),
+                orderMapper.toBackofficeResponseDTO(updatedRow.order(), updatedRow.payment()));
         return ResponseEntity.noContent().build();
     }
 
@@ -131,6 +136,9 @@ public class BackofficeOrderController {
 
         orderService.transitionToPreviousStatusForBackoffice(id,
                 principal.getBranchId(), principal.getUserId());
+        BackofficeOrderRow updatedRow = orderService.findOrderRowById(id);
+        notificationService.sendOrderUpdatedEvent(principal.getBranchId(),
+                orderMapper.toBackofficeResponseDTO(updatedRow.order(), updatedRow.payment()));
         return ResponseEntity.noContent().build();
     }
 
@@ -145,6 +153,9 @@ public class BackofficeOrderController {
 
         orderService.resolveCancellationRequest(id, dto.getAction(),
                 principal.getBranchId(), principal.getUserId());
+        BackofficeOrderRow updatedRow = orderService.findOrderRowById(id);
+        notificationService.sendOrderUpdatedEvent(principal.getBranchId(),
+                orderMapper.toBackofficeResponseDTO(updatedRow.order(), updatedRow.payment()));
         return ResponseEntity.noContent().build();
     }
 
@@ -162,6 +173,9 @@ public class BackofficeOrderController {
         }
 
         Payment payment = paymentService.confirmCashPayment(id, principal.getBranchId());
+        BackofficeOrderRow updatedRow = orderService.findOrderRowById(id);
+        notificationService.sendOrderUpdatedEvent(principal.getBranchId(),
+                orderMapper.toBackofficeResponseDTO(updatedRow.order(), payment));
         return ResponseEntity.ok(PaymentStatusResponseDTO.builder()
                 .status(payment.getStatus())
                 .method(payment.getMethod())

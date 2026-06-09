@@ -25,6 +25,7 @@ import lombok.RequiredArgsConstructor;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
 	private final JwtService jwtService;
+	private final TokenBlacklist tokenBlacklist;
 
 	@Override
 	protected boolean shouldNotFilterAsyncDispatch() {
@@ -41,6 +42,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 		}
 
 		String token = header.substring(7);
+		if (tokenBlacklist.contains(token)) {
+			writeError(response, HttpStatus.UNAUTHORIZED, "Token revoked");
+			return;
+		}
 		try {
 			Integer userId = jwtService.extractUserId(token);
 			String role = jwtService.extractRole(token);

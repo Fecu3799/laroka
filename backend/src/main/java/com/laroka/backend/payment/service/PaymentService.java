@@ -156,7 +156,7 @@ public class PaymentService {
                 log.info("processWebhook: transitioning order to RECEIVED — orderId={}, requestId={}", orderId, xRequestId);
                 orderService.transitionStatus(orderId, OrderStatus.RECEIVED);
                 log.info("processWebhook: order transitioned to RECEIVED — orderId={}, requestId={}", orderId, xRequestId);
-                notificationService.sendNewOrderEvent(order.getBranch().getId(), orderId, order.getCreatedAt());
+                notificationService.sendNewOrderEvent(order.getBranch().getId(), orderId, order.getCreatedAt(), order.getOrigin());
             } else if (order.getStatus() == OrderStatus.CANCELLED) {
                 log.error("processWebhook: pago aprobado para pedido CANCELADO — race condition detectada, iniciando reembolso automático | orderId={} mpPaymentId={} requestId={}",
                         orderId, paymentId, xRequestId);
