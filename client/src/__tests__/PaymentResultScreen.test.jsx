@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
-import { PaymentResultScreen } from '../components/PaymentResultScreen'
+import { PaymentResultScreen } from '../pages/PaymentResultScreen'
 
-vi.mock('../components/ConfirmationScreen', () => ({
+vi.mock('../pages/ConfirmationScreen', () => ({
   ConfirmationScreen: ({ orderId }) => <div>Confirmación {orderId}</div>,
 }))
 

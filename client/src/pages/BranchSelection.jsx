@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { LaRokaLogo } from './LaRokaLogo'
+import { LaRokaLogo } from '../components/LaRokaLogo'
 import heroPizzaImg from '../assets/hero-pizza.webp'
 import playaImg from '../assets/cities/playa.webp'
 import madrynImg from '../assets/cities/madryn.webp'

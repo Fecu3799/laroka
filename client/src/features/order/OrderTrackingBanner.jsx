@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { usePreferredBranch } from '../hooks/usePreferredBranch'
-import { readActiveOrders, removeActiveOrder } from '../utils/activeOrders'
-import { cancelOrder } from '../services/ordersService'
-import { initiatePayment } from '../services/paymentsService'
+import { usePreferredBranch } from '../../hooks/usePreferredBranch'
+import { readActiveOrders, removeActiveOrder } from '../../utils/activeOrders'
+import { cancelOrder } from '../../services/ordersService'
+import { initiatePayment } from '../../services/paymentsService'
 import styles from './OrderTrackingBanner.module.css'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080'
