@@ -118,7 +118,6 @@ export function MenuScreen({ branchId, branchName, onChangeBranch, paymentFailur
   const [error, setError] = useState(null)
   const [activeCategory, setActiveCategory] = useState(null)
   const [activeCategoryIndex, setActiveCategoryIndex] = useState(0)
-  const [swipeDirection, setSwipeDirection] = useState('right')
   const [searchQuery, setSearchQuery] = useState('')
   const [activeTab, setActiveTab] = useState(() => (paymentFailureRecovery || pendingPaymentRecovery) ? 'cart' : 'menu')
   const [selectedProduct, setSelectedProduct] = useState(null)
@@ -131,11 +130,21 @@ export function MenuScreen({ branchId, branchName, onChangeBranch, paymentFailur
     pendingPaymentRecovery ? { orderId: pendingPaymentRecovery.orderId } : null
   )
   const [showSwitchWarning, setShowSwitchWarning] = useState(false)
+
   const retryRef = useRef(null)
-  const prevCategoryIndexRef = useRef(0)
+  const swipeContainerRef = useRef(null)
+  const trackRef = useRef(null)
+  const activeCategoryIndexRef = useRef(0)
+  const gestureRef = useRef({ active: false, startX: 0, startY: 0, direction: null })
+
   const { items, addItem, removeItem, updateQty, clearCart, count } = useCart(
     (paymentFailureRecovery?.items ?? pendingPaymentRecovery?.items)?.map(i => ({ ...i })) || []
   )
+
+  // Keep ref in sync after every render (same pattern as OrderTrackingBanner)
+  useEffect(() => {
+    activeCategoryIndexRef.current = activeCategoryIndex
+  })
 
   useEffect(() => {
     if (!paymentFailureRecovery) return
@@ -180,7 +189,6 @@ export function MenuScreen({ branchId, branchName, onChangeBranch, paymentFailur
           if (data.length > 0) {
             setActiveCategory(data[0].categoryId)
             setActiveCategoryIndex(0)
-            prevCategoryIndexRef.current = 0
           }
         }
       } catch (err) {
@@ -209,11 +217,13 @@ export function MenuScreen({ branchId, branchName, onChangeBranch, paymentFailur
 
   const handleCategoryChange = (categoryId) => {
     const newIndex = categories.findIndex(c => c.categoryId === categoryId)
-    if (newIndex !== activeCategoryIndex) {
-      setSwipeDirection(newIndex > activeCategoryIndex ? 'left' : 'right')
+    if (newIndex !== -1 && newIndex !== activeCategoryIndex) {
       setActiveCategoryIndex(newIndex)
       setActiveCategory(categoryId)
-      prevCategoryIndexRef.current = newIndex
+      if (trackRef.current && categories.length > 0) {
+        trackRef.current.style.transition = 'transform 0.3s ease-out'
+        trackRef.current.style.transform = `translateX(${-(newIndex / categories.length) * 100}%)`
+      }
     }
   }
 
@@ -233,6 +243,71 @@ export function MenuScreen({ branchId, branchName, onChangeBranch, paymentFailur
   const handleCancelBranchSwitch = useCallback(() => {
     setShowSwitchWarning(false)
   }, [])
+
+  function handleGestureDown(e) {
+    if (e.pointerType === 'mouse') return
+    gestureRef.current = { active: true, startX: e.clientX, startY: e.clientY, direction: null }
+  }
+
+  function handleGestureMove(e) {
+    const g = gestureRef.current
+    if (!g.active) return
+    const dx = e.clientX - g.startX
+    const dy = e.clientY - g.startY
+    if (g.direction === null) {
+      if (Math.abs(dx) < 5 && Math.abs(dy) < 5) return
+      g.direction = Math.abs(dy) > Math.abs(dx) ? 'vertical' : 'horizontal'
+      if (g.direction === 'vertical') { g.active = false; return }
+      e.currentTarget.setPointerCapture(e.pointerId)
+    }
+    if (g.direction !== 'horizontal') return
+    const track = trackRef.current
+    const outer = swipeContainerRef.current
+    if (!track || !outer) return
+    const n = categories.length
+    if (n === 0) return
+    const idx = activeCategoryIndexRef.current
+    const blocked = (dx < 0 && idx >= n - 1) || (dx > 0 && idx <= 0)
+    const clamped = blocked ? 0 : dx
+    const outerWidth = outer.offsetWidth
+    const totalOffsetPx = -idx * outerWidth + clamped
+    const totalPercent = (totalOffsetPx / (n * outerWidth)) * 100
+    track.style.transition = 'none'
+    track.style.transform = `translateX(${totalPercent}%)`
+  }
+
+  function handleGestureUp(e) {
+    const g = gestureRef.current
+    if (!g.active || g.direction !== 'horizontal') { g.active = false; return }
+    g.active = false
+    const track = trackRef.current
+    if (!track) return
+    const dx = e.clientX - g.startX
+    const n = categories.length
+    const idx = activeCategoryIndexRef.current
+    let newIndex = idx
+    if (dx < 0 && idx < n - 1) newIndex = idx + 1
+    else if (dx > 0 && idx > 0) newIndex = idx - 1
+    const targetPercent = -(newIndex / n) * 100
+    track.style.transition = 'transform 0.3s ease-out'
+    track.style.transform = `translateX(${targetPercent}%)`
+    if (newIndex !== idx) {
+      setActiveCategoryIndex(newIndex)
+      setActiveCategory(categories[newIndex].categoryId)
+    }
+  }
+
+  function handleGestureCancel() {
+    const g = gestureRef.current
+    if (!g.active) return
+    g.active = false
+    const track = trackRef.current
+    if (!track) return
+    const n = categories.length
+    const idx = activeCategoryIndexRef.current
+    track.style.transition = 'transform 0.3s ease-out'
+    track.style.transform = `translateX(${-(idx / n) * 100}%)`
+  }
 
   return (
     <div className="menu-screen">
@@ -315,33 +390,13 @@ export function MenuScreen({ branchId, branchName, onChangeBranch, paymentFailur
                   Reintentar
                 </button>
               </div>
-            ) : currentProducts.length === 0 ? (
-              <div className="menu-empty">
-                <p>No se encontraron productos</p>
-              </div>
-            ) : (
-              <AnimatePresence mode="wait">
-                <Motion.ul
-                  key={activeCategory}
-                  className="menu-list"
-                  role="list"
-                  initial={{
-                    opacity: 0,
-                    x: swipeDirection === 'left' ? 80 : -80,
-                  }}
-                  animate={{
-                    opacity: 1,
-                    x: 0,
-                  }}
-                  exit={{
-                    opacity: 0,
-                    x: swipeDirection === 'left' ? -80 : 80,
-                  }}
-                  transition={{
-                    duration: 0.32,
-                    ease: [0.34, 1.56, 0.64, 1],
-                  }}
-                >
+            ) : searchQuery.trim() ? (
+              currentProducts.length === 0 ? (
+                <div className="menu-empty">
+                  <p>No se encontraron productos</p>
+                </div>
+              ) : (
+                <ul className="menu-list" role="list">
                   {currentProducts.map(product => (
                     <ProductCard
                       key={product.id}
@@ -350,8 +405,51 @@ export function MenuScreen({ branchId, branchName, onChangeBranch, paymentFailur
                       onAdd={p => addItem(p, 1)}
                     />
                   ))}
-                </Motion.ul>
-              </AnimatePresence>
+                </ul>
+              )
+            ) : (
+              <div
+                ref={swipeContainerRef}
+                className="menu-swipe-outer"
+                onPointerDown={handleGestureDown}
+                onPointerMove={handleGestureMove}
+                onPointerUp={handleGestureUp}
+                onPointerCancel={handleGestureCancel}
+              >
+                <div
+                  ref={trackRef}
+                  className="menu-swipe-track"
+                  style={{
+                    width: `${categories.length * 100}%`,
+                    transform: `translateX(${categories.length > 0 ? -(activeCategoryIndex / categories.length) * 100 : 0}%)`,
+                  }}
+                >
+                  {categories.map(cat => (
+                    <div
+                      key={cat.categoryId}
+                      className="menu-swipe-slide"
+                      style={{ width: `${100 / categories.length}%` }}
+                    >
+                      {cat.products.length === 0 ? (
+                        <div className="menu-empty">
+                          <p>No se encontraron productos</p>
+                        </div>
+                      ) : (
+                        <ul className="menu-list" role="list">
+                          {cat.products.map(product => (
+                            <ProductCard
+                              key={product.id}
+                              product={product}
+                              onSelect={handleSelectProduct}
+                              onAdd={p => addItem(p, 1)}
+                            />
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
           </>
         )}

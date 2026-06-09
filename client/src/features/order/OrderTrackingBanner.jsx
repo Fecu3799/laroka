@@ -550,10 +550,12 @@ export function OrderTrackingBanner({ branchId }) {
   const [activeIndex, setActiveIndex] = useState(0)
 
   const orderEntriesRef = useRef(orderEntries)
-  const touchStartRef = useRef(null)
   const visibleEntriesRef = useRef([])
   const clampedIndexRef = useRef(0)
   const anyModalOpenRef = useRef(false)
+  const slidesOuterRef = useRef(null)
+  const slidesInnerRef = useRef(null)
+  const bannerGestureRef = useRef({ active: false, startX: 0, startY: 0, direction: null })
 
   const visibleEntries = orderEntries.filter(e => e.branchId === branchId)
   const n = visibleEntries.length
@@ -646,20 +648,60 @@ export function OrderTrackingBanner({ branchId }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderEntries.length > 0])
 
-  const handleTouchStart = (e) => {
-    if (anyModalOpenRef.current) return
-    touchStartRef.current = e.touches[0].clientX
+  const handleGestureDown = (e) => {
+    if (anyModalOpenRef.current || n <= 1 || e.pointerType === 'mouse') return
+    bannerGestureRef.current = { active: true, startX: e.clientX, startY: e.clientY, direction: null }
   }
 
-  const handleTouchEnd = (e) => {
-    if (anyModalOpenRef.current || touchStartRef.current === null) return
-    const delta = e.changedTouches[0].clientX - touchStartRef.current
-    if (delta < -50) {
-      setActiveIndex(i => Math.min(n - 1, i + 1))
-    } else if (delta > 50) {
-      setActiveIndex(i => Math.max(0, i - 1))
+  const handleGestureMove = (e) => {
+    const g = bannerGestureRef.current
+    if (!g.active) return
+    const dx = e.clientX - g.startX
+    const dy = e.clientY - g.startY
+    if (g.direction === null) {
+      if (Math.abs(dx) < 5 && Math.abs(dy) < 5) return
+      g.direction = Math.abs(dy) > Math.abs(dx) ? 'vertical' : 'horizontal'
+      if (g.direction === 'vertical') { g.active = false; return }
+      e.currentTarget.setPointerCapture(e.pointerId)
     }
-    touchStartRef.current = null
+    if (g.direction !== 'horizontal') return
+    const track = slidesInnerRef.current
+    const outer = slidesOuterRef.current
+    if (!track || !outer) return
+    const idx = clampedIndexRef.current
+    const blocked = (dx < 0 && idx >= n - 1) || (dx > 0 && idx <= 0)
+    const clamped = blocked ? 0 : dx
+    const outerWidth = outer.offsetWidth
+    const totalPercent = ((-idx * outerWidth + clamped) / (n * outerWidth)) * 100
+    track.style.transition = 'none'
+    track.style.transform = `translateX(${totalPercent}%)`
+  }
+
+  const handleGestureUp = (e) => {
+    const g = bannerGestureRef.current
+    if (!g.active || g.direction !== 'horizontal') { g.active = false; return }
+    g.active = false
+    const track = slidesInnerRef.current
+    if (!track) return
+    const dx = e.clientX - g.startX
+    const idx = clampedIndexRef.current
+    let newIndex = idx
+    if (dx < 0 && idx < n - 1) newIndex = idx + 1
+    else if (dx > 0 && idx > 0) newIndex = idx - 1
+    track.style.transition = 'transform 300ms ease'
+    track.style.transform = `translateX(${-(newIndex / n) * 100}%)`
+    if (newIndex !== idx) setActiveIndex(newIndex)
+  }
+
+  const handleGestureCancel = () => {
+    const g = bannerGestureRef.current
+    if (!g.active) return
+    g.active = false
+    const track = slidesInnerRef.current
+    if (!track) return
+    const idx = clampedIndexRef.current
+    track.style.transition = 'transform 300ms ease'
+    track.style.transform = `translateX(${-(idx / n) * 100}%)`
   }
 
   const handleModalChange = useCallback((isOpen) => {
@@ -711,11 +753,15 @@ export function OrderTrackingBanner({ branchId }) {
     <>
       <div className={styles.banner}>
         <div
+          ref={slidesOuterRef}
           className={styles.slidesOuter}
-          onTouchStart={n > 1 ? handleTouchStart : undefined}
-          onTouchEnd={n > 1 ? handleTouchEnd : undefined}
+          onPointerDown={handleGestureDown}
+          onPointerMove={handleGestureMove}
+          onPointerUp={handleGestureUp}
+          onPointerCancel={handleGestureCancel}
         >
           <div
+            ref={slidesInnerRef}
             className={styles.slidesInner}
             style={{
               width: `${100 * n}%`,

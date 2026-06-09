@@ -469,6 +469,22 @@
 }
 
 /* Product list */
+.menu-swipe-outer {
+  overflow: hidden;
+  touch-action: pan-y;
+}
+
+.menu-swipe-track {
+  display: flex;
+  align-items: flex-start;
+  will-change: transform;
+  transition: transform 0.3s ease-out;
+}
+
+.menu-swipe-slide {
+  flex-shrink: 0;
+}
+
 .menu-list {
   list-style: none;
   margin: 0;
