@@ -2,28 +2,12 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { motion as Motion, AnimatePresence } from 'framer-motion'
 import { LaRokaLogo } from '../components/LaRokaLogo'
 import { BottomNav } from '../components/BottomNav'
-import { BranchDropdown } from '../components/BranchDropdown'
 import { ProductDetailScreen } from './ProductDetailScreen'
 import { CartScreen } from './CartScreen'
 import { OrderTrackingBanner } from '../features/order/OrderTrackingBanner'
 import { useCart } from '../hooks/useCart'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080'
-
-function readActiveBranchIds() {
-  try {
-    const raw = localStorage.getItem('laroka_active_orders')
-    if (!raw) return new Set()
-    const entries = JSON.parse(raw)
-    return new Set(
-      entries
-        .map(e => (typeof e === 'object' && e ? e.branchId : null))
-        .filter(id => id != null)
-    )
-  } catch {
-    return new Set()
-  }
-}
 
 function formatPrice(price) {
   return `$${Number(price).toLocaleString('es-AR')}`
@@ -34,14 +18,6 @@ function SearchIcon() {
     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true" className="menu-search-icon">
       <circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth="2.2"/>
       <path d="M21 21l-4.35-4.35" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"/>
-    </svg>
-  )
-}
-
-function ChevronDown() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   )
 }
@@ -136,7 +112,7 @@ function BranchSwitchWarningModal({ onConfirm, onCancel }) {
   )
 }
 
-export function MenuScreen({ branchId, branchName, onSwitchBranch, paymentFailureRecovery = null, onPaymentFailureConsumed = () => {}, pendingPaymentRecovery = null, onPendingPaymentConsumed = () => {} }) {
+export function MenuScreen({ branchId, branchName, onChangeBranch, paymentFailureRecovery = null, onPaymentFailureConsumed = () => {}, pendingPaymentRecovery = null, onPendingPaymentConsumed = () => {} }) {
   const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -145,8 +121,6 @@ export function MenuScreen({ branchId, branchName, onSwitchBranch, paymentFailur
   const [swipeDirection, setSwipeDirection] = useState('right')
   const [searchQuery, setSearchQuery] = useState('')
   const [activeTab, setActiveTab] = useState(() => (paymentFailureRecovery || pendingPaymentRecovery) ? 'cart' : 'menu')
-  const [drawerOpen, setDrawerOpen] = useState(false)
-  const [branches, setBranches] = useState([])
   const [selectedProduct, setSelectedProduct] = useState(null)
   const [cartFailureData, setCartFailureData] = useState(() =>
     paymentFailureRecovery
@@ -156,17 +130,12 @@ export function MenuScreen({ branchId, branchName, onSwitchBranch, paymentFailur
   const [cartPendingData, setCartPendingData] = useState(() =>
     pendingPaymentRecovery ? { orderId: pendingPaymentRecovery.orderId } : null
   )
+  const [showSwitchWarning, setShowSwitchWarning] = useState(false)
   const retryRef = useRef(null)
   const prevCategoryIndexRef = useRef(0)
   const { items, addItem, removeItem, updateQty, clearCart, count } = useCart(
     (paymentFailureRecovery?.items ?? pendingPaymentRecovery?.items)?.map(i => ({ ...i })) || []
   )
-  const [activeBranchIds, setActiveBranchIds] = useState(() => readActiveBranchIds())
-  const [pendingBranch, setPendingBranch] = useState(null)
-
-  const syncActiveBranchIds = useCallback(() => {
-    setActiveBranchIds(readActiveBranchIds())
-  }, [])
 
   useEffect(() => {
     if (!paymentFailureRecovery) return
@@ -183,15 +152,6 @@ export function MenuScreen({ branchId, branchName, onSwitchBranch, paymentFailur
   const handleCartFailureConsumed = useCallback(() => {
     setCartFailureData(null)
   }, [])
-
-  useEffect(() => {
-    window.addEventListener('laroka_orders_updated', syncActiveBranchIds)
-    window.addEventListener('storage', syncActiveBranchIds)
-    return () => {
-      window.removeEventListener('laroka_orders_updated', syncActiveBranchIds)
-      window.removeEventListener('storage', syncActiveBranchIds)
-    }
-  }, [syncActiveBranchIds])
 
   const handleSelectProduct = useCallback((product) => {
     const cat = categories.find(c => c.products.some(p => p.id === product.id))
@@ -260,48 +220,18 @@ export function MenuScreen({ branchId, branchName, onSwitchBranch, paymentFailur
   const isMenuTab = activeTab === 'menu'
   const isProfileTab = activeTab === 'profile'
 
-  const hasCurrentBranchOrder = branchId != null && activeBranchIds.has(branchId)
-  const hasOtherBranchOrder = !hasCurrentBranchOrder && activeBranchIds.size > 0
-
-  useEffect(() => {
-    if (!drawerOpen) return
-    let cancelled = false
-    const load = async () => {
-      try {
-        const res = await fetch(`${API_BASE}/branches`)
-        if (!res.ok) throw new Error('Error')
-        const data = await res.json()
-        if (!cancelled) setBranches(data)
-      } catch {
-        if (!cancelled) setBranches([])
-      }
-    }
-    load()
-    return () => { cancelled = true }
-  }, [drawerOpen])
-
-  const handleSelectBranchFromDrawer = (newBranchId) => {
-    if (newBranchId !== branchId) {
-      const branch = branches.find(b => b.id === newBranchId)
-      if (branch) {
-        if (count > 0) {
-          setPendingBranch(branch)
-        } else {
-          onSwitchBranch(branch)
-        }
-      }
-    }
-  }
+  const handleChangeBranchClick = useCallback(() => {
+    if (count > 0) setShowSwitchWarning(true)
+    else onChangeBranch()
+  }, [count, onChangeBranch])
 
   const handleConfirmBranchSwitch = useCallback(() => {
-    if (!pendingBranch) return
     clearCart()
-    onSwitchBranch(pendingBranch)
-    setPendingBranch(null)
-  }, [pendingBranch, clearCart, onSwitchBranch])
+    onChangeBranch()
+  }, [clearCart, onChangeBranch])
 
   const handleCancelBranchSwitch = useCallback(() => {
-    setPendingBranch(null)
+    setShowSwitchWarning(false)
   }, [])
 
   return (
@@ -309,33 +239,15 @@ export function MenuScreen({ branchId, branchName, onSwitchBranch, paymentFailur
       <div className="menu-header-area">
         <header className="menu-header">
           <LaRokaLogo className="menu-logo" />
-          <div className="menu-branch-selector-wrapper">
+          <div className="menu-branch-info">
             <button
-              className={`menu-branch-selector${drawerOpen ? ' menu-branch-selector--open' : ''}`}
-              onClick={(e) => {
-                e.stopPropagation()
-                setDrawerOpen(!drawerOpen)
-              }}
-              aria-label="Cambiar sucursal"
-              aria-expanded={drawerOpen}
+              className="menu-change-branch-btn"
+              type="button"
+              onClick={handleChangeBranchClick}
             >
-              <span className="menu-branch-label">
-                {hasOtherBranchOrder && <span className="branch-active-dot" aria-hidden="true" />}
-                Sucursal <ChevronDown />
-              </span>
-              <span className="menu-branch-name">
-                {hasCurrentBranchOrder && <span className="branch-active-dot" aria-hidden="true" />}
-                {branchName || '—'}
-              </span>
+              Cambiar sucursal
             </button>
-            <BranchDropdown
-              isOpen={drawerOpen}
-              branches={branches}
-              currentBranchId={branchId}
-              onClose={() => setDrawerOpen(false)}
-              onSelectBranch={handleSelectBranchFromDrawer}
-              activeBranchIds={activeBranchIds}
-            />
+            <span className="menu-branch-name">{branchName || '—'}</span>
           </div>
         </header>
       </div>
@@ -466,7 +378,7 @@ export function MenuScreen({ branchId, branchName, onSwitchBranch, paymentFailur
         )}
       </AnimatePresence>
 
-      {pendingBranch && (
+      {showSwitchWarning && (
         <BranchSwitchWarningModal
           onConfirm={handleConfirmBranchSwitch}
           onCancel={handleCancelBranchSwitch}

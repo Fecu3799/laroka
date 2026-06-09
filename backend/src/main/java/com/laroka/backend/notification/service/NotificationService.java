@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import com.laroka.backend.order.dto.BackofficeOrderResponseDTO;
+import com.laroka.backend.order.entity.OrderOrigin;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -42,7 +43,7 @@ public class NotificationService {
         return emitter;
     }
 
-    public void sendNewOrderEvent(Integer branchId, UUID orderId, LocalDateTime createdAt) {
+    public void sendNewOrderEvent(Integer branchId, UUID orderId, LocalDateTime createdAt, OrderOrigin origin) {
         List<EmitterEntry> dead = new ArrayList<>();
         for (EmitterEntry entry : emitters) {
             if (entry.branchId().equals(branchId)) {
@@ -52,6 +53,7 @@ public class NotificationService {
                     data.put("orderId", orderId.toString());
                     data.put("branchId", branchId);
                     data.put("createdAt", createdAt.toString());
+                    data.put("origin", origin != null ? origin.name() : OrderOrigin.CLIENT.name());
                     entry.emitter().send(SseEmitter.event().name("new-order").data(data));
                 } catch (Exception e) {
                     log.warn("SSE send failed, removing dead emitter | branchId={}", branchId);

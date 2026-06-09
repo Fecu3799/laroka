@@ -480,7 +480,7 @@ public class OrderService {
             idempotencyStore.put(idempotencyKey, result);
         }
 
-        notificationService.sendNewOrderEvent(result.getBranch().getId(), result.getId(), result.getCreatedAt());
+        notificationService.sendNewOrderEvent(result.getBranch().getId(), result.getId(), result.getCreatedAt(), result.getOrigin());
 
         return new OrderCreationResult(result, false);
     }

@@ -116,7 +116,7 @@ export default function Layout() {
                       detail: { orderId, type: json.type, order: json.order ?? null },
                     }))
                     if (orderId !== openOrderIdRef.current) {
-                      if (json.type === 'NEW_ORDER') setNewOrderCount(prev => prev + 1)
+                      if (json.type === 'NEW_ORDER' && json.origin !== 'BACKOFFICE') setNewOrderCount(prev => prev + 1)
                       else if (json.type === 'CANCELLATION_REQUESTED') setCancelCount(prev => prev + 1)
                     }
                   }

@@ -33,7 +33,7 @@ public class OrderMapper {
                 .notes(dto.getNotes())
                 .customerName(dto.getCustomerName())
                 .customerPhone(dto.getCustomerPhone())
-                .origin(OrderOrigin.CLIENT)
+                .origin(dto.getOrigin() != null ? dto.getOrigin() : OrderOrigin.CLIENT)
                 .build();
     }
 

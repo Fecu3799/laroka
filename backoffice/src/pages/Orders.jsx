@@ -1137,7 +1137,7 @@ function OrderDetail({
           <div className="detail-block detail-block--origin">
             <div className="detail-overline">ORIGEN</div>
             <div className="detail-origin-name">
-              {order.origin === "CLIENT" ? "App Roka" : "Manual"}
+              {order.origin === "CLIENT" ? "App Roka" : "Local"}
             </div>
             <div className="detail-origin-time">
               {formatDateTime(order.createdAt)}

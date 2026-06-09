@@ -2,6 +2,7 @@ package com.laroka.backend.order.dto;
 
 import java.util.List;
 
+import com.laroka.backend.order.entity.OrderOrigin;
 import com.laroka.backend.order.entity.OrderType;
 import com.laroka.backend.order.entity.PaymentMethod;
 
@@ -34,4 +35,6 @@ public class CreateOrderRequestDTO {
 
     @NotNull
     private PaymentMethod paymentMethod;
+
+    private OrderOrigin origin = OrderOrigin.CLIENT;
 }

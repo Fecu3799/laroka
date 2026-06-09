@@ -298,6 +298,26 @@
   padding-top: 10px;
 }
 
+/* Change branch button */
+.menu-branch-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.menu-change-branch-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font-family: 'Oswald', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 400;
+  color: color-mix(in srgb, var(--text-primary) 65%, transparent);
+  letter-spacing: 0.3px;
+}
+
 /* Branch selector button */
 .menu-branch-selector-wrapper {
   position: relative;

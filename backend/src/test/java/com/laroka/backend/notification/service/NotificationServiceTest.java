@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import com.laroka.backend.order.dto.BackofficeOrderResponseDTO;
+import com.laroka.backend.order.entity.OrderOrigin;
 import com.laroka.backend.order.entity.OrderStatus;
 
 class NotificationServiceTest {
@@ -32,7 +33,7 @@ class NotificationServiceTest {
         service.register(1, emitterBranch1);
         service.register(2, emitterBranch2);
 
-        service.sendNewOrderEvent(1, UUID.randomUUID(), LocalDateTime.now());
+        service.sendNewOrderEvent(1, UUID.randomUUID(), LocalDateTime.now(), OrderOrigin.CLIENT);
 
         verify(emitterBranch1).send(any(SseEmitter.SseEventBuilder.class));
         verify(emitterBranch2, never()).send(any(SseEmitter.SseEventBuilder.class));
@@ -40,7 +41,7 @@ class NotificationServiceTest {
 
     @Test
     void sendNewOrderEvent_noSubscribers_doesNotThrow() {
-        service.sendNewOrderEvent(99, UUID.randomUUID(), LocalDateTime.now());
+        service.sendNewOrderEvent(99, UUID.randomUUID(), LocalDateTime.now(), OrderOrigin.CLIENT);
     }
 
     @Test
@@ -54,7 +55,7 @@ class NotificationServiceTest {
         service.register(1, dead);
         service.register(1, alive);
 
-        service.sendNewOrderEvent(1, UUID.randomUUID(), LocalDateTime.now());
+        service.sendNewOrderEvent(1, UUID.randomUUID(), LocalDateTime.now(), OrderOrigin.CLIENT);
 
         verify(alive).send(any(SseEmitter.SseEventBuilder.class));
     }
