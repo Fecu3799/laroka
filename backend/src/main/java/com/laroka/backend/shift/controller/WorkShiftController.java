@@ -1,13 +1,17 @@
 package com.laroka.backend.shift.controller;
 
+import java.util.Optional;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.laroka.backend.shift.dto.CloseShiftResponseDTO;
+import com.laroka.backend.shift.dto.CurrentShiftResponseDTO;
 import com.laroka.backend.shift.dto.OpenShiftResponseDTO;
 import com.laroka.backend.shift.entity.WorkShift;
 import com.laroka.backend.shift.entity.WorkShiftSummary;
@@ -49,6 +53,27 @@ public class WorkShiftController {
             .branchId(shift.getBranch().getId())
             .warningPreviousShiftClosed(result.previousShiftClosed())
             .build());
+    }
+
+    @GetMapping("/current")
+    @Operation(summary = "Get current active shift",
+            description = "Returns the active shift for the authenticated user's branch, or active=false if none exists.")
+    public ResponseEntity<CurrentShiftResponseDTO> getCurrentShift(
+            @AuthenticationPrincipal CustomUserDetails principal,
+            HttpServletRequest request) {
+
+        Integer branchId = securityUtils.resolveBranchId(principal, request);
+        Optional<WorkShift> shift = workShiftService.getCurrentShift(branchId);
+
+        CurrentShiftResponseDTO response = shift.map(ws -> CurrentShiftResponseDTO.builder()
+                .active(true)
+                .shiftId(ws.getId())
+                .openedAt(ws.getOpenedAt())
+                .openedBy(ws.getOpenedBy().getName())
+                .build())
+            .orElse(CurrentShiftResponseDTO.builder().active(false).build());
+
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/close")

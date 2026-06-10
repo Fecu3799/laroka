@@ -229,6 +229,32 @@ class WorkShiftServiceTest {
     }
 
     @Test
+    void getCurrentShift_activeShift_returnsShift() {
+        Branch branch = branch();
+        StaffUser opener = staffUser();
+        WorkShift shift = openShift(branch, opener);
+
+        when(workShiftRepository.findByBranchIdAndStatusWithOpenedBy(1, ShiftStatus.OPEN))
+            .thenReturn(Optional.of(shift));
+
+        Optional<WorkShift> result = workShiftService.getCurrentShift(1);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getStatus()).isEqualTo(ShiftStatus.OPEN);
+        assertThat(result.get().getOpenedBy().getName()).isEqualTo("Manager 1");
+    }
+
+    @Test
+    void getCurrentShift_noActiveShift_returnsEmpty() {
+        when(workShiftRepository.findByBranchIdAndStatusWithOpenedBy(1, ShiftStatus.OPEN))
+            .thenReturn(Optional.empty());
+
+        Optional<WorkShift> result = workShiftService.getCurrentShift(1);
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
     void closeShift_noActiveShift_throwsBusinessException() {
         StaffUser closer = staffUser();
 

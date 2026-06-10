@@ -68,6 +68,10 @@ public class WorkShiftService {
         return new OpenShiftResult(workShiftRepository.save(newShift), previousShiftClosed);
     }
 
+    public Optional<WorkShift> getCurrentShift(Integer branchId) {
+        return workShiftRepository.findByBranchIdAndStatusWithOpenedBy(branchId, ShiftStatus.OPEN);
+    }
+
     @Transactional
     public WorkShiftSummary closeShift(Integer branchId, Integer userId) {
         StaffUser closer = staffUserRepository.findById(userId)
