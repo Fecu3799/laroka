@@ -153,6 +153,25 @@
   line-height: 1.3;
 }
 
+.layout-branch-change-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 6px;
+  margin-top: 4px;
+  background: transparent;
+  border: 1px solid rgba(245, 197, 24, 0.25);
+  border-radius: 5px;
+  color: rgba(245, 197, 24, 0.6);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.layout-branch-change-btn:hover {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
 .layout-logout-btn {
   display: flex;
   align-items: center;

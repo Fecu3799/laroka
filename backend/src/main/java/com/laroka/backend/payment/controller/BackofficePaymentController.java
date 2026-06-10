@@ -12,9 +12,11 @@ import org.springframework.web.bind.annotation.RestController;
 import com.laroka.backend.payment.dto.QrChargeRequestDTO;
 import com.laroka.backend.payment.service.PaymentService;
 import com.laroka.backend.shared.security.CustomUserDetails;
+import com.laroka.backend.shared.security.SecurityUtils;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
@@ -25,6 +27,7 @@ import lombok.RequiredArgsConstructor;
 public class BackofficePaymentController {
 
     private final PaymentService paymentService;
+    private final SecurityUtils securityUtils;
 
     @PostMapping("/qr-charge")
     @Operation(summary = "Charge QR",
@@ -32,10 +35,11 @@ public class BackofficePaymentController {
                     + "Cancels any active QR charge before registering the new one (RN-21).")
     public ResponseEntity<Void> chargeQr(
             @Valid @RequestBody QrChargeRequestDTO dto,
-            @AuthenticationPrincipal CustomUserDetails principal) {
+            @AuthenticationPrincipal CustomUserDetails principal,
+            HttpServletRequest request) {
 
         UUID orderId = dto.getOrderId();
-        Integer branchId = principal.getBranchId();
+        Integer branchId = securityUtils.resolveBranchId(principal, request);
         paymentService.chargeQr(orderId, branchId);
         return ResponseEntity.ok().build();
     }

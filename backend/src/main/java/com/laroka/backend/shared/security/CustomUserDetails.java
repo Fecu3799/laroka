@@ -9,14 +9,16 @@ public class CustomUserDetails implements UserDetails {
 
 	private final Integer userId;
 	private final Integer branchId;
+	private final Integer tenantId;
 	private final String username;
 	private final String password;
 	private final Collection<? extends GrantedAuthority> authorities;
 
-	public CustomUserDetails(Integer userId, Integer branchId, String username, String password,
+	public CustomUserDetails(Integer userId, Integer branchId, Integer tenantId, String username, String password,
 			Collection<? extends GrantedAuthority> authorities) {
 		this.userId = userId;
 		this.branchId = branchId;
+		this.tenantId = tenantId;
 		this.username = username;
 		this.password = password;
 		this.authorities = authorities;
@@ -28,6 +30,10 @@ public class CustomUserDetails implements UserDetails {
 
 	public Integer getBranchId() {
 		return branchId;
+	}
+
+	public Integer getTenantId() {
+		return tenantId;
 	}
 
 	@Override

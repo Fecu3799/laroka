@@ -18,7 +18,7 @@ const ORDER_B = {
 }
 
 beforeEach(() => {
-  sessionStorage.clear()
+  localStorage.clear()
   global.fetch = vi.fn().mockResolvedValue({
     ok: true,
     json: async () => [],
@@ -73,8 +73,8 @@ test('dismissedIds acumula múltiples ids y todos persisten tras refresh()', asy
   expect(result.current.dismissedIds.has('order-3')).toBe(true)
 })
 
-test('dismissedIds se inicializa desde sessionStorage', async () => {
-  sessionStorage.setItem('laroka_dismissed_ids', JSON.stringify(['stored-order']))
+test('dismissedIds se inicializa desde localStorage', async () => {
+  localStorage.setItem('laroka_dismissed_ids', JSON.stringify(['stored-order']))
 
   const { result } = renderHook(() => useOrders('test-token'))
   await waitFor(() => expect(result.current.loading).toBe(false))

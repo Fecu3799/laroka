@@ -89,7 +89,7 @@ public class SecurityConfig {
 		List<String> origins = Arrays.asList(corsAllowedOrigins.split(","));
 		config.setAllowedOrigins(origins);
 		config.setAllowedMethods(List.of("GET", "POST", "PATCH", "DELETE"));
-		config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Idempotency-Key"));
+		config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Idempotency-Key", "X-Branch-Id"));
 		config.setAllowCredentials(true);
 
 		UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

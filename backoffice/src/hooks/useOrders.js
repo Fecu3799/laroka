@@ -1,13 +1,13 @@
 import { useState, useCallback, useEffect } from 'react'
 const API_URL = import.meta.env.VITE_API_URL ?? ''
 
-export default function useOrders(token) {
+export default function useOrders(token, branchId = null) {
   const [orders, setOrders]           = useState([])
   const [loading, setLoading]         = useState(true)
   const [error, setError]             = useState(null)
   const [dismissedIds, setDismissedIds] = useState(() => {
     try {
-      const stored = sessionStorage.getItem('laroka_dismissed_ids')
+      const stored = localStorage.getItem('laroka_dismissed_ids')
       return stored ? new Set(JSON.parse(stored)) : new Set()
     } catch { return new Set() }
   })
@@ -17,9 +17,9 @@ export default function useOrders(token) {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch(`${API_URL}/backoffice/orders`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      const headers = { Authorization: `Bearer ${token}` }
+      if (branchId != null) headers['X-Branch-Id'] = String(branchId)
+      const res = await fetch(`${API_URL}/backoffice/orders`, { headers })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       setOrders(await res.json())
     } catch (e) {
@@ -27,19 +27,23 @@ export default function useOrders(token) {
     } finally {
       setLoading(false)
     }
-  }, [token])
+  }, [token, branchId])
 
   useEffect(() => { fetchOrders() }, [fetchOrders])
 
   useEffect(() => {
     try {
-      sessionStorage.setItem('laroka_dismissed_ids', JSON.stringify([...dismissedIds]))
+      localStorage.setItem('laroka_dismissed_ids', JSON.stringify([...dismissedIds]))
     } catch { /* noop */ }
   }, [dismissedIds])
 
   const refresh = useCallback(() => {
     fetchOrders()
   }, [fetchOrders])
+
+  const clearOrders = useCallback(() => {
+    setOrders([])
+  }, [])
 
   const dismissOrder = useCallback((id) => {
     setDismissedIds(prev => new Set([...prev, id]))
@@ -61,5 +65,5 @@ export default function useOrders(token) {
     })
   }, [])
 
-  return { orders, loading, error, refresh, dismissOrder, dismissedIds, updateOrderInList, updatePaymentInList, replaceOrderInList }
+  return { orders, loading, error, refresh, clearOrders, dismissOrder, dismissedIds, updateOrderInList, updatePaymentInList, replaceOrderInList }
 }

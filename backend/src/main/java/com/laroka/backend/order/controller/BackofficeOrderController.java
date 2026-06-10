@@ -34,9 +34,11 @@ import com.laroka.backend.payment.service.PaymentService;
 import com.laroka.backend.notification.service.NotificationService;
 import com.laroka.backend.shared.exception.BusinessException;
 import com.laroka.backend.shared.security.CustomUserDetails;
+import com.laroka.backend.shared.security.SecurityUtils;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
@@ -50,6 +52,7 @@ public class BackofficeOrderController {
     private final OrderMapper orderMapper;
     private final PaymentService paymentService;
     private final NotificationService notificationService;
+    private final SecurityUtils securityUtils;
 
     @GetMapping
     @Operation(summary = "Get active orders",
@@ -60,10 +63,12 @@ public class BackofficeOrderController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime dateFrom,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime dateTo,
             @RequestParam(required = false, defaultValue = "createdAt_desc") String orderBy,
-            @AuthenticationPrincipal CustomUserDetails principal) {
+            @AuthenticationPrincipal CustomUserDetails principal,
+            HttpServletRequest request) {
 
+        Integer branchId = securityUtils.resolveBranchId(principal, request);
         OrderFilterParams params = new OrderFilterParams(status, dateFrom, dateTo, orderBy);
-        List<BackofficeOrderRow> rows = orderService.findActiveOrdersByBranch(principal.getBranchId(), params);
+        List<BackofficeOrderRow> rows = orderService.findActiveOrdersByBranch(branchId, params);
         List<BackofficeOrderResponseDTO> response = rows.stream()
                 .map(row -> orderMapper.toBackofficeResponseDTO(row.order(), row.payment()))
                 .toList();
@@ -81,10 +86,12 @@ public class BackofficeOrderController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime dateTo,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
-            @AuthenticationPrincipal CustomUserDetails principal) {
+            @AuthenticationPrincipal CustomUserDetails principal,
+            HttpServletRequest request) {
 
+        Integer branchId = securityUtils.resolveBranchId(principal, request);
         Page<BackofficeOrderRow> orderPage = orderService.findOrderHistoryByBranch(
-                principal.getBranchId(), status, dateFrom, dateTo, page, size);
+                branchId, status, dateFrom, dateTo, page, size);
 
         List<BackofficeOrderResponseDTO> content = orderPage.getContent().stream()
                 .map(row -> orderMapper.toBackofficeResponseDTO(row.order(), row.payment()))
@@ -103,9 +110,11 @@ public class BackofficeOrderController {
                     "Returns 403 if order belongs to a different branch, 404 if not found.")
     public ResponseEntity<BackofficeOrderDetailDTO> getOrderDetail(
             @PathVariable UUID id,
-            @AuthenticationPrincipal CustomUserDetails principal) {
+            @AuthenticationPrincipal CustomUserDetails principal,
+            HttpServletRequest request) {
 
-        BackofficeOrderDetail detail = orderService.getOrderDetailForBackoffice(id, principal.getBranchId());
+        Integer branchId = securityUtils.resolveBranchId(principal, request);
+        BackofficeOrderDetail detail = orderService.getOrderDetailForBackoffice(id, branchId);
         return ResponseEntity.ok(orderMapper.toBackofficeDetailDTO(detail));
     }
 
@@ -116,12 +125,14 @@ public class BackofficeOrderController {
     public ResponseEntity<Void> updateStatus(
             @PathVariable UUID id,
             @Valid @RequestBody UpdateOrderStatusRequestDTO dto,
-            @AuthenticationPrincipal CustomUserDetails principal) {
+            @AuthenticationPrincipal CustomUserDetails principal,
+            HttpServletRequest request) {
 
+        Integer branchId = securityUtils.resolveBranchId(principal, request);
         orderService.transitionStatusForBackoffice(id, dto.getNextStatus(), dto.getReason(),
-                principal.getBranchId(), principal.getUserId());
+                branchId, principal.getUserId());
         BackofficeOrderRow updatedRow = orderService.findOrderRowById(id);
-        notificationService.sendOrderUpdatedEvent(principal.getBranchId(),
+        notificationService.sendOrderUpdatedEvent(branchId,
                 orderMapper.toBackofficeResponseDTO(updatedRow.order(), updatedRow.payment()));
         return ResponseEntity.noContent().build();
     }
@@ -132,12 +143,13 @@ public class BackofficeOrderController {
                     "Returns 422 if the current status cannot be reverted, 403 if order belongs to a different branch.")
     public ResponseEntity<Void> revertStatus(
             @PathVariable UUID id,
-            @AuthenticationPrincipal CustomUserDetails principal) {
+            @AuthenticationPrincipal CustomUserDetails principal,
+            HttpServletRequest request) {
 
-        orderService.transitionToPreviousStatusForBackoffice(id,
-                principal.getBranchId(), principal.getUserId());
+        Integer branchId = securityUtils.resolveBranchId(principal, request);
+        orderService.transitionToPreviousStatusForBackoffice(id, branchId, principal.getUserId());
         BackofficeOrderRow updatedRow = orderService.findOrderRowById(id);
-        notificationService.sendOrderUpdatedEvent(principal.getBranchId(),
+        notificationService.sendOrderUpdatedEvent(branchId,
                 orderMapper.toBackofficeResponseDTO(updatedRow.order(), updatedRow.payment()));
         return ResponseEntity.noContent().build();
     }
@@ -149,12 +161,13 @@ public class BackofficeOrderController {
     public ResponseEntity<Void> resolveCancellationRequest(
             @PathVariable UUID id,
             @Valid @RequestBody CancelRequestActionDTO dto,
-            @AuthenticationPrincipal CustomUserDetails principal) {
+            @AuthenticationPrincipal CustomUserDetails principal,
+            HttpServletRequest request) {
 
-        orderService.resolveCancellationRequest(id, dto.getAction(),
-                principal.getBranchId(), principal.getUserId());
+        Integer branchId = securityUtils.resolveBranchId(principal, request);
+        orderService.resolveCancellationRequest(id, dto.getAction(), branchId, principal.getUserId());
         BackofficeOrderRow updatedRow = orderService.findOrderRowById(id);
-        notificationService.sendOrderUpdatedEvent(principal.getBranchId(),
+        notificationService.sendOrderUpdatedEvent(branchId,
                 orderMapper.toBackofficeResponseDTO(updatedRow.order(), updatedRow.payment()));
         return ResponseEntity.noContent().build();
     }
@@ -166,15 +179,17 @@ public class BackofficeOrderController {
     public ResponseEntity<PaymentStatusResponseDTO> confirmCashPayment(
             @PathVariable UUID id,
             @RequestBody Map<String, String> body,
-            @AuthenticationPrincipal CustomUserDetails principal) {
+            @AuthenticationPrincipal CustomUserDetails principal,
+            HttpServletRequest request) {
 
         if (!"CONFIRM".equals(body.get("action"))) {
             throw new BusinessException("action debe ser CONFIRM");
         }
 
-        Payment payment = paymentService.confirmCashPayment(id, principal.getBranchId());
+        Integer branchId = securityUtils.resolveBranchId(principal, request);
+        Payment payment = paymentService.confirmCashPayment(id, branchId);
         BackofficeOrderRow updatedRow = orderService.findOrderRowById(id);
-        notificationService.sendOrderUpdatedEvent(principal.getBranchId(),
+        notificationService.sendOrderUpdatedEvent(branchId,
                 orderMapper.toBackofficeResponseDTO(updatedRow.order(), payment));
         return ResponseEntity.ok(PaymentStatusResponseDTO.builder()
                 .status(payment.getStatus())

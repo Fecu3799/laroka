@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.context.request.async.AsyncRequestTimeoutException;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 
 import com.laroka.backend.auth.exception.InvalidCredentialsException;
@@ -85,6 +86,14 @@ public class GlobalExceptionHandler {
 			NoHandlerFoundException ex, HttpServletRequest request) {
 		String message = "Endpoint no encontrado: " + request.getMethod() + " " + request.getRequestURI();
 		return buildResponse(HttpStatus.NOT_FOUND, message, null, request);
+	}
+
+	@ExceptionHandler(ResponseStatusException.class)
+	public ResponseEntity<Map<String, Object>> handleResponseStatus(
+			ResponseStatusException ex, HttpServletRequest request) {
+		HttpStatus status = HttpStatus.valueOf(ex.getStatusCode().value());
+		String message = ex.getReason() != null ? ex.getReason() : ex.getMessage();
+		return buildResponse(status, message, null, request);
 	}
 
 	@ExceptionHandler({ AsyncRequestTimeoutException.class, AsyncRequestNotUsableException.class })

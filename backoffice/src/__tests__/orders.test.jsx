@@ -13,6 +13,10 @@ vi.mock('../hooks/useAuth', () => ({
   default: () => ({ token: 'test-token', branchId: 1, branchName: 'Test' }),
 }))
 
+vi.mock('../hooks/useBranch', () => ({
+  default: () => ({ activeBranchId: 1, activeBranchName: 'Test', setActiveBranch: vi.fn() }),
+}))
+
 vi.mock('../hooks/useOrders', () => ({
   default: vi.fn(),
 }))
@@ -73,6 +77,7 @@ const DEFAULT_HOOK = {
   loading: false,
   error: null,
   refresh: vi.fn(),
+  clearOrders: vi.fn(),
   dismissOrder: vi.fn(),
   dismissedIds: new Set(),
   updateOrderInList: vi.fn(),
