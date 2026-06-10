@@ -31,10 +31,10 @@ export default function SubHeader() {
   // ── Listen to SSE events ─────────────────────────────────────
   useEffect(() => {
     function handle(e) {
-      const { orderId, type, order, origin } = e.detail
+      const { orderId, type, order, origin, actionOrigin } = e.detail
       if (!orderId) return
       if (type === 'NEW_ORDER' && origin === 'BACKOFFICE') return
-      if (type === 'ORDER_UPDATED' && order?.origin !== 'CLIENT') return
+      if (type === 'ORDER_UPDATED' && actionOrigin === 'BACKOFFICE') return
       if (!['NEW_ORDER', 'ORDER_UPDATED', 'CANCELLATION_REQUESTED'].includes(type)) return
 
       const displayId = orderId.replace(/-/g, '').slice(0, 4).toUpperCase()
@@ -74,6 +74,12 @@ export default function SubHeader() {
     window.addEventListener('laroka:clear-feed', handle)
     return () => window.removeEventListener('laroka:clear-feed', handle)
   }, [])
+
+  // ── Notify Orders of pending orderIds whenever feed changes ──
+  useEffect(() => {
+    const orderColorMap = new Map(feedItems.map(item => [item.orderId, item.color]))
+    window.dispatchEvent(new CustomEvent('laroka:feed-updated', { detail: { orderColorMap } }))
+  }, [feedItems])
 
   // ── Click outside closes panel ───────────────────────────────
   useEffect(() => {

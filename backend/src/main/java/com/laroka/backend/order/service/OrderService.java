@@ -200,7 +200,7 @@ public class OrderService {
         if (next == OrderStatus.CANCELLED) {
             BackofficeOrderRow row = findOrderRowById(saved.getId());
             notificationService.sendOrderUpdatedEvent(saved.getBranch().getId(),
-                    orderMapper.toBackofficeResponseDTO(row.order(), row.payment()));
+                    orderMapper.toBackofficeResponseDTO(row.order(), row.payment()), "CLIENT");
         }
     }
 

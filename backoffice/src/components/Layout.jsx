@@ -119,7 +119,7 @@ export default function Layout() {
                   const orderId = json.orderId ?? json.order?.id
                   if (orderId) {
                     window.dispatchEvent(new CustomEvent('laroka:order-updated', {
-                      detail: { orderId, type: json.type, order: json.order ?? null, origin: json.origin ?? null },
+                      detail: { orderId, type: json.type, order: json.order ?? null, origin: json.origin ?? null, actionOrigin: json.actionOrigin ?? null },
                     }))
                     if (orderId !== openOrderIdRef.current) {
                       if (json.type === 'NEW_ORDER' && json.origin !== 'BACKOFFICE') setNewOrderCount(prev => prev + 1)

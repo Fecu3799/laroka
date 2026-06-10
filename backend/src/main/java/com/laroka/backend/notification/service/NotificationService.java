@@ -64,8 +64,8 @@ public class NotificationService {
         emitters.removeAll(dead);
     }
 
-    public void sendOrderUpdatedEvent(Integer branchId, BackofficeOrderResponseDTO orderDto) {
-        log.debug("SSE order-updated | branchId={} orderId={} status={}", branchId, orderDto.getId(), orderDto.getStatus());
+    public void sendOrderUpdatedEvent(Integer branchId, BackofficeOrderResponseDTO orderDto, String actionOrigin) {
+        log.debug("SSE order-updated | branchId={} orderId={} status={} actionOrigin={}", branchId, orderDto.getId(), orderDto.getStatus(), actionOrigin);
         List<EmitterEntry> dead = new ArrayList<>();
         for (EmitterEntry entry : emitters) {
             if (entry.branchId().equals(branchId)) {
@@ -73,6 +73,7 @@ public class NotificationService {
                     Map<String, Object> data = new LinkedHashMap<>();
                     data.put("type", "ORDER_UPDATED");
                     data.put("branchId", branchId);
+                    data.put("actionOrigin", actionOrigin);
                     data.put("order", orderDto);
                     entry.emitter().send(SseEmitter.event().name("order-updated").data(data));
                 } catch (Exception e) {

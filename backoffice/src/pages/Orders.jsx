@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useOutletContext } from "react-router-dom";
 import useAuth from "../hooks/useAuth";
 import useBranch from "../hooks/useBranch";
@@ -543,6 +543,27 @@ export default function Orders() {
   const [selectedId, setSelectedId] = useState(null);
   const [advancing, setAdvancing] = useState(null);
   const { detail, refetchDetail } = useOrderDetail(selectedId, token, branchId);
+
+  // ── Flash state ──────────────────────────────────────────────
+  const [flashedIds, setFlashedIds] = useState(new Set());
+  const [pendingOrderIds, setPendingOrderIds] = useState(new Map());
+  const flashTimeoutsRef = useRef(new Map());
+
+  const flashOrder = useCallback((orderId) => {
+    setFlashedIds(prev => new Set([...prev, orderId]));
+    if (flashTimeoutsRef.current.has(orderId)) clearTimeout(flashTimeoutsRef.current.get(orderId));
+    const tid = setTimeout(() => {
+      setFlashedIds(prev => { const s = new Set(prev); s.delete(orderId); return s; });
+      flashTimeoutsRef.current.delete(orderId);
+    }, 600);
+    flashTimeoutsRef.current.set(orderId, tid);
+  }, []);
+
+  useEffect(() => {
+    const map = flashTimeoutsRef.current;
+    return () => map.forEach(clearTimeout);
+  }, []);
+
   // ── Refresh when a new order is created via the modal ────────
   useEffect(() => {
     function handleOrderCreated() {
@@ -553,15 +574,35 @@ export default function Orders() {
       window.removeEventListener("laroka:order-created", handleOrderCreated);
   }, [refresh]);
 
-  // ── Feed item pressed in SubHeader → merge order into list ───
+  // ── Feed item pressed in SubHeader → merge + flash ───────────
   useEffect(() => {
     function handleOrderInsert(e) {
-      if (e.detail?.order) updateSingleOrder(e.detail.order);
+      if (e.detail?.order) {
+        const { order } = e.detail;
+        updateSingleOrder(order);
+        flashOrder(order.id);
+      }
     }
     window.addEventListener("laroka:order-insert", handleOrderInsert);
     return () =>
       window.removeEventListener("laroka:order-insert", handleOrderInsert);
-  }, [updateSingleOrder]);
+  }, [updateSingleOrder, flashOrder]);
+
+  // ── Sync pending dot set from SubHeader feed ─────────────────
+  useEffect(() => {
+    function handle(e) { setPendingOrderIds(e.detail?.orderColorMap ?? new Map()); }
+    window.addEventListener("laroka:feed-updated", handle);
+    return () => window.removeEventListener("laroka:feed-updated", handle);
+  }, []);
+
+  // ── Remove pending dot when detail panel opens ───────────────
+  useEffect(() => {
+    if (!selectedId) return;
+    setPendingOrderIds(prev => {
+      if (!prev.has(selectedId)) return prev;
+      const m = new Map(prev); m.delete(selectedId); return m;
+    });
+  }, [selectedId]);
 
   // ── Sync open panel ID to Layout ref ─────────────────────────
   useEffect(() => { setOpenOrderId(selectedId) }, [selectedId, setOpenOrderId])
@@ -684,7 +725,7 @@ export default function Orders() {
         <button
           className="orders-refresh-btn"
           type="button"
-          onClick={() => { refresh(); if (selectedId) refetchDetail(); window.dispatchEvent(new CustomEvent('laroka:clear-feed')); }}
+          onClick={() => { pendingOrderIds.forEach((_, orderId) => flashOrder(orderId)); refresh(); if (selectedId) refetchDetail(); window.dispatchEvent(new CustomEvent('laroka:clear-feed')); }}
         >
           <RefreshIcon />
           Actualizar lista
@@ -761,6 +802,8 @@ export default function Orders() {
                       isSelected={order.id === selectedId}
                       advancing={advancing}
                       contracted={contracted}
+                      isFlashing={flashedIds.has(order.id)}
+                      pendingColor={pendingOrderIds.get(order.id) ?? null}
                       onSelect={() =>
                         setSelectedId(order.id === selectedId ? null : order.id)
                       }
@@ -810,6 +853,8 @@ function OrderRow({
   isSelected,
   advancing,
   contracted,
+  isFlashing,
+  pendingColor,
   onSelect,
   onAdvance,
   onDismiss,
@@ -817,6 +862,8 @@ function OrderRow({
   const cfg = STATUS_CONFIG[order.status] ?? {};
   const next = getNextStatus(order.status, order.orderType);
   const isTerminal = TERMINAL.has(order.status);
+
+  const rowStyle = pendingColor ? { '--pending-color': pendingColor } : undefined;
 
   return (
     <div
@@ -828,9 +875,12 @@ function OrderRow({
         order.status === "CANCELLATION_REQUESTED"
           ? "orders-row--cancel-request"
           : "",
+        isFlashing ? "orders-row--flash" : "",
+        pendingColor ? "orders-row--pending" : "",
       ]
         .filter(Boolean)
         .join(" ")}
+      style={rowStyle}
       onClick={onSelect}
     >
       {/* PEDIDO */}

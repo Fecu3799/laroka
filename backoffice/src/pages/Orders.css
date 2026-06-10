@@ -265,7 +265,13 @@
 
 /* ── Order row ───────────────────────────────────────────────── */
 
+@keyframes row-flash {
+  0%   { box-shadow: inset 0 0 0 1px rgba(255,255,255,0.6), inset 0 0 12px 2px rgba(255,255,255,0.25); }
+  100% { box-shadow: inset 0 0 0 1px rgba(255,255,255,0), inset 0 0 12px 2px rgba(255,255,255,0); }
+}
+
 .orders-row {
+  position: relative;
   padding: 14px 18px;
   border-bottom: 1px solid rgba(101, 163, 105, 0.08);
   border-left: 3px solid transparent;
@@ -274,12 +280,24 @@
   flex-shrink: 0;
 }
 
+.orders-row--flash { animation: row-flash 1000ms ease-out forwards; }
+
 .orders-row:hover                { background: #132019; }
 .orders-row--selected            { border-left-color: #fecd18; background: rgba(254, 205, 24, 0.04); }
 .orders-row--selected:hover      { background: rgba(254, 205, 24, 0.06); }
 .orders-row--cancelled           { opacity: 0.65; }
-.orders-row--cancel-request      { border-left-color: #fb923c; background: rgba(251, 146, 60, 0.04); }
-.orders-row--cancel-request:hover { background: rgba(251, 146, 60, 0.07); }
+.orders-row--cancel-request      { border-left-color: #fb923c; }
+
+.orders-row--pending::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  background: var(--pending-color, transparent);
+  border-radius: 0 2px 2px 0;
+}
 
 /* ── Col: PEDIDO ─────────────────────────────────────────────── */
 
