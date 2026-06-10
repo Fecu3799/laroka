@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.laroka.backend.branch.entity.Branch;
 import com.laroka.backend.branch.exception.BranchNotFoundException;
 import com.laroka.backend.branch.repository.BranchRepository;
+import com.laroka.backend.shared.exception.BusinessException;
 import com.laroka.backend.order.entity.Order;
 import com.laroka.backend.order.entity.OrderStatus;
 import com.laroka.backend.order.entity.PaymentMethod;
@@ -67,13 +68,23 @@ public class WorkShiftService {
         return new OpenShiftResult(workShiftRepository.save(newShift), previousShiftClosed);
     }
 
-    void closeShiftInternal(WorkShift shift, StaffUser closer) {
+    @Transactional
+    public WorkShiftSummary closeShift(Integer branchId, Integer userId) {
+        StaffUser closer = staffUserRepository.findById(userId)
+            .orElseThrow(() -> new IllegalStateException("Authenticated user not found: " + userId));
+        WorkShift shift = workShiftRepository.findByBranchIdAndStatus(branchId, ShiftStatus.OPEN)
+            .orElseThrow(() -> new BusinessException("No hay turno activo para esta sucursal"));
+        return closeShiftInternal(shift, closer);
+    }
+
+    WorkShiftSummary closeShiftInternal(WorkShift shift, StaffUser closer) {
         WorkShiftSummary summary = calculateSummary(shift);
-        workShiftSummaryRepository.save(summary);
+        WorkShiftSummary saved = workShiftSummaryRepository.save(summary);
         shift.setClosedAt(OffsetDateTime.now());
         shift.setClosedBy(closer);
         shift.setStatus(ShiftStatus.CLOSED);
         workShiftRepository.save(shift);
+        return saved;
     }
 
     private WorkShiftSummary calculateSummary(WorkShift shift) {

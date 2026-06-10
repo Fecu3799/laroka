@@ -1,6 +1,7 @@
 package com.laroka.backend.shift.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.eq;
@@ -23,6 +24,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.laroka.backend.branch.entity.Branch;
 import com.laroka.backend.branch.repository.BranchRepository;
+import com.laroka.backend.shared.exception.BusinessException;
 import com.laroka.backend.order.entity.Order;
 import com.laroka.backend.order.entity.OrderStatus;
 import com.laroka.backend.order.entity.PaymentMethod;
@@ -158,5 +160,84 @@ class WorkShiftServiceTest {
         assertThat(summary.getTotalRevenue()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(summary.getAverageTicket()).isEqualByComparingTo(BigDecimal.ZERO);
         verify(paymentRepository, never()).findByOrderIdIn(anyCollection());
+    }
+
+    @Test
+    void closeShift_withMixedOrders_calculatesCorrectSummary() {
+        Branch branch = branch();
+        StaffUser closer = staffUser();
+        WorkShift shift = openShift(branch, closer);
+
+        UUID deliveredId1 = UUID.randomUUID();
+        UUID deliveredId2 = UUID.randomUUID();
+        UUID cancelledId = UUID.randomUUID();
+
+        Order delivered1 = Order.builder().id(deliveredId1).status(OrderStatus.DELIVERED)
+            .totalAmount(new BigDecimal("900.00")).build();
+        Order delivered2 = Order.builder().id(deliveredId2).status(OrderStatus.DELIVERED)
+            .totalAmount(new BigDecimal("600.00")).build();
+        Order cancelled = Order.builder().id(cancelledId).status(OrderStatus.CANCELLED)
+            .totalAmount(new BigDecimal("300.00")).build();
+
+        Payment payment1 = Payment.builder().method(PaymentMethod.CASH).order(delivered1).build();
+        Payment payment2 = Payment.builder().method(PaymentMethod.MERCADOPAGO).order(delivered2).build();
+
+        when(staffUserRepository.findById(10)).thenReturn(Optional.of(closer));
+        when(workShiftRepository.findByBranchIdAndStatus(1, ShiftStatus.OPEN))
+            .thenReturn(Optional.of(shift));
+        when(orderRepository.findByBranch_IdAndStatusInAndCreatedAtBetween(
+            eq(1), anyCollection(), any(), any()))
+            .thenReturn(List.of(delivered1, delivered2, cancelled));
+        when(paymentRepository.findByOrderIdIn(anyCollection()))
+            .thenReturn(List.of(payment1, payment2));
+        when(workShiftRepository.save(any(WorkShift.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(workShiftSummaryRepository.save(any(WorkShiftSummary.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        WorkShiftSummary result = workShiftService.closeShift(1, 10);
+
+        assertThat(result.getTotalOrders()).isEqualTo(3);
+        assertThat(result.getDeliveredOrders()).isEqualTo(2);
+        assertThat(result.getCancelledOrders()).isEqualTo(1);
+        assertThat(result.getTotalRevenue()).isEqualByComparingTo("1500.00");
+        assertThat(result.getCashRevenue()).isEqualByComparingTo("900.00");
+        assertThat(result.getMpRevenue()).isEqualByComparingTo("600.00");
+        assertThat(result.getQrRevenue()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(result.getAverageTicket()).isEqualByComparingTo("750.00");
+    }
+
+    @Test
+    void closeShift_withNoOrders_summaryIsAllZero() {
+        Branch branch = branch();
+        StaffUser closer = staffUser();
+        WorkShift shift = openShift(branch, closer);
+
+        when(staffUserRepository.findById(10)).thenReturn(Optional.of(closer));
+        when(workShiftRepository.findByBranchIdAndStatus(1, ShiftStatus.OPEN))
+            .thenReturn(Optional.of(shift));
+        when(orderRepository.findByBranch_IdAndStatusInAndCreatedAtBetween(
+            eq(1), anyCollection(), any(), any()))
+            .thenReturn(List.of());
+        when(workShiftRepository.save(any(WorkShift.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(workShiftSummaryRepository.save(any(WorkShiftSummary.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        WorkShiftSummary result = workShiftService.closeShift(1, 10);
+
+        assertThat(result.getTotalOrders()).isZero();
+        assertThat(result.getTotalRevenue()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(result.getAverageTicket()).isEqualByComparingTo(BigDecimal.ZERO);
+        verify(paymentRepository, never()).findByOrderIdIn(anyCollection());
+    }
+
+    @Test
+    void closeShift_noActiveShift_throwsBusinessException() {
+        StaffUser closer = staffUser();
+
+        when(staffUserRepository.findById(10)).thenReturn(Optional.of(closer));
+        when(workShiftRepository.findByBranchIdAndStatus(1, ShiftStatus.OPEN))
+            .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> workShiftService.closeShift(1, 10))
+            .isInstanceOf(BusinessException.class)
+            .hasMessage("No hay turno activo para esta sucursal");
     }
 }
