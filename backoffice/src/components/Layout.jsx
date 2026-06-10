@@ -5,6 +5,7 @@ import useAuth from '../hooks/useAuth'
 import useBranch from '../hooks/useBranch'
 import { logout } from '../services/authService'
 import NewOrderModal from './NewOrderModal'
+import SubHeader from './SubHeader'
 import { Toast } from './Toast'
 import './Layout.css'
 
@@ -58,8 +59,8 @@ const NAV = [
 export default function Layout() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { token, role, tenantName } = useAuth()
-  const { activeBranchId, activeBranchName, setActiveBranch } = useBranch()
+  const { token, tenantName } = useAuth()
+  const { activeBranchId } = useBranch()
   const [time, setTime] = useState(new Date())
   const [connectionStatus, setConnectionStatus] = useState('disconnected')
   const [newOrderCount, setNewOrderCount] = useState(0)
@@ -206,28 +207,6 @@ export default function Layout() {
           )}
         </nav>
 
-        <div className="layout-sidebar-branch" aria-label="Sucursal activa">
-          <div className="layout-branch-info">
-            <span className="layout-branch-label">SUCURSAL</span>
-            <span className="layout-branch-name">{activeBranchName ?? '—'}</span>
-          </div>
-          {role === 'ADMIN' && (
-            <button
-              className="layout-branch-change-btn"
-              onClick={() => { setActiveBranch(null, null); navigate('/branch-select') }}
-              title="Cambiar sucursal"
-              aria-label="Cambiar sucursal"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="M17 1l4 4-4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M3 11V9a4 4 0 0 1 4-4h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                <path d="M7 23l-4-4 4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M21 13v2a4 4 0 0 1-4 4H3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-              </svg>
-            </button>
-          )}
-        </div>
-
         <button className="layout-logout-btn" onClick={handleLogout} aria-label="Cerrar sesión">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
@@ -272,6 +251,8 @@ export default function Layout() {
             <span className="layout-header-clock" aria-live="polite">{formattedTime}</span>
           </div>
         </header>
+
+        <SubHeader />
 
         <main className="layout-main">
           <Outlet context={{ newOrderCount, cancelCount, resetCounts, setOpenOrderId }} />
