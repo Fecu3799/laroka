@@ -33,6 +33,11 @@ class SecurityUtilsTest {
             List.of(new SimpleGrantedAuthority("ROLE_STAFF")));
     }
 
+    private CustomUserDetails manager(Integer branchId) {
+        return new CustomUserDetails(3, branchId, 10, "manager@test.com", null,
+            List.of(new SimpleGrantedAuthority("ROLE_MANAGER")));
+    }
+
     private CustomUserDetails admin() {
         return new CustomUserDetails(2, null, 10, "admin@test.com", null,
             List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
@@ -57,6 +62,27 @@ class SecurityUtilsTest {
         Integer result = securityUtils.resolveBranchId(principal, request);
 
         assertThat(result).isEqualTo(5);
+    }
+
+    @Test
+    void manager_returnsBranchIdFromToken() {
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        CustomUserDetails principal = manager(7);
+
+        Integer result = securityUtils.resolveBranchId(principal, request);
+
+        assertThat(result).isEqualTo(7);
+    }
+
+    @Test
+    void manager_ignoresXBranchIdHeader() {
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        when(request.getHeader("X-Branch-Id")).thenReturn("99");
+        CustomUserDetails principal = manager(7);
+
+        Integer result = securityUtils.resolveBranchId(principal, request);
+
+        assertThat(result).isEqualTo(7);
     }
 
     @Test
