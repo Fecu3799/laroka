@@ -9,9 +9,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import com.laroka.backend.staffuser.entity.StaffUser;
+import com.laroka.backend.staffuser.entity.UserRole;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtBuilder;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.MalformedJwtException;
 import io.jsonwebtoken.UnsupportedJwtException;
@@ -30,17 +32,22 @@ public class JwtService {
 	public String generateToken(StaffUser user) {
 		Date now = new Date();
 		Date expiry = new Date(now.getTime() + expirationMs);
-		return Jwts.builder()
+
+		JwtBuilder builder = Jwts.builder()
 			.subject(String.valueOf(user.getId()))
 			.claim("role", user.getRole().name())
-			.claim("branchId", user.getBranch().getId())
-			.claim("branchName", user.getBranch().getName())
 			.claim("tenantId", user.getBranch().getTenant().getId())
 			.claim("tenantName", user.getBranch().getTenant().getName())
 			.issuedAt(now)
 			.expiration(expiry)
-			.signWith(secretKey())
-			.compact();
+			.signWith(secretKey());
+
+		if (user.getRole() != UserRole.ADMIN) {
+			builder.claim("branchId", user.getBranch().getId());
+			builder.claim("branchName", user.getBranch().getName());
+		}
+
+		return builder.compact();
 	}
 
 	public boolean validateToken(String token) {

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import ReactDOM from 'react-dom'
 import useAuth from '../hooks/useAuth'
+import useBranch from '../hooks/useBranch'
 import { createBackofficeOrder } from '../services/ordersService'
 import { fetchBranchMenu } from '../services/catalogService'
 import { fetchBranches } from '../services/branchService'
@@ -26,7 +27,8 @@ function TrashIcon() {
 }
 
 export default function NewOrderModal({ open, onClose }) {
-  const { token, branchId } = useAuth()
+  const { token } = useAuth()
+  const { activeBranchId: branchId } = useBranch()
 
   const [menuCategories,  setMenuCategories]  = useState([])
   const [menuLoading,     setMenuLoading]     = useState(false)

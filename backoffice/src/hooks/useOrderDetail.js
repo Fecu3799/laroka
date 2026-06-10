@@ -1,16 +1,16 @@
 import { useState, useEffect, useCallback } from 'react'
 import { fetchOrderDetail } from '../services/ordersService'
 
-export default function useOrderDetail(selectedId, token) {
+export default function useOrderDetail(selectedId, token, branchId = null) {
   const [detail, setDetail] = useState(null)
 
   const load = useCallback(async () => {
     if (!selectedId || !token) { setDetail(null); return }
     try {
-      const data = await fetchOrderDetail(selectedId, token)
+      const data = await fetchOrderDetail(selectedId, token, branchId)
       setDetail(data)
     } catch { /* silent */ }
-  }, [selectedId, token])
+  }, [selectedId, token, branchId])
 
   useEffect(() => { load() }, [load])
 

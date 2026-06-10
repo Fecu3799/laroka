@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useOutletContext } from "react-router-dom";
 import useAuth from "../hooks/useAuth";
+import useBranch from "../hooks/useBranch";
 import useOrders from "../hooks/useOrders";
 import useOrderDetail from "../hooks/useOrderDetail";
 import {
@@ -514,6 +515,7 @@ function PaymentStatusIcon({ status }) {
 
 export default function Orders() {
   const { token } = useAuth();
+  const { activeBranchId: branchId } = useBranch();
   const { newOrderCount, cancelCount, resetCounts, setOpenOrderId } = useOutletContext();
   const {
     orders,
@@ -525,13 +527,13 @@ export default function Orders() {
     updateOrderInList,
     updatePaymentInList,
     replaceOrderInList,
-  } = useOrders(token);
+  } = useOrders(token, branchId);
 
   const [activeTab, setActiveTab] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedId, setSelectedId] = useState(null);
   const [advancing, setAdvancing] = useState(null);
-  const { detail, refetchDetail } = useOrderDetail(selectedId, token);
+  const { detail, refetchDetail } = useOrderDetail(selectedId, token, branchId);
   // ── Refresh when a new order is created via the modal ────────
   useEffect(() => {
     function handleOrderCreated() {
@@ -579,7 +581,7 @@ export default function Orders() {
       if (!next) return;
       setAdvancing(order.id);
       try {
-        await advanceOrderStatus(order.id, next, token);
+        await advanceOrderStatus(order.id, next, token, branchId);
         updateOrderInList(order.id, next);
         refetchDetail();
       } catch {
@@ -765,6 +767,7 @@ export default function Orders() {
                 onAdvance={handleAdvance}
                 advancing={advancing}
                 token={token}
+                branchId={branchId}
                 onRefetch={refetchDetail}
                 onRefresh={refresh}
                 onPaymentConfirmed={updatePaymentInList}
@@ -951,6 +954,7 @@ function OrderDetail({
   onAdvance,
   advancing,
   token,
+  branchId,
   onRefetch,
   onRefresh,
   onPaymentConfirmed,
@@ -973,12 +977,11 @@ function OrderDetail({
     e.stopPropagation();
     setPaying(true);
     try {
+      const payHeaders = { "Content-Type": "application/json", Authorization: `Bearer ${token}` }
+      if (branchId != null) payHeaders["X-Branch-Id"] = String(branchId)
       await apiFetch(`${API_URL}/backoffice/orders/${order.id}/payment`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers: payHeaders,
         body: JSON.stringify({ action: "CONFIRM" }),
       });
       onPaymentConfirmed(order.id, "APPROVED");
@@ -994,12 +997,11 @@ function OrderDetail({
     e.stopPropagation();
     setActionLoading("back");
     try {
+      const backHeaders = { Authorization: `Bearer ${token}` }
+      if (branchId != null) backHeaders["X-Branch-Id"] = String(branchId)
       await apiFetch(
         `${API_URL}/backoffice/orders/${order.id}/status/previous`,
-        {
-          method: "PATCH",
-          headers: { Authorization: `Bearer ${token}` },
-        },
+        { method: "PATCH", headers: backHeaders },
       );
       onRefetch();
       onRefresh();
@@ -1013,12 +1015,11 @@ function OrderDetail({
   const handleCancelConfirm = async () => {
     setActionLoading("cancel");
     try {
+      const cancelHeaders = { "Content-Type": "application/json", Authorization: `Bearer ${token}` }
+      if (branchId != null) cancelHeaders["X-Branch-Id"] = String(branchId)
       await apiFetch(`${API_URL}/backoffice/orders/${order.id}/status`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers: cancelHeaders,
         body: JSON.stringify({ nextStatus: "CANCELLED", reason: cancelReason.trim() }),
       });
       onRefetch();
@@ -1036,7 +1037,7 @@ function OrderDetail({
     const key = action === "APPROVE" ? "approve" : "reject";
     setCancelRequestLoading(key);
     try {
-      await resolveCancelRequest(order.id, action, token);
+      await resolveCancelRequest(order.id, action, token, branchId);
       onRefetch();
       onRefresh();
     } catch {

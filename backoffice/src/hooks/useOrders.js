@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react'
 const API_URL = import.meta.env.VITE_API_URL ?? ''
 
-export default function useOrders(token) {
+export default function useOrders(token, branchId = null) {
   const [orders, setOrders]           = useState([])
   const [loading, setLoading]         = useState(true)
   const [error, setError]             = useState(null)
@@ -17,9 +17,9 @@ export default function useOrders(token) {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch(`${API_URL}/backoffice/orders`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      const headers = { Authorization: `Bearer ${token}` }
+      if (branchId != null) headers['X-Branch-Id'] = String(branchId)
+      const res = await fetch(`${API_URL}/backoffice/orders`, { headers })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       setOrders(await res.json())
     } catch (e) {
@@ -27,7 +27,7 @@ export default function useOrders(token) {
     } finally {
       setLoading(false)
     }
-  }, [token])
+  }, [token, branchId])
 
   useEffect(() => { fetchOrders() }, [fetchOrders])
 

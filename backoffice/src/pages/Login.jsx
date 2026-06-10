@@ -7,7 +7,7 @@ import './Login.css'
 export default function Login() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, role } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -18,9 +18,9 @@ export default function Login() {
 
   useEffect(() => {
     if (isAuthenticated) {
-      navigate('/orders', { replace: true })
+      navigate(role === 'ADMIN' ? '/branch-select' : '/orders', { replace: true })
     }
-  }, [isAuthenticated, navigate])
+  }, [isAuthenticated, role, navigate])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -43,6 +43,13 @@ export default function Login() {
       const data = await res.json()
       localStorage.setItem('laroka_token', data.token)
       if (data.refreshToken) localStorage.setItem('laroka_refresh_token', data.refreshToken)
+      try {
+        const payload = JSON.parse(atob(data.token.split('.')[1]))
+        if (payload.role === 'ADMIN') {
+          navigate('/branch-select', { replace: true })
+          return
+        }
+      } catch { /* fallback */ }
       navigate('/orders', { replace: true })
     } catch {
       setError('Error al conectar. Intentá de nuevo.')

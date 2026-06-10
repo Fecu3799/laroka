@@ -21,12 +21,14 @@ import com.laroka.backend.catalog.dto.ProductResponseDTO;
 import com.laroka.backend.catalog.entity.Product;
 import com.laroka.backend.catalog.mapper.ProductMapper;
 import com.laroka.backend.catalog.service.ProductService;
+import com.laroka.backend.shared.security.CustomUserDetails;
 import com.laroka.backend.shared.security.SecurityUtils;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
-
 import lombok.RequiredArgsConstructor;
 
 
@@ -84,8 +86,12 @@ public class ProductController {
 
 	@PatchMapping("/{id}/availability")
 	@Operation(summary = "Update product availability", description = "Updates the availability status of a product")
-	public ResponseEntity<ProductResponseDTO> updateAvailability(@PathVariable Integer id, @Valid @RequestBody AvailabilityUpdateDTO dto) {
-		Integer userBranchId = securityUtils.getAuthenticatedUserBranchId();
+	public ResponseEntity<ProductResponseDTO> updateAvailability(
+			@PathVariable Integer id,
+			@Valid @RequestBody AvailabilityUpdateDTO dto,
+			@AuthenticationPrincipal CustomUserDetails principal,
+			HttpServletRequest request) {
+		Integer userBranchId = securityUtils.resolveBranchId(principal, request);
 		return ResponseEntity.ok(mapper.toResponseDTO(service.updateAvailability(id, dto.getAvailable(), userBranchId)));
 	}
 }
