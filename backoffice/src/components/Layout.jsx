@@ -60,7 +60,7 @@ export default function Layout() {
   const navigate = useNavigate()
   const location = useLocation()
   const { token, tenantName } = useAuth()
-  const { activeBranchId } = useBranch()
+  const { activeBranchId, setActiveBranch } = useBranch()
   const [time, setTime] = useState(new Date())
   const [connectionStatus, setConnectionStatus] = useState('disconnected')
   const [newOrderCount, setNewOrderCount] = useState(0)
@@ -119,7 +119,7 @@ export default function Layout() {
                   const orderId = json.orderId ?? json.order?.id
                   if (orderId) {
                     window.dispatchEvent(new CustomEvent('laroka:order-updated', {
-                      detail: { orderId, type: json.type, order: json.order ?? null },
+                      detail: { orderId, type: json.type, order: json.order ?? null, origin: json.origin ?? null },
                     }))
                     if (orderId !== openOrderIdRef.current) {
                       if (json.type === 'NEW_ORDER' && json.origin !== 'BACKOFFICE') setNewOrderCount(prev => prev + 1)

@@ -535,6 +535,7 @@ export default function Orders() {
     updateOrderInList,
     updatePaymentInList,
     replaceOrderInList,
+    updateSingleOrder,
   } = useOrders(token, branchId, shift?.openedAt ?? null);
 
   const [activeTab, setActiveTab] = useState("ALL");
@@ -551,6 +552,16 @@ export default function Orders() {
     return () =>
       window.removeEventListener("laroka:order-created", handleOrderCreated);
   }, [refresh]);
+
+  // ── Feed item pressed in SubHeader → merge order into list ───
+  useEffect(() => {
+    function handleOrderInsert(e) {
+      if (e.detail?.order) updateSingleOrder(e.detail.order);
+    }
+    window.addEventListener("laroka:order-insert", handleOrderInsert);
+    return () =>
+      window.removeEventListener("laroka:order-insert", handleOrderInsert);
+  }, [updateSingleOrder]);
 
   // ── Sync open panel ID to Layout ref ─────────────────────────
   useEffect(() => { setOpenOrderId(selectedId) }, [selectedId, setOpenOrderId])

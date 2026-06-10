@@ -67,5 +67,5 @@ export default function useOrders(token, branchId = null, dateFrom = null) {
     })
   }, [])
 
-  return { orders, loading, error, refresh, clearOrders, dismissOrder, dismissedIds, updateOrderInList, updatePaymentInList, replaceOrderInList }
+  return { orders, loading, error, refresh, clearOrders, dismissOrder, dismissedIds, updateOrderInList, updatePaymentInList, replaceOrderInList, updateSingleOrder: replaceOrderInList }
 }
