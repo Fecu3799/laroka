@@ -6,10 +6,16 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.laroka.backend.branch.repository.BranchRepository;
+
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
 
 @Component
+@RequiredArgsConstructor
 public class SecurityUtils {
+
+	private final BranchRepository branchRepository;
 
 	public Integer getAuthenticatedUserBranchId() {
 		Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -33,12 +39,18 @@ public class SecurityUtils {
 				throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
 					"X-Branch-Id header is required for ADMIN role");
 			}
+			Integer branchId;
 			try {
-				return Integer.parseInt(headerVal.trim());
+				branchId = Integer.parseInt(headerVal.trim());
 			} catch (NumberFormatException e) {
 				throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
 					"X-Branch-Id header must be a valid integer");
 			}
+			if (!branchRepository.existsByIdAndTenantId(branchId, principal.getTenantId())) {
+				throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+					"Branch does not belong to your tenant");
+			}
+			return branchId;
 		}
 
 		return principal.getBranchId();

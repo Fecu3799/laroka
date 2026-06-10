@@ -7,7 +7,7 @@ export default function useOrders(token, branchId = null) {
   const [error, setError]             = useState(null)
   const [dismissedIds, setDismissedIds] = useState(() => {
     try {
-      const stored = sessionStorage.getItem('laroka_dismissed_ids')
+      const stored = localStorage.getItem('laroka_dismissed_ids')
       return stored ? new Set(JSON.parse(stored)) : new Set()
     } catch { return new Set() }
   })
@@ -33,13 +33,17 @@ export default function useOrders(token, branchId = null) {
 
   useEffect(() => {
     try {
-      sessionStorage.setItem('laroka_dismissed_ids', JSON.stringify([...dismissedIds]))
+      localStorage.setItem('laroka_dismissed_ids', JSON.stringify([...dismissedIds]))
     } catch { /* noop */ }
   }, [dismissedIds])
 
   const refresh = useCallback(() => {
     fetchOrders()
   }, [fetchOrders])
+
+  const clearOrders = useCallback(() => {
+    setOrders([])
+  }, [])
 
   const dismissOrder = useCallback((id) => {
     setDismissedIds(prev => new Set([...prev, id]))
@@ -61,5 +65,5 @@ export default function useOrders(token, branchId = null) {
     })
   }, [])
 
-  return { orders, loading, error, refresh, dismissOrder, dismissedIds, updateOrderInList, updatePaymentInList, replaceOrderInList }
+  return { orders, loading, error, refresh, clearOrders, dismissOrder, dismissedIds, updateOrderInList, updatePaymentInList, replaceOrderInList }
 }

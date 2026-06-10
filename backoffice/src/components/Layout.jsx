@@ -69,6 +69,7 @@ export default function Layout() {
   const setOpenOrderId = useCallback(id => { openOrderIdRef.current = id }, [])
 
   function handleLogout() {
+    setActiveBranch(null, null)
     logout(token)
     navigate('/login', { replace: true })
   }

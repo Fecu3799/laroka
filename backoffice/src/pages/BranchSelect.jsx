@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Navigate } from 'react-router-dom'
 import useAuth from '../hooks/useAuth'
 import useBranch from '../hooks/useBranch'
 import { fetchBranches } from '../services/branchService'
@@ -15,18 +15,6 @@ export default function BranchSelect() {
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    if (role && role !== 'ADMIN') {
-      navigate('/orders', { replace: true })
-    }
-  }, [role, navigate])
-
-  useEffect(() => {
-    if (activeBranchId != null) {
-      navigate('/orders', { replace: true })
-    }
-  }, [activeBranchId, navigate])
-
-  useEffect(() => {
     if (!token) return
     async function load() {
       try {
@@ -40,6 +28,9 @@ export default function BranchSelect() {
     }
     load()
   }, [token])
+
+  if (role && role !== 'ADMIN') return <Navigate to="/orders" replace />
+  if (activeBranchId != null) return <Navigate to="/orders" replace />
 
   function handleSelect(branch) {
     setActiveBranch(branch.id, branch.name)

@@ -72,6 +72,10 @@ public class JwtService {
 		return parseClaims(token).get("branchId", Integer.class);
 	}
 
+	public Integer extractTenantId(String token) {
+		return parseClaims(token).get("tenantId", Integer.class);
+	}
+
 	private Claims parseClaims(String token) {
 		return Jwts.parser()
 			.verifyWith(secretKey())

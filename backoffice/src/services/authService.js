@@ -22,4 +22,5 @@ export function logout(token) {
   }
   localStorage.removeItem('laroka_token')
   localStorage.removeItem('laroka_refresh_token')
+  localStorage.removeItem('laroka_dismissed_ids')
 }

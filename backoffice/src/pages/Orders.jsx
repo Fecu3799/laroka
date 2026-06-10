@@ -522,6 +522,7 @@ export default function Orders() {
     loading,
     error,
     refresh,
+    clearOrders,
     dismissOrder,
     dismissedIds,
     updateOrderInList,
@@ -565,6 +566,12 @@ export default function Orders() {
     return () =>
       window.removeEventListener("laroka:order-updated", handleOrderUpdated);
   }, [selectedId, refetchDetail, updateOrderInList, replaceOrderInList]);
+
+  // ── Clear list and close panel synchronously on branch change ─
+  useEffect(() => {
+    clearOrders();
+    setSelectedId(null);
+  }, [branchId, clearOrders]);
 
   // ── Auto-clear selected if order leaves visible list ─────────
   useEffect(() => {

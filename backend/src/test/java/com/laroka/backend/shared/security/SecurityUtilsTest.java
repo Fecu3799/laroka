@@ -13,24 +13,28 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.laroka.backend.branch.repository.BranchRepository;
+
 import jakarta.servlet.http.HttpServletRequest;
 
 class SecurityUtilsTest {
 
     private SecurityUtils securityUtils;
+    private BranchRepository branchRepository;
 
     @BeforeEach
     void setUp() {
-        securityUtils = new SecurityUtils();
+        branchRepository = mock(BranchRepository.class);
+        securityUtils = new SecurityUtils(branchRepository);
     }
 
     private CustomUserDetails staff(Integer branchId) {
-        return new CustomUserDetails(1, branchId, "staff@test.com", null,
+        return new CustomUserDetails(1, branchId, 10, "staff@test.com", null,
             List.of(new SimpleGrantedAuthority("ROLE_STAFF")));
     }
 
     private CustomUserDetails admin() {
-        return new CustomUserDetails(2, null, "admin@test.com", null,
+        return new CustomUserDetails(2, null, 10, "admin@test.com", null,
             List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
     }
 
@@ -59,11 +63,25 @@ class SecurityUtilsTest {
     void admin_withValidHeader_returnsParsedBranchId() {
         HttpServletRequest request = mock(HttpServletRequest.class);
         when(request.getHeader("X-Branch-Id")).thenReturn("3");
+        when(branchRepository.existsByIdAndTenantId(3, 10)).thenReturn(true);
         CustomUserDetails principal = admin();
 
         Integer result = securityUtils.resolveBranchId(principal, request);
 
         assertThat(result).isEqualTo(3);
+    }
+
+    @Test
+    void admin_withBranchFromOtherTenant_throws403() {
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        when(request.getHeader("X-Branch-Id")).thenReturn("99");
+        when(branchRepository.existsByIdAndTenantId(99, 10)).thenReturn(false);
+        CustomUserDetails principal = admin();
+
+        assertThatThrownBy(() -> securityUtils.resolveBranchId(principal, request))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode().value())
+                .isEqualTo(HttpStatus.FORBIDDEN.value()));
     }
 
     @Test
