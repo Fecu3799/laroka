@@ -597,7 +597,7 @@ export default function Orders() {
         setAdvancing(null);
       }
     },
-    [token, updateOrderInList, refetchDetail],
+    [token, branchId, updateOrderInList, refetchDetail],
   );
 
   // ── Derived ──────────────────────────────────────────────────

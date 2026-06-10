@@ -1,7 +1,6 @@
-import { createContext, useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import useAuth from '../hooks/useAuth'
-
-export const BranchContext = createContext(null)
+import { BranchContext } from '../hooks/useBranch'
 
 const SESSION_KEY = 'laroka_active_branch'
 
