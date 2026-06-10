@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useOutletContext } from "react-router-dom";
 import useAuth from "../hooks/useAuth";
 import useBranch from "../hooks/useBranch";
+import useCurrentShift from "../hooks/useCurrentShift";
 import useOrders from "../hooks/useOrders";
 import useOrderDetail from "../hooks/useOrderDetail";
 import {
@@ -124,6 +125,11 @@ function formatTime(createdAt) {
     date.toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit" }) +
     ` · ${timeStr}`
   );
+}
+
+function formatHour(iso) {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false })
 }
 
 function formatDateTime(ts) {
@@ -517,6 +523,7 @@ export default function Orders() {
   const { token } = useAuth();
   const { activeBranchId: branchId } = useBranch();
   const { newOrderCount, cancelCount, resetCounts, setOpenOrderId } = useOutletContext();
+  const { shift } = useCurrentShift();
   const {
     orders,
     loading,
@@ -528,7 +535,7 @@ export default function Orders() {
     updateOrderInList,
     updatePaymentInList,
     replaceOrderInList,
-  } = useOrders(token, branchId);
+  } = useOrders(token, branchId, shift?.openedAt ?? null);
 
   const [activeTab, setActiveTab] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
@@ -783,6 +790,14 @@ export default function Orders() {
           </>
         )}
       </div>
+
+      {/* ── Shift banner ─────────────────────────────────────── */}
+      {shift && (
+        <div className="orders-shift-banner">
+          <span className="orders-shift-banner-dot" />
+          Mostrando pedidos del turno actual desde {formatHour(shift.openedAt)}
+        </div>
+      )}
     </div>
   );
 }
