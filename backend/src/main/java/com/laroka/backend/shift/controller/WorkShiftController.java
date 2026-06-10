@@ -2,17 +2,20 @@ package com.laroka.backend.shift.controller;
 
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.laroka.backend.shift.dto.CloseShiftResponseDTO;
 import com.laroka.backend.shift.dto.CurrentShiftResponseDTO;
 import com.laroka.backend.shift.dto.OpenShiftResponseDTO;
+import com.laroka.backend.shift.dto.ShiftHistoryItemDTO;
 import com.laroka.backend.shift.entity.WorkShift;
 import com.laroka.backend.shift.entity.WorkShiftSummary;
 import com.laroka.backend.shift.service.OpenShiftResult;
@@ -33,6 +36,21 @@ public class WorkShiftController {
 
     private final WorkShiftService workShiftService;
     private final SecurityUtils securityUtils;
+
+    @GetMapping("/history")
+    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+    @Operation(summary = "Get closed shift history",
+            description = "Returns a paginated list of closed shifts with their summaries, ordered by closedAt descending.")
+    public ResponseEntity<Page<ShiftHistoryItemDTO>> getShiftHistory(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @AuthenticationPrincipal CustomUserDetails principal,
+            HttpServletRequest request) {
+
+        Integer branchId = securityUtils.resolveBranchId(principal, request);
+        Page<WorkShift> shifts = workShiftService.getShiftHistory(branchId, page, size);
+        return ResponseEntity.ok(shifts.map(this::toHistoryItem));
+    }
 
     @PostMapping("/open")
     @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
@@ -100,5 +118,28 @@ public class WorkShiftController {
             .averageTicket(summary.getAverageTicket())
             .calculatedAt(summary.getCalculatedAt())
             .build());
+    }
+
+    private ShiftHistoryItemDTO toHistoryItem(WorkShift ws) {
+        WorkShiftSummary s = ws.getSummary();
+        return ShiftHistoryItemDTO.builder()
+            .shiftId(ws.getId())
+            .openedAt(ws.getOpenedAt())
+            .closedAt(ws.getClosedAt())
+            .openedBy(ws.getOpenedBy().getName())
+            .closedBy(ws.getClosedBy() != null ? ws.getClosedBy().getName() : null)
+            .summary(CloseShiftResponseDTO.builder()
+                .shiftId(ws.getId())
+                .totalOrders(s.getTotalOrders())
+                .deliveredOrders(s.getDeliveredOrders())
+                .cancelledOrders(s.getCancelledOrders())
+                .totalRevenue(s.getTotalRevenue())
+                .cashRevenue(s.getCashRevenue())
+                .mpRevenue(s.getMpRevenue())
+                .qrRevenue(s.getQrRevenue())
+                .averageTicket(s.getAverageTicket())
+                .calculatedAt(s.getCalculatedAt())
+                .build())
+            .build();
     }
 }

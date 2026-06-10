@@ -30,7 +30,7 @@ public interface OrderRepository extends JpaRepository<Order, UUID>, JpaSpecific
     @Query("SELECT o FROM Order o WHERE o.id IN :ids")
     List<Order> findByIdsWithItems(@Param("ids") Collection<UUID> ids);
 
-    List<Order> findByBranch_IdAndStatusInAndCreatedAtBetween(
+    List<Order> findByBranchIdAndStatusInAndCreatedAtBetween(
             Integer branchId,
             Collection<OrderStatus> statuses,
             LocalDateTime from,

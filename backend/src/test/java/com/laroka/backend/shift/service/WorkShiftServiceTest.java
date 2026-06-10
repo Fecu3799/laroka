@@ -9,11 +9,17 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import org.springframework.data.domain.Sort;
+
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -110,7 +116,7 @@ class WorkShiftServiceTest {
         when(branchRepository.findById(1)).thenReturn(Optional.of(branch));
         when(workShiftRepository.findByBranchIdAndStatus(1, ShiftStatus.OPEN))
             .thenReturn(Optional.of(existing));
-        when(orderRepository.findByBranch_IdAndStatusInAndCreatedAtBetween(
+        when(orderRepository.findByBranchIdAndStatusInAndCreatedAtBetween(
             eq(1), anyCollection(), any(), any()))
             .thenReturn(List.of(deliveredOrder));
         when(paymentRepository.findByOrderIdIn(anyCollection()))
@@ -144,7 +150,7 @@ class WorkShiftServiceTest {
         when(branchRepository.findById(1)).thenReturn(Optional.of(branch));
         when(workShiftRepository.findByBranchIdAndStatus(1, ShiftStatus.OPEN))
             .thenReturn(Optional.of(existing));
-        when(orderRepository.findByBranch_IdAndStatusInAndCreatedAtBetween(
+        when(orderRepository.findByBranchIdAndStatusInAndCreatedAtBetween(
             eq(1), anyCollection(), any(), any()))
             .thenReturn(List.of());
         when(workShiftRepository.save(any(WorkShift.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -185,7 +191,7 @@ class WorkShiftServiceTest {
         when(staffUserRepository.findById(10)).thenReturn(Optional.of(closer));
         when(workShiftRepository.findByBranchIdAndStatus(1, ShiftStatus.OPEN))
             .thenReturn(Optional.of(shift));
-        when(orderRepository.findByBranch_IdAndStatusInAndCreatedAtBetween(
+        when(orderRepository.findByBranchIdAndStatusInAndCreatedAtBetween(
             eq(1), anyCollection(), any(), any()))
             .thenReturn(List.of(delivered1, delivered2, cancelled));
         when(paymentRepository.findByOrderIdIn(anyCollection()))
@@ -214,7 +220,7 @@ class WorkShiftServiceTest {
         when(staffUserRepository.findById(10)).thenReturn(Optional.of(closer));
         when(workShiftRepository.findByBranchIdAndStatus(1, ShiftStatus.OPEN))
             .thenReturn(Optional.of(shift));
-        when(orderRepository.findByBranch_IdAndStatusInAndCreatedAtBetween(
+        when(orderRepository.findByBranchIdAndStatusInAndCreatedAtBetween(
             eq(1), anyCollection(), any(), any()))
             .thenReturn(List.of());
         when(workShiftRepository.save(any(WorkShift.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -252,6 +258,34 @@ class WorkShiftServiceTest {
         Optional<WorkShift> result = workShiftService.getCurrentShift(1);
 
         assertThat(result).isEmpty();
+    }
+
+    @Test
+    void getShiftHistory_twoClosedShifts_returnsPageCorrectlyMapped() {
+        Branch branch = branch();
+        StaffUser opener = staffUser();
+        OffsetDateTime now = OffsetDateTime.now();
+
+        WorkShift shift1 = WorkShift.builder()
+            .id(UUID.randomUUID()).branch(branch).openedBy(opener).closedBy(opener)
+            .openedAt(now.minusHours(10)).closedAt(now.minusHours(2))
+            .status(ShiftStatus.CLOSED).build();
+        WorkShift shift2 = WorkShift.builder()
+            .id(UUID.randomUUID()).branch(branch).openedBy(opener).closedBy(opener)
+            .openedAt(now.minusHours(25)).closedAt(now.minusHours(13))
+            .status(ShiftStatus.CLOSED).build();
+
+        PageRequest pageable = PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "closedAt"));
+        Page<WorkShift> pageResult = new PageImpl<>(List.of(shift1, shift2), pageable, 2);
+
+        when(workShiftRepository.findByBranchIdAndStatus(eq(1), eq(ShiftStatus.CLOSED), any(PageRequest.class)))
+            .thenReturn(pageResult);
+
+        Page<WorkShift> result = workShiftService.getShiftHistory(1, 0, 20);
+
+        assertThat(result.getTotalElements()).isEqualTo(2);
+        assertThat(result.getContent()).containsExactly(shift1, shift2);
+        assertThat(result.getContent().get(0).getClosedAt()).isAfter(result.getContent().get(1).getClosedAt());
     }
 
     @Test

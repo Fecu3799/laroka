@@ -16,11 +16,14 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 
 @Entity
 @Table(name = "work_shift")
@@ -55,4 +58,9 @@ public class WorkShift {
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 10)
     private ShiftStatus status;
+
+    @OneToOne(mappedBy = "shift", fetch = FetchType.LAZY)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private WorkShiftSummary summary;
 }

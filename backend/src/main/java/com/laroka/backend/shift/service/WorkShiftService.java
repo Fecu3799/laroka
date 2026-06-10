@@ -10,6 +10,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -68,6 +71,11 @@ public class WorkShiftService {
         return new OpenShiftResult(workShiftRepository.save(newShift), previousShiftClosed);
     }
 
+    public Page<WorkShift> getShiftHistory(Integer branchId, int page, int size) {
+        PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "closedAt"));
+        return workShiftRepository.findByBranchIdAndStatus(branchId, ShiftStatus.CLOSED, pageable);
+    }
+
     public Optional<WorkShift> getCurrentShift(Integer branchId) {
         return workShiftRepository.findByBranchIdAndStatusWithOpenedBy(branchId, ShiftStatus.OPEN);
     }
@@ -96,7 +104,7 @@ public class WorkShiftService {
         LocalDateTime from = shift.getOpenedAt().toLocalDateTime();
         LocalDateTime to = LocalDateTime.now();
 
-        List<Order> orders = orderRepository.findByBranch_IdAndStatusInAndCreatedAtBetween(
+        List<Order> orders = orderRepository.findByBranchIdAndStatusInAndCreatedAtBetween(
             branchId,
             List.of(OrderStatus.DELIVERED, OrderStatus.CANCELLED),
             from, to
