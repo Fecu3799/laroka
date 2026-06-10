@@ -68,6 +68,13 @@ export default function SubHeader() {
     return () => window.removeEventListener('laroka:order-updated', handle)
   }, [])
 
+  // ── Clear feed on full refresh ───────────────────────────────
+  useEffect(() => {
+    function handle() { setFeedItems([]) }
+    window.addEventListener('laroka:clear-feed', handle)
+    return () => window.removeEventListener('laroka:clear-feed', handle)
+  }, [])
+
   // ── Click outside closes panel ───────────────────────────────
   useEffect(() => {
     if (!panelOpen) return

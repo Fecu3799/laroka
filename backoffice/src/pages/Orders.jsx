@@ -522,7 +522,7 @@ function PaymentStatusIcon({ status }) {
 export default function Orders() {
   const { token } = useAuth();
   const { activeBranchId: branchId } = useBranch();
-  const { newOrderCount, cancelCount, resetCounts, setOpenOrderId } = useOutletContext();
+  const { setOpenOrderId } = useOutletContext();
   const { shift } = useCurrentShift();
   const {
     orders,
@@ -682,22 +682,12 @@ export default function Orders() {
         </div>
 
         <button
-          className={`orders-refresh-btn${(newOrderCount > 0 || cancelCount > 0) ? ' orders-refresh-btn--notify' : ''}`}
+          className="orders-refresh-btn"
           type="button"
-          onClick={() => { resetCounts(); refresh(); if (selectedId) refetchDetail(); }}
+          onClick={() => { refresh(); if (selectedId) refetchDetail(); window.dispatchEvent(new CustomEvent('laroka:clear-feed')); }}
         >
           <RefreshIcon />
           Actualizar lista
-          {(newOrderCount > 0 || cancelCount > 0) && (
-            <span className="orders-refresh-badges">
-              {newOrderCount > 0 && (
-                <span className="orders-refresh-badge orders-refresh-badge--received">{newOrderCount}</span>
-              )}
-              {cancelCount > 0 && (
-                <span className="orders-refresh-badge orders-refresh-badge--cancel">{cancelCount}</span>
-              )}
-            </span>
-          )}
         </button>
       </div>
 
