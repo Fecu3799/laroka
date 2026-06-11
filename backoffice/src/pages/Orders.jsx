@@ -523,7 +523,7 @@ function PaymentStatusIcon({ status }) {
 export default function Orders() {
   const { token } = useAuth();
   const { activeBranchId: branchId } = useBranch();
-  const { setOpenOrderId } = useOutletContext();
+  const { setOpenOrderId, resetCounts } = useOutletContext();
   const { shift } = useCurrentShift();
   const {
     orders,
@@ -605,6 +605,9 @@ export default function Orders() {
       const m = new Map(prev); m.delete(selectedId); return m;
     });
   }, [selectedId]);
+
+  // ── Clear PEDIDOS badge counter al entrar a /orders ──────────
+  useEffect(() => { resetCounts() }, [resetCounts])
 
   // ── Sync open panel ID to Layout ref ─────────────────────────
   useEffect(() => { setOpenOrderId(selectedId) }, [selectedId, setOpenOrderId])
@@ -727,7 +730,7 @@ export default function Orders() {
         <button
           className="orders-refresh-btn"
           type="button"
-          onClick={() => { pendingOrderIds.forEach((_, orderId) => flashOrder(orderId)); refresh(); if (selectedId) refetchDetail(); window.dispatchEvent(new CustomEvent('laroka:clear-feed')); }}
+          onClick={() => { pendingOrderIds.forEach((_, orderId) => flashOrder(orderId)); refresh(); resetCounts(); if (selectedId) refetchDetail(); window.dispatchEvent(new CustomEvent('laroka:clear-feed')); }}
         >
           <RefreshIcon />
           Actualizar lista
