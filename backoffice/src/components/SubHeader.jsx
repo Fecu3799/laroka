@@ -20,7 +20,10 @@ export default function SubHeader() {
   const navigate = useNavigate()
   const { token, role } = useAuth()
   const { activeBranchName, activeBranchId, setActiveBranch } = useBranch()
-  const { shift, loading, warning, confirmWarning, openShift, closeShift, closeSummary, dismissSummary } = useCurrentShift()
+  const {
+    shift, loading, warning, confirmWarning, openShift, closeShift, closeSummary, dismissSummary,
+    acceptingOrders, toggleOrders, suggestOrders, confirmSuggestOrders, dismissSuggestOrders,
+  } = useCurrentShift()
   const [confirmClose, setConfirmClose] = useState(false)
 
   // ── Feed state ───────────────────────────────────────────────
@@ -156,6 +159,20 @@ export default function SubHeader() {
             )}
           </div>
 
+          {/* Toggle recepción de pedidos — solo con turno abierto */}
+          {shift && (
+            <button
+              type="button"
+              className={`sub-header-orders-toggle ${acceptingOrders ? 'sub-header-orders-toggle--on' : 'sub-header-orders-toggle--off'}`}
+              onClick={toggleOrders}
+              disabled={loading}
+              aria-pressed={acceptingOrders}
+            >
+              <span className="sub-header-orders-dot" />
+              {acceptingOrders ? 'Aceptando pedidos' : 'Pedidos cerrados'}
+            </button>
+          )}
+
           {/* Bell */}
           <div className="sub-header-bell-wrapper" ref={bellRef}>
             <button
@@ -219,6 +236,33 @@ export default function SubHeader() {
             <div className="sub-header-modal-actions">
               <button className="sub-header-modal-btn sub-header-modal-btn--secondary" onClick={confirmWarning}>
                 Entendido
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sugerencia: habilitar recepción de pedidos al abrir turno */}
+      {suggestOrders && (
+        <div className="sub-header-overlay" role="dialog" aria-modal="true" aria-labelledby="suggest-title">
+          <div className="sub-header-modal">
+            <p className="sub-header-modal-title" id="suggest-title">Recepción de pedidos</p>
+            <p className="sub-header-modal-body">
+              ¿Querés habilitar la recepción de pedidos?
+            </p>
+            <div className="sub-header-modal-actions">
+              <button
+                className="sub-header-modal-btn sub-header-modal-btn--secondary"
+                onClick={dismissSuggestOrders}
+              >
+                Ahora no
+              </button>
+              <button
+                className="sub-header-modal-btn sub-header-modal-btn--primary"
+                onClick={confirmSuggestOrders}
+                disabled={loading}
+              >
+                Sí, habilitar
               </button>
             </div>
           </div>

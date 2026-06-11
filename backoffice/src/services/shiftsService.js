@@ -40,6 +40,16 @@ export async function getCurrentShiftSummary(token, branchId) {
   return res.json()
 }
 
+// Alterna la recepción de pedidos de la sucursal. Requiere turno activo
+// (el backend responde 422 si no hay turno abierto). Retorna { acceptingOrders }.
+export async function toggleAcceptingOrders(token, branchId) {
+  const res = await apiFetch(`${API_URL}/backoffice/branches/toggle-orders`, {
+    method: 'PATCH',
+    headers: authHeaders(token, branchId),
+  })
+  return res.json()
+}
+
 // Historial paginado de turnos cerrados (con su summary embebido).
 export async function getShiftHistory(token, branchId, page = 0, size = 20) {
   const res = await apiFetch(

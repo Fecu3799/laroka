@@ -115,10 +115,16 @@ describe('CartScreen — paymentFailure recovery', () => {
 
   it('persiste laroka_checkout_recovery en sessionStorage al confirmar con MercadoPago', async () => {
     const user = userEvent.setup()
-    vi.mocked(fetch).mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve({ orderId: 'order-99' }),
-    })
+    // 1) verificación de acceptingOrders del branch, 2) creación del pedido
+    vi.mocked(fetch)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ acceptingOrders: true }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ orderId: 'order-99' }),
+      })
 
     renderCart(ITEMS, { paymentFailure: FAILURE_DATA })
 

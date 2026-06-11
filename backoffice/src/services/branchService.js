@@ -8,3 +8,11 @@ export async function fetchBranches(token) {
   })
   return res.json()
 }
+
+// Datos públicos de una sucursal (incluye acceptingOrders).
+export async function fetchBranch(token, branchId) {
+  const res = await apiFetch(`${API_URL}/branches/${branchId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  return res.json()
+}
