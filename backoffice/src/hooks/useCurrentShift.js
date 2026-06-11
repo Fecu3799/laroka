@@ -15,6 +15,7 @@ export default function useCurrentShift() {
 
   const [shift, setShift] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [ready, setReady] = useState(false)
   const [warning, setWarning] = useState(false)
   const [pendingShift, setPendingShift] = useState(null)
   const [closeSummary, setCloseSummary] = useState(null)
@@ -22,7 +23,7 @@ export default function useCurrentShift() {
   const [suggestOrders, setSuggestOrders] = useState(false)
 
   const refresh = useCallback(async () => {
-    if (!token || activeBranchId == null) { setLoading(false); return }
+    if (!token || activeBranchId == null) { setLoading(false); setReady(true); return }
     setLoading(true)
     try {
       const data = await getCurrentShift(token, activeBranchId)
@@ -39,6 +40,8 @@ export default function useCurrentShift() {
       }
     } catch { /* apiFetch already toasts */ } finally {
       setLoading(false)
+      // El turno quedó resuelto (éxito o error): habilitamos el fetch de useOrders.
+      setReady(true)
     }
   }, [token, activeBranchId])
 
@@ -105,7 +108,7 @@ export default function useCurrentShift() {
   const dismissSummary = useCallback(() => setCloseSummary(null), [])
 
   return {
-    shift, loading, warning, confirmWarning,
+    shift, loading, ready, warning, confirmWarning,
     openShift, closeShift, closeSummary, dismissSummary,
     acceptingOrders, toggleOrders,
     suggestOrders, confirmSuggestOrders, dismissSuggestOrders,

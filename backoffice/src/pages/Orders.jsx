@@ -524,7 +524,7 @@ export default function Orders() {
   const { token } = useAuth();
   const { activeBranchId: branchId } = useBranch();
   const { setOpenOrderId, resetCounts } = useOutletContext();
-  const { shift } = useCurrentShift();
+  const { shift, ready } = useCurrentShift();
   const {
     orders,
     loading,
@@ -537,7 +537,7 @@ export default function Orders() {
     updatePaymentInList,
     replaceOrderInList,
     updateSingleOrder,
-  } = useOrders(token, branchId, shift?.openedAt ?? null);
+  } = useOrders(token, branchId, shift?.openedAt ?? null, ready);
 
   const [activeTab, setActiveTab] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
