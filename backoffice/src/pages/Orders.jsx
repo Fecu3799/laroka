@@ -18,6 +18,7 @@ import {
   canGoBack as goBackAllowed,
   canCancel as cancelAllowed,
 } from "../utils/ordersUtils";
+import NewOrderModal from "../components/NewOrderModal";
 import "./Orders.css";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "";
@@ -542,6 +543,7 @@ export default function Orders() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedId, setSelectedId] = useState(null);
   const [advancing, setAdvancing] = useState(null);
+  const [newOrderModalOpen, setNewOrderModalOpen] = useState(false);
   const { detail, refetchDetail } = useOrderDetail(selectedId, token, branchId);
 
   // ── Flash state ──────────────────────────────────────────────
@@ -835,6 +837,21 @@ export default function Orders() {
         )}
       </div>
 
+      {/* ── FAB Nueva Orden ──────────────────────────────────── */}
+      {!panelOpen && (
+        <button
+          className="orders-fab"
+          type="button"
+          onClick={() => setNewOrderModalOpen(true)}
+          aria-label="Nueva orden"
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+          </svg>
+          <span className="orders-fab-tooltip">Nueva orden</span>
+        </button>
+      )}
+
       {/* ── Shift banner ─────────────────────────────────────── */}
       {shift && (
         <div className="orders-shift-banner">
@@ -842,6 +859,11 @@ export default function Orders() {
           Mostrando pedidos del turno actual desde {formatHour(shift.openedAt)}
         </div>
       )}
+
+      <NewOrderModal
+        open={newOrderModalOpen}
+        onClose={() => setNewOrderModalOpen(false)}
+      />
     </div>
   );
 }

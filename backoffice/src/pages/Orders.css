@@ -5,6 +5,7 @@
   flex-direction: column;
   height: 100%;
   overflow: hidden;
+  position: relative;
 }
 
 /* ── Top bar ─────────────────────────────────────────────────── */
@@ -1289,6 +1290,55 @@
 .detail-cancel-reason-actions {
   display: flex;
   gap: 8px;
+}
+
+/* ── FAB Nueva Orden ─────────────────────────────────────────── */
+
+.orders-fab {
+  position: absolute;
+  bottom: 40px;
+  right: 40px;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: #fecd18;
+  border: none;
+  color: #0b1610;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(254, 205, 24, 0.28);
+  z-index: 50;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.orders-fab:hover {
+  transform: scale(1.07);
+  box-shadow: 0 6px 22px rgba(254, 205, 24, 0.45);
+}
+
+.orders-fab-tooltip {
+  position: absolute;
+  right: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%);
+  white-space: nowrap;
+  background: #0d1a11;
+  border: 1px solid rgba(101, 163, 105, 0.2);
+  color: #e8f0ea;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 6px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.orders-fab:hover .orders-fab-tooltip {
+  opacity: 1;
 }
 
 /* ── Shift banner ────────────────────────────────────────────── */

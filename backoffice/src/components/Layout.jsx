@@ -4,7 +4,6 @@ import logo from '../assets/logo.png'
 import useAuth from '../hooks/useAuth'
 import useBranch from '../hooks/useBranch'
 import { logout } from '../services/authService'
-import NewOrderModal from './NewOrderModal'
 import SubHeader from './SubHeader'
 import { Toast } from './Toast'
 import './Layout.css'
@@ -12,15 +11,6 @@ import './Layout.css'
 const API_URL = import.meta.env.VITE_API_URL ?? ''
 
 const NAV = [
-  {
-    action: 'new-order',
-    label: 'NUEVA ORDEN',
-    icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
-      </svg>
-    ),
-  },
   {
     to: '/summary',
     label: 'RESUMEN',
@@ -65,7 +55,6 @@ export default function Layout() {
   const [connectionStatus, setConnectionStatus] = useState('disconnected')
   const [newOrderCount, setNewOrderCount] = useState(0)
   const [cancelCount, setCancelCount] = useState(0)
-  const [newOrderModalOpen, setNewOrderModalOpen] = useState(false)
   const openOrderIdRef = useRef(null)
   const setOpenOrderId = useCallback(id => { openOrderIdRef.current = id }, [])
 
@@ -171,40 +160,28 @@ export default function Layout() {
         </div>
 
         <nav className="layout-sidebar-nav" aria-label="Navegación principal">
-          {NAV.map(({ to, label, icon, end, action }) =>
-            action === 'new-order' ? (
-              <button
-                key="new-order"
-                type="button"
-                className="layout-nav-item layout-nav-btn"
-                onClick={() => setNewOrderModalOpen(true)}
-              >
-                <span className="layout-nav-icon">{icon}</span>
-                <span className="layout-nav-label">{label}</span>
-              </button>
-            ) : (
-              <NavLink
-                key={to}
-                to={to}
-                end={end}
-                className={({ isActive }) =>
-                  `layout-nav-item${isActive ? ' layout-nav-item--active' : ''}`
-                }
-              >
-                <span className="layout-nav-icon">
-                  {to === '/orders' ? (
-                    <div style={{ position: 'relative' }}>
-                      {icon}
-                      {(newOrderCount + cancelCount) > 0 && location.pathname !== '/orders' && (
-                        <span className="layout-nav-badge">{newOrderCount + cancelCount}</span>
-                      )}
-                    </div>
-                  ) : icon}
-                </span>
-                <span className="layout-nav-label">{label}</span>
-              </NavLink>
-            )
-          )}
+          {NAV.map(({ to, label, icon, end }) => (
+            <NavLink
+              key={to}
+              to={to}
+              end={end}
+              className={({ isActive }) =>
+                `layout-nav-item${isActive ? ' layout-nav-item--active' : ''}`
+              }
+            >
+              <span className="layout-nav-icon">
+                {to === '/orders' ? (
+                  <div style={{ position: 'relative' }}>
+                    {icon}
+                    {(newOrderCount + cancelCount) > 0 && location.pathname !== '/orders' && (
+                      <span className="layout-nav-badge">{newOrderCount + cancelCount}</span>
+                    )}
+                  </div>
+                ) : icon}
+              </span>
+              <span className="layout-nav-label">{label}</span>
+            </NavLink>
+          ))}
         </nav>
 
         <button className="layout-logout-btn" onClick={handleLogout} aria-label="Cerrar sesión">
@@ -259,10 +236,6 @@ export default function Layout() {
         </main>
       </div>
 
-      <NewOrderModal
-        open={newOrderModalOpen}
-        onClose={() => setNewOrderModalOpen(false)}
-      />
       <Toast />
     </div>
   )
