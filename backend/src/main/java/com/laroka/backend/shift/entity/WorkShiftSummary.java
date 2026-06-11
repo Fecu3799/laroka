@@ -59,6 +59,15 @@ public class WorkShiftSummary {
     @Column(name = "average_ticket", nullable = false, precision = 10, scale = 2)
     private BigDecimal averageTicket;
 
+    @Column(name = "delivery_orders", nullable = false)
+    private Integer deliveryOrders;
+
+    @Column(name = "takeaway_orders", nullable = false)
+    private Integer takeawayOrders;
+
+    @Column(name = "cancellation_rate", nullable = false, precision = 5, scale = 2)
+    private BigDecimal cancellationRate;
+
     @Column(name = "calculated_at", nullable = false)
     private OffsetDateTime calculatedAt;
 

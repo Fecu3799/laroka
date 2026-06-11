@@ -33,10 +33,13 @@ import com.laroka.backend.branch.repository.BranchRepository;
 import com.laroka.backend.shared.exception.BusinessException;
 import com.laroka.backend.order.entity.Order;
 import com.laroka.backend.order.entity.OrderStatus;
+import com.laroka.backend.order.entity.OrderType;
 import com.laroka.backend.order.entity.PaymentMethod;
+import com.laroka.backend.order.repository.OrderItemRepository;
 import com.laroka.backend.order.repository.OrderRepository;
 import com.laroka.backend.payment.entity.Payment;
 import com.laroka.backend.payment.repository.PaymentRepository;
+import com.laroka.backend.shift.dto.TopProductDTO;
 import com.laroka.backend.shift.entity.ShiftStatus;
 import com.laroka.backend.shift.entity.WorkShift;
 import com.laroka.backend.shift.entity.WorkShiftSummary;
@@ -51,6 +54,7 @@ class WorkShiftServiceTest {
     @Mock private WorkShiftRepository workShiftRepository;
     @Mock private WorkShiftSummaryRepository workShiftSummaryRepository;
     @Mock private OrderRepository orderRepository;
+    @Mock private OrderItemRepository orderItemRepository;
     @Mock private PaymentRepository paymentRepository;
     @Mock private StaffUserRepository staffUserRepository;
     @Mock private BranchRepository branchRepository;
@@ -105,6 +109,7 @@ class WorkShiftServiceTest {
         Order deliveredOrder = Order.builder()
             .id(deliveredOrderId)
             .status(OrderStatus.DELIVERED)
+            .orderType(OrderType.DELIVERY)
             .totalAmount(new BigDecimal("1500.00"))
             .build();
         Payment payment = Payment.builder()
@@ -138,6 +143,9 @@ class WorkShiftServiceTest {
         assertThat(summary.getMpRevenue()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(summary.getQrRevenue()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(summary.getAverageTicket()).isEqualByComparingTo("1500.00");
+        assertThat(summary.getDeliveryOrders()).isEqualTo(1);
+        assertThat(summary.getTakeawayOrders()).isZero();
+        assertThat(summary.getCancellationRate()).isEqualByComparingTo(BigDecimal.ZERO);
     }
 
     @Test
@@ -179,9 +187,9 @@ class WorkShiftServiceTest {
         UUID cancelledId = UUID.randomUUID();
 
         Order delivered1 = Order.builder().id(deliveredId1).status(OrderStatus.DELIVERED)
-            .totalAmount(new BigDecimal("900.00")).build();
+            .orderType(OrderType.DELIVERY).totalAmount(new BigDecimal("900.00")).build();
         Order delivered2 = Order.builder().id(deliveredId2).status(OrderStatus.DELIVERED)
-            .totalAmount(new BigDecimal("600.00")).build();
+            .orderType(OrderType.TAKEAWAY).totalAmount(new BigDecimal("600.00")).build();
         Order cancelled = Order.builder().id(cancelledId).status(OrderStatus.CANCELLED)
             .totalAmount(new BigDecimal("300.00")).build();
 
@@ -209,6 +217,10 @@ class WorkShiftServiceTest {
         assertThat(result.getMpRevenue()).isEqualByComparingTo("600.00");
         assertThat(result.getQrRevenue()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(result.getAverageTicket()).isEqualByComparingTo("750.00");
+        assertThat(result.getDeliveryOrders()).isEqualTo(1);
+        assertThat(result.getTakeawayOrders()).isEqualTo(1);
+        // cancellationRate: 1 cancelled / 3 total * 100 = 33.33
+        assertThat(result.getCancellationRate()).isEqualByComparingTo("33.33");
     }
 
     @Test
@@ -299,5 +311,53 @@ class WorkShiftServiceTest {
         assertThatThrownBy(() -> workShiftService.closeShift(1, 10))
             .isInstanceOf(BusinessException.class)
             .hasMessage("No hay turno activo para esta sucursal");
+    }
+
+    @Test
+    void getTopProducts_closedShift_returnsMappedList() {
+        Branch branch = branch();
+        UUID shiftId = UUID.randomUUID();
+        WorkShift shift = WorkShift.builder()
+            .id(shiftId)
+            .branch(branch)
+            .openedAt(OffsetDateTime.now().minusHours(4))
+            .closedAt(OffsetDateTime.now().minusHours(1))
+            .status(ShiftStatus.CLOSED)
+            .build();
+
+        List<Object[]> rawRows = List.of(
+            new Object[]{10, "Pizza Muzzarella", 8L},
+            new Object[]{11, "Fugazza", 5L}
+        );
+
+        when(workShiftRepository.findById(shiftId)).thenReturn(Optional.of(shift));
+        when(orderItemRepository.findTopProducts(eq(1), eq(OrderStatus.DELIVERED), any(), any(), any()))
+            .thenReturn(rawRows);
+
+        List<TopProductDTO> result = workShiftService.getTopProducts(shiftId, 1);
+
+        assertThat(result).hasSize(2);
+        assertThat(result.get(0).getProductId()).isEqualTo(10);
+        assertThat(result.get(0).getProductName()).isEqualTo("Pizza Muzzarella");
+        assertThat(result.get(0).getQuantitySold()).isEqualTo(8L);
+        assertThat(result.get(1).getProductName()).isEqualTo("Fugazza");
+    }
+
+    @Test
+    void getTopProducts_wrongBranch_throwsBusinessException() {
+        Branch branch = branch(); // id=1
+        UUID shiftId = UUID.randomUUID();
+        WorkShift shift = WorkShift.builder()
+            .id(shiftId)
+            .branch(branch)
+            .openedAt(OffsetDateTime.now().minusHours(4))
+            .closedAt(OffsetDateTime.now().minusHours(1))
+            .status(ShiftStatus.CLOSED)
+            .build();
+
+        when(workShiftRepository.findById(shiftId)).thenReturn(Optional.of(shift));
+
+        assertThatThrownBy(() -> workShiftService.getTopProducts(shiftId, 99))
+            .isInstanceOf(BusinessException.class);
     }
 }

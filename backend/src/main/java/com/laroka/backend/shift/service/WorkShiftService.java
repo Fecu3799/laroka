@@ -22,10 +22,13 @@ import com.laroka.backend.branch.repository.BranchRepository;
 import com.laroka.backend.shared.exception.BusinessException;
 import com.laroka.backend.order.entity.Order;
 import com.laroka.backend.order.entity.OrderStatus;
+import com.laroka.backend.order.entity.OrderType;
 import com.laroka.backend.order.entity.PaymentMethod;
+import com.laroka.backend.order.repository.OrderItemRepository;
 import com.laroka.backend.order.repository.OrderRepository;
 import com.laroka.backend.payment.entity.Payment;
 import com.laroka.backend.payment.repository.PaymentRepository;
+import com.laroka.backend.shift.dto.TopProductDTO;
 import com.laroka.backend.shift.entity.ShiftStatus;
 import com.laroka.backend.shift.entity.WorkShift;
 import com.laroka.backend.shift.entity.WorkShiftSummary;
@@ -43,6 +46,7 @@ public class WorkShiftService {
     private final WorkShiftRepository workShiftRepository;
     private final WorkShiftSummaryRepository workShiftSummaryRepository;
     private final OrderRepository orderRepository;
+    private final OrderItemRepository orderItemRepository;
     private final PaymentRepository paymentRepository;
     private final StaffUserRepository staffUserRepository;
     private final BranchRepository branchRepository;
@@ -136,20 +140,54 @@ public class WorkShiftService {
         }
 
         int deliveredCount = delivered.size();
+        int cancelledCount = (int) orders.stream().filter(o -> o.getStatus() == OrderStatus.CANCELLED).count();
+        int totalCount = orders.size();
+
         BigDecimal averageTicket = deliveredCount == 0
             ? BigDecimal.ZERO
             : totalRevenue.divide(BigDecimal.valueOf(deliveredCount), 2, RoundingMode.HALF_UP);
 
+        int deliveryOrders = (int) delivered.stream().filter(o -> o.getOrderType() == OrderType.DELIVERY).count();
+        int takeawayOrders = (int) delivered.stream().filter(o -> o.getOrderType() == OrderType.TAKEAWAY).count();
+
+        BigDecimal cancellationRate = totalCount == 0
+            ? BigDecimal.ZERO
+            : BigDecimal.valueOf(cancelledCount)
+                .multiply(BigDecimal.valueOf(100))
+                .divide(BigDecimal.valueOf(totalCount), 2, RoundingMode.HALF_UP);
+
         return WorkShiftSummary.builder()
             .shift(shift)
-            .totalOrders(orders.size())
+            .totalOrders(totalCount)
             .deliveredOrders(deliveredCount)
-            .cancelledOrders((int) orders.stream().filter(o -> o.getStatus() == OrderStatus.CANCELLED).count())
+            .cancelledOrders(cancelledCount)
             .totalRevenue(totalRevenue)
             .cashRevenue(revenueByMethod.getOrDefault(PaymentMethod.CASH, BigDecimal.ZERO))
             .mpRevenue(revenueByMethod.getOrDefault(PaymentMethod.MERCADOPAGO, BigDecimal.ZERO))
             .qrRevenue(revenueByMethod.getOrDefault(PaymentMethod.QR_CODE, BigDecimal.ZERO))
             .averageTicket(averageTicket)
+            .deliveryOrders(deliveryOrders)
+            .takeawayOrders(takeawayOrders)
+            .cancellationRate(cancellationRate)
             .build();
+    }
+
+    public List<TopProductDTO> getTopProducts(UUID shiftId, Integer branchId) {
+        WorkShift shift = workShiftRepository.findById(shiftId)
+            .orElseThrow(() -> new BusinessException("Turno no encontrado"));
+        if (!shift.getBranch().getId().equals(branchId)) {
+            throw new BusinessException("El turno no pertenece a esta sucursal");
+        }
+        LocalDateTime from = shift.getOpenedAt().toLocalDateTime();
+        LocalDateTime to = shift.getClosedAt() != null
+            ? shift.getClosedAt().toLocalDateTime()
+            : LocalDateTime.now();
+
+        List<Object[]> rows = orderItemRepository.findTopProducts(
+            branchId, OrderStatus.DELIVERED, from, to, PageRequest.of(0, 5));
+
+        return rows.stream()
+            .map(r -> new TopProductDTO((Integer) r[0], (String) r[1], (Long) r[2]))
+            .toList();
     }
 }
