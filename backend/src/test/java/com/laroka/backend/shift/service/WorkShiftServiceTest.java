@@ -30,8 +30,11 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import org.springframework.test.util.ReflectionTestUtils;
+
 import com.laroka.backend.branch.entity.Branch;
 import com.laroka.backend.branch.repository.BranchRepository;
+import com.laroka.backend.branch.service.BranchService;
 import com.laroka.backend.shared.exception.BusinessException;
 import com.laroka.backend.order.entity.Order;
 import com.laroka.backend.order.entity.OrderStatus;
@@ -60,6 +63,7 @@ class WorkShiftServiceTest {
     @Mock private PaymentRepository paymentRepository;
     @Mock private StaffUserRepository staffUserRepository;
     @Mock private BranchRepository branchRepository;
+    @Mock private BranchService branchService;
 
     @InjectMocks
     private WorkShiftService workShiftService;
@@ -384,7 +388,41 @@ class WorkShiftServiceTest {
     }
 
     @Test
-    void toggleAcceptingOrders_activeShift_flipsValue() {
+    void toggleAcceptingOrders_activeShiftWithinHours_flipsValue() {
+        Branch branch = Branch.builder().id(1).name("Playa Unión").acceptingOrders(false).build();
+        WorkShift shift = openShift(branch, staffUser());
+
+        when(workShiftRepository.findByBranchIdAndStatus(1, ShiftStatus.OPEN))
+            .thenReturn(Optional.of(shift));
+        when(branchRepository.findById(1)).thenReturn(Optional.of(branch));
+        when(branchService.isOpen(1)).thenReturn(true);
+
+        boolean result = workShiftService.toggleAcceptingOrders(1);
+
+        assertThat(result).isTrue();
+        verify(branchRepository).updateAcceptingOrders(1, true);
+    }
+
+    @Test
+    void toggleAcceptingOrders_activatingOutsideHours_throwsBusinessException() {
+        Branch branch = Branch.builder().id(1).name("Playa Unión").acceptingOrders(false).build();
+        WorkShift shift = openShift(branch, staffUser());
+
+        when(workShiftRepository.findByBranchIdAndStatus(1, ShiftStatus.OPEN))
+            .thenReturn(Optional.of(shift));
+        when(branchRepository.findById(1)).thenReturn(Optional.of(branch));
+        when(branchService.isOpen(1)).thenReturn(false);
+
+        assertThatThrownBy(() -> workShiftService.toggleAcceptingOrders(1))
+            .isInstanceOf(BusinessException.class)
+            .hasMessage("La sucursal está fuera de su horario operativo");
+
+        verify(branchRepository, never()).updateAcceptingOrders(anyInt(), anyBoolean());
+    }
+
+    @Test
+    void toggleAcceptingOrders_activatingOutsideHoursWithBypass_flipsValue() {
+        ReflectionTestUtils.setField(workShiftService, "bypassBranchHours", true);
         Branch branch = Branch.builder().id(1).name("Playa Unión").acceptingOrders(false).build();
         WorkShift shift = openShift(branch, staffUser());
 
@@ -396,6 +434,7 @@ class WorkShiftServiceTest {
 
         assertThat(result).isTrue();
         verify(branchRepository).updateAcceptingOrders(1, true);
+        verify(branchService, never()).isOpen(anyInt());
     }
 
     @Test

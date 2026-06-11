@@ -5,6 +5,7 @@ import useBranch from '../hooks/useBranch'
 import useCurrentShift from '../hooks/useCurrentShift'
 import { fetchOrderDetail } from '../services/ordersService'
 import { STATUS_CONFIG } from '../utils/ordersUtils'
+import ToggleSwitch from './ToggleSwitch'
 import './SubHeader.css'
 
 function fmt(amount) {
@@ -135,43 +136,38 @@ export default function SubHeader() {
           )}
         </div>
 
-        {/* Shift + Bell */}
-        <div className="sub-header-right">
-          <div className="sub-header-shift">
-            <span className={`sub-header-shift-dot ${shift ? 'sub-header-shift-dot--open' : 'sub-header-shift-dot--closed'}`} />
-            <span className="sub-header-shift-label">{shift ? 'TURNO ABIERTO' : 'TURNO CERRADO'}</span>
-            {shift ? (
-              <button
-                className="sub-header-shift-btn sub-header-shift-btn--close"
-                onClick={() => setConfirmClose(true)}
-                disabled={loading}
-              >
-                Cerrar turno
-              </button>
-            ) : (
-              <button
-                className="sub-header-shift-btn sub-header-shift-btn--open"
-                onClick={openShift}
-                disabled={loading}
-              >
-                Abrir turno
-              </button>
-            )}
-          </div>
-
-          {/* Toggle recepción de pedidos — solo con turno abierto */}
-          {shift && (
+        {/* Shift */}
+        <div className="sub-header-shift">
+          <span className={`sub-header-shift-dot ${shift ? 'sub-header-shift-dot--open' : 'sub-header-shift-dot--closed'}`} />
+          <span className="sub-header-shift-label">{shift ? 'TURNO ABIERTO' : 'TURNO CERRADO'}</span>
+          {shift ? (
             <button
-              type="button"
-              className={`sub-header-orders-toggle ${acceptingOrders ? 'sub-header-orders-toggle--on' : 'sub-header-orders-toggle--off'}`}
-              onClick={toggleOrders}
+              className="sub-header-shift-btn sub-header-shift-btn--close"
+              onClick={() => setConfirmClose(true)}
               disabled={loading}
-              aria-pressed={acceptingOrders}
             >
-              <span className="sub-header-orders-dot" />
-              {acceptingOrders ? 'Aceptando pedidos' : 'Pedidos cerrados'}
+              Cerrar turno
+            </button>
+          ) : (
+            <button
+              className="sub-header-shift-btn sub-header-shift-btn--open"
+              onClick={openShift}
+              disabled={loading}
+            >
+              Abrir turno
             </button>
           )}
+        </div>
+
+        {/* Right: Toggle + Bell */}
+        <div className="sub-header-right">
+          {/* Toggle recepción de pedidos */}
+          <ToggleSwitch
+            checked={acceptingOrders}
+            onChange={toggleOrders}
+            disabled={!shift}
+            label="Pedidos"
+          />
 
           {/* Bell */}
           <div className="sub-header-bell-wrapper" ref={bellRef}>

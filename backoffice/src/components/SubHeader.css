@@ -6,7 +6,6 @@
   border-bottom: 1px solid rgba(101, 163, 105, 0.08);
   display: flex;
   align-items: center;
-  justify-content: space-between;
   padding: 0 1.5rem;
   flex-shrink: 0;
   z-index: 4;
@@ -66,6 +65,7 @@
   align-items: center;
   gap: 1rem;
   flex-shrink: 0;
+  margin-left: auto;
 }
 
 /* Shift status */
@@ -136,62 +136,6 @@
 .sub-header-shift-btn--close:hover:not(:disabled) {
   background: rgba(239, 68, 68, 0.15);
   border-color: rgba(239, 68, 68, 0.55);
-}
-
-/* Orders acceptance toggle (visible solo con turno abierto) */
-.sub-header-orders-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-family: 'Inter', sans-serif;
-  font-size: 11px;
-  font-weight: 600;
-  padding: 4px 11px;
-  border-radius: 999px;
-  border: 1px solid;
-  cursor: pointer;
-  letter-spacing: 0.02em;
-  transition: background 0.15s, border-color 0.15s, color 0.15s, opacity 0.15s;
-}
-
-.sub-header-orders-toggle:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.sub-header-orders-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: currentColor;
-  flex-shrink: 0;
-}
-
-.sub-header-orders-toggle--on {
-  background: rgba(34, 197, 94, 0.1);
-  border-color: rgba(34, 197, 94, 0.35);
-  color: #22c55e;
-}
-
-.sub-header-orders-toggle--on:hover:not(:disabled) {
-  background: rgba(34, 197, 94, 0.18);
-  border-color: rgba(34, 197, 94, 0.6);
-}
-
-.sub-header-orders-toggle--on .sub-header-orders-dot {
-  box-shadow: 0 0 5px rgba(34, 197, 94, 0.6);
-}
-
-.sub-header-orders-toggle--off {
-  background: rgba(148, 163, 184, 0.08);
-  border-color: rgba(148, 163, 184, 0.3);
-  color: rgba(255, 255, 255, 0.55);
-}
-
-.sub-header-orders-toggle--off:hover:not(:disabled) {
-  background: rgba(239, 68, 68, 0.12);
-  border-color: rgba(239, 68, 68, 0.45);
-  color: #ef4444;
 }
 
 /* Bell */
