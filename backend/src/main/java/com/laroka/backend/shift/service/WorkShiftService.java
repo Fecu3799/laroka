@@ -100,7 +100,23 @@ public class WorkShiftService {
         shift.setClosedBy(closer);
         shift.setStatus(ShiftStatus.CLOSED);
         workShiftRepository.save(shift);
+        // Cerrar turno siempre deshabilita la recepción de pedidos, sin importar
+        // el estado actual del toggle (cubre también el cierre forzado al abrir
+        // un turno nuevo, ya que openShift delega en este método).
+        branchRepository.updateAcceptingOrders(shift.getBranch().getId(), false);
         return saved;
+    }
+
+    @Transactional
+    public boolean toggleAcceptingOrders(Integer branchId) {
+        if (workShiftRepository.findByBranchIdAndStatus(branchId, ShiftStatus.OPEN).isEmpty()) {
+            throw new BusinessException("No hay turno activo para esta sucursal");
+        }
+        Branch branch = branchRepository.findById(branchId)
+            .orElseThrow(() -> new BranchNotFoundException(branchId));
+        boolean next = !branch.isAcceptingOrders();
+        branchRepository.updateAcceptingOrders(branchId, next);
+        return next;
     }
 
     private WorkShiftSummary calculateSummary(WorkShift shift) {

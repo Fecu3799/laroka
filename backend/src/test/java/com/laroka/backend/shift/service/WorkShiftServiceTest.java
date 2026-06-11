@@ -3,7 +3,9 @@ package com.laroka.backend.shift.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -379,6 +381,68 @@ class WorkShiftServiceTest {
         assertThat(result.get(0).getProductName()).isEqualTo("Pizza Muzzarella");
         assertThat(result.get(0).getQuantitySold()).isEqualTo(8L);
         assertThat(result.get(1).getProductName()).isEqualTo("Fugazza");
+    }
+
+    @Test
+    void toggleAcceptingOrders_activeShift_flipsValue() {
+        Branch branch = Branch.builder().id(1).name("Playa Unión").acceptingOrders(false).build();
+        WorkShift shift = openShift(branch, staffUser());
+
+        when(workShiftRepository.findByBranchIdAndStatus(1, ShiftStatus.OPEN))
+            .thenReturn(Optional.of(shift));
+        when(branchRepository.findById(1)).thenReturn(Optional.of(branch));
+
+        boolean result = workShiftService.toggleAcceptingOrders(1);
+
+        assertThat(result).isTrue();
+        verify(branchRepository).updateAcceptingOrders(1, true);
+    }
+
+    @Test
+    void toggleAcceptingOrders_activeShiftAlreadyAccepting_flipsToFalse() {
+        Branch branch = Branch.builder().id(1).name("Playa Unión").acceptingOrders(true).build();
+        WorkShift shift = openShift(branch, staffUser());
+
+        when(workShiftRepository.findByBranchIdAndStatus(1, ShiftStatus.OPEN))
+            .thenReturn(Optional.of(shift));
+        when(branchRepository.findById(1)).thenReturn(Optional.of(branch));
+
+        boolean result = workShiftService.toggleAcceptingOrders(1);
+
+        assertThat(result).isFalse();
+        verify(branchRepository).updateAcceptingOrders(1, false);
+    }
+
+    @Test
+    void toggleAcceptingOrders_noActiveShift_throwsBusinessException() {
+        when(workShiftRepository.findByBranchIdAndStatus(1, ShiftStatus.OPEN))
+            .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> workShiftService.toggleAcceptingOrders(1))
+            .isInstanceOf(BusinessException.class)
+            .hasMessage("No hay turno activo para esta sucursal");
+
+        verify(branchRepository, never()).updateAcceptingOrders(anyInt(), anyBoolean());
+    }
+
+    @Test
+    void closeShift_disablesAcceptingOrders() {
+        Branch branch = branch();
+        StaffUser closer = staffUser();
+        WorkShift shift = openShift(branch, closer);
+
+        when(staffUserRepository.findById(10)).thenReturn(Optional.of(closer));
+        when(workShiftRepository.findByBranchIdAndStatus(1, ShiftStatus.OPEN))
+            .thenReturn(Optional.of(shift));
+        when(orderRepository.findByBranchIdAndStatusInAndCreatedAtBetween(
+            eq(1), anyCollection(), any(), any()))
+            .thenReturn(List.of());
+        when(workShiftRepository.save(any(WorkShift.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(workShiftSummaryRepository.save(any(WorkShiftSummary.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        workShiftService.closeShift(1, 10);
+
+        verify(branchRepository).updateAcceptingOrders(1, false);
     }
 
     @Test
