@@ -6,6 +6,7 @@ import Login from './pages/Login'
 import BranchSelect from './pages/BranchSelect'
 import Orders from './pages/Orders'
 import OrderDetail from './pages/OrderDetail'
+import Summary from './pages/Summary'
 import './App.css'
 
 function App() {
@@ -30,6 +31,7 @@ function App() {
               </ProtectedRoute>
             }
           >
+            <Route path="/summary" element={<Summary />} />
             <Route path="/orders" element={<Orders />} />
             <Route path="/orders/:id" element={<OrderDetail />} />
           </Route>

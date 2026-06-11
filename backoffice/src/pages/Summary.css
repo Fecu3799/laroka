@@ -1,0 +1,343 @@
+/* ── Vista RESUMEN de turno (US-08-F-03) ───────────────────────── */
+
+.summary-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px 28px;
+  max-width: 900px;
+  width: 100%;
+}
+
+/* Fuente monoespaciada para horarios y montos (igual que el diseño) */
+.summary-period-range,
+.summary-metric-value,
+.summary-breakdown-amount,
+.summary-breakdown-total {
+  font-family: ui-monospace, 'SFMono-Regular', 'JetBrains Mono', Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Encabezado ────────────────────────────────────────────────── */
+
+.summary-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.summary-title {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.summary-subtitle {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.summary-subtitle strong {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+/* ── Estados: loading / error / empty ──────────────────────────── */
+
+.summary-state-center {
+  align-items: center;
+  justify-content: center;
+  min-height: 320px;
+}
+
+.summary-spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid color-mix(in srgb, var(--border) 25%, transparent);
+  border-top-color: var(--border);
+  border-radius: 50%;
+  animation: summary-spin 0.7s linear infinite;
+}
+
+@keyframes summary-spin { to { transform: rotate(360deg); } }
+
+.summary-state-error { color: var(--color-danger); font-size: 14px; }
+.summary-empty { color: var(--text-secondary); font-size: 15px; }
+
+/* ── Card superior: encargado + período ────────────────────────── */
+
+.summary-period-card {
+  background: var(--color-sidebar-bg);
+  border: 1px solid color-mix(in srgb, var(--border) 28%, transparent);
+  border-radius: 14px;
+  padding: 18px 22px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.summary-manager {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.summary-avatar {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.summary-manager-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.summary-status-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.summary-status-line.is-active { color: var(--color-success); }
+.summary-status-line.is-closed { color: var(--text-secondary); }
+
+.summary-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.summary-manager-name {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.summary-manager-sub {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.summary-period-meta {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.summary-period-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.summary-period-caption {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--text-secondary);
+}
+
+.summary-period-range {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.summary-period-arrow { color: var(--text-secondary); }
+.summary-period-now { color: var(--color-success); }
+
+.summary-duration-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 14px;
+  border-radius: 9px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 32%, transparent);
+}
+
+/* ── Grid de métricas (2x2) ────────────────────────────────────── */
+
+.summary-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+}
+
+.summary-metric {
+  background: var(--color-sidebar-bg);
+  border: 1px solid color-mix(in srgb, var(--border) 28%, transparent);
+  border-left: 3px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.summary-metric-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.summary-metric-value {
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.summary-metric--success { border-left-color: var(--color-success); }
+.summary-metric--success .summary-metric-value { color: var(--color-success); }
+
+.summary-metric--danger { border-left-color: var(--color-danger); }
+.summary-metric--danger .summary-metric-value { color: var(--color-danger); }
+
+.summary-metric--ticket { border-left-color: var(--color-success); }
+.summary-metric--ticket .summary-metric-value { color: var(--color-success); }
+
+.summary-metric--revenue {
+  border-left-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 7%, var(--color-sidebar-bg));
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.summary-metric--revenue .summary-metric-value {
+  color: var(--accent);
+  font-size: 34px;
+}
+
+/* ── Desgloses (ingresos / modalidad) ──────────────────────────── */
+
+.summary-breakdown {
+  background: var(--color-sidebar-bg);
+  border: 1px solid color-mix(in srgb, var(--border) 28%, transparent);
+  border-radius: 12px;
+  padding: 18px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.summary-breakdown-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.summary-breakdown-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.summary-breakdown-total {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.summary-breakdown-row {
+  display: grid;
+  grid-template-columns: 150px 1fr 96px 52px;
+  align-items: center;
+  gap: 14px;
+}
+
+.summary-breakdown-label {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.summary-breakdown-icon {
+  display: flex;
+  color: var(--text-secondary);
+}
+
+.summary-bar-track {
+  height: 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--border) 16%, transparent);
+  overflow: hidden;
+}
+
+.summary-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+
+.summary-breakdown-amount {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-align: right;
+}
+
+.summary-breakdown-pct {
+  font-size: 13px;
+  font-weight: 700;
+  text-align: right;
+}
+
+/* Color por método: tiñe la barra y el porcentaje */
+.summary-breakdown-row.is-cash .summary-bar-fill { background: var(--color-success); }
+.summary-breakdown-row.is-cash .summary-breakdown-pct { color: var(--color-success); }
+
+.summary-breakdown-row.is-mp .summary-bar-fill { background: var(--color-info); }
+.summary-breakdown-row.is-mp .summary-breakdown-pct { color: var(--color-info); }
+
+.summary-breakdown-row.is-qr .summary-bar-fill { background: var(--accent); }
+.summary-breakdown-row.is-qr .summary-breakdown-pct { color: var(--accent); }
+
+/* ── Responsive ────────────────────────────────────────────────── */
+
+@media (max-width: 680px) {
+  .summary-page { padding: 16px; }
+  .summary-metrics { grid-template-columns: 1fr; }
+  .summary-period-card { align-items: flex-start; }
+  .summary-period-meta { width: 100%; justify-content: space-between; }
+  .summary-breakdown-row {
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "label pct"
+      "bar bar"
+      "amount amount";
+    row-gap: 6px;
+  }
+  .summary-breakdown-label { grid-area: label; }
+  .summary-bar-track { grid-area: bar; }
+  .summary-breakdown-pct { grid-area: pct; }
+  .summary-breakdown-amount { grid-area: amount; text-align: left; }
+}

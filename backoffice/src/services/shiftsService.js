@@ -30,3 +30,21 @@ export async function closeShift(token, branchId) {
   })
   return res.json()
 }
+
+// Resumen calculado en tiempo real del turno activo (no persiste).
+// El backend responde 404 si no hay turno activo.
+export async function getCurrentShiftSummary(token, branchId) {
+  const res = await apiFetch(`${API_URL}/backoffice/shifts/current/summary`, {
+    headers: authHeaders(token, branchId),
+  })
+  return res.json()
+}
+
+// Historial paginado de turnos cerrados (con su summary embebido).
+export async function getShiftHistory(token, branchId, page = 0, size = 20) {
+  const res = await apiFetch(
+    `${API_URL}/backoffice/shifts/history?page=${page}&size=${size}`,
+    { headers: authHeaders(token, branchId) },
+  )
+  return res.json()
+}
