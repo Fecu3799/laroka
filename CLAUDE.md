@@ -75,6 +75,8 @@ Capas obligatorias por módulo:
 | V14     | refresh_token                              |
 | V15     | work_shift                                 |
 | V16     | work_shift_summary                         |
+| V17     | work_shift_summary analytics columns       |
+| V18     | branch accepting_orders                    |
 
 Toda migración nueva debe ser la siguiente versión disponible en esta tabla.
 Actualizar esta tabla al agregar una migración.

@@ -61,6 +61,9 @@ public class Branch {
 	@Column(name = "open_days", nullable = false, length = 50)
 	private String openDays;
 
+	@Column(name = "accepting_orders", nullable = false)
+	private boolean acceptingOrders;
+
 	@ManyToOne(fetch = FetchType.LAZY)
 	@JoinColumn(name = "tenant_id", nullable = false)
 	private Tenant tenant;
