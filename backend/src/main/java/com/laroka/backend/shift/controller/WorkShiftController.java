@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.laroka.backend.shared.exception.BusinessException;
 import com.laroka.backend.shift.dto.CloseShiftResponseDTO;
 import com.laroka.backend.shift.dto.CurrentShiftResponseDTO;
 import com.laroka.backend.shift.dto.OpenShiftResponseDTO;
@@ -111,6 +112,23 @@ public class WorkShiftController {
         WorkShiftSummary summary = workShiftService.closeShift(branchId, principal.getUserId());
 
         return ResponseEntity.ok(toCloseShiftResponse(summary.getShift().getId(), summary));
+    }
+
+    @GetMapping("/current/summary")
+    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+    @Operation(summary = "Get live summary of current active shift",
+            description = "Returns a calculated (non-persisted) summary of the currently open shift. Returns 404 if no active shift exists.")
+    public ResponseEntity<CloseShiftResponseDTO> getCurrentShiftSummary(
+            @AuthenticationPrincipal CustomUserDetails principal,
+            HttpServletRequest request) {
+
+        Integer branchId = securityUtils.resolveBranchId(principal, request);
+        try {
+            WorkShiftSummary summary = workShiftService.getCurrentShiftSummary(branchId);
+            return ResponseEntity.ok(toCloseShiftResponse(summary.getShift().getId(), summary));
+        } catch (BusinessException e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 
     @GetMapping("/{shiftId}/top-products")

@@ -314,6 +314,44 @@ class WorkShiftServiceTest {
     }
 
     @Test
+    void getCurrentShiftSummary_activeShiftWithOrders_returnsSummaryWithoutPersisting() {
+        Branch branch = branch();
+        StaffUser opener = staffUser();
+        WorkShift shift = openShift(branch, opener);
+
+        UUID orderId = UUID.randomUUID();
+        Order delivered = Order.builder()
+            .id(orderId)
+            .status(OrderStatus.DELIVERED)
+            .orderType(OrderType.DELIVERY)
+            .totalAmount(new BigDecimal("1200.00"))
+            .build();
+        Payment payment = Payment.builder()
+            .method(PaymentMethod.CASH)
+            .order(delivered)
+            .build();
+
+        when(workShiftRepository.findByBranchIdAndStatus(1, ShiftStatus.OPEN))
+            .thenReturn(Optional.of(shift));
+        when(orderRepository.findByBranchIdAndStatusInAndCreatedAtBetween(
+            eq(1), anyCollection(), any(), any()))
+            .thenReturn(List.of(delivered));
+        when(paymentRepository.findByOrderIdIn(anyCollection()))
+            .thenReturn(List.of(payment));
+
+        WorkShiftSummary result = workShiftService.getCurrentShiftSummary(1);
+
+        assertThat(result.getDeliveredOrders()).isEqualTo(1);
+        assertThat(result.getCancelledOrders()).isZero();
+        assertThat(result.getTotalRevenue()).isEqualByComparingTo("1200.00");
+        assertThat(result.getCashRevenue()).isEqualByComparingTo("1200.00");
+        assertThat(result.getAverageTicket()).isEqualByComparingTo("1200.00");
+        assertThat(result.getDeliveryOrders()).isEqualTo(1);
+        assertThat(result.getCalculatedAt()).isNotNull();
+        verify(workShiftSummaryRepository, never()).save(any());
+    }
+
+    @Test
     void getTopProducts_closedShift_returnsMappedList() {
         Branch branch = branch();
         UUID shiftId = UUID.randomUUID();

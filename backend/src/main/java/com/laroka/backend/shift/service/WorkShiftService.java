@@ -172,6 +172,14 @@ public class WorkShiftService {
             .build();
     }
 
+    public WorkShiftSummary getCurrentShiftSummary(Integer branchId) {
+        WorkShift shift = workShiftRepository.findByBranchIdAndStatus(branchId, ShiftStatus.OPEN)
+            .orElseThrow(() -> new BusinessException("No hay turno activo"));
+        WorkShiftSummary summary = calculateSummary(shift);
+        summary.setCalculatedAt(OffsetDateTime.now());
+        return summary;
+    }
+
     public List<TopProductDTO> getTopProducts(UUID shiftId, Integer branchId) {
         WorkShift shift = workShiftRepository.findById(shiftId)
             .orElseThrow(() -> new BusinessException("Turno no encontrado"));
