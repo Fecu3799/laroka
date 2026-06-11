@@ -60,6 +60,9 @@ test.describe('US-06-F-05 · resolución de solicitud de cancelación', () => {
     await page.route('**/backoffice/events', route =>
       route.fulfill({ status: 200, body: '' })
     )
+    await page.route('**/backoffice/shifts/current', route =>
+      route.fulfill({ json: { active: false } })
+    )
   })
 
   test('APPROVE: la solicitud de cancelación se aprueba y el pedido queda CANCELLED', async ({ page }) => {
@@ -190,6 +193,9 @@ test.describe('US-06-F-05 · cancelación directa del operador con motivo', () =
     )
     await page.route('**/backoffice/events', route =>
       route.fulfill({ status: 200, body: '' })
+    )
+    await page.route('**/backoffice/shifts/current', route =>
+      route.fulfill({ json: { active: false } })
     )
   })
 
