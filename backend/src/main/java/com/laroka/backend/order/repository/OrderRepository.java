@@ -36,6 +36,11 @@ public interface OrderRepository extends JpaRepository<Order, UUID>, JpaSpecific
             LocalDateTime from,
             LocalDateTime to);
 
+    boolean existsByBranchIdAndStatusInAndCreatedAtGreaterThanEqual(
+            Integer branchId,
+            List<OrderStatus> statuses,
+            LocalDateTime from);
+
     @EntityGraph(attributePaths = {"branch"})
     @Query("SELECT o FROM Order o WHERE o.id = :id")
     Optional<Order> findByIdWithBranch(@Param("id") UUID id);

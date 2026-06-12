@@ -67,8 +67,10 @@ public class WorkShiftService {
         boolean previousShiftClosed = false;
         Optional<WorkShift> existing = workShiftRepository.findByBranchIdAndStatus(branchId, ShiftStatus.OPEN);
         if (existing.isPresent()) {
-            closeShiftInternal(existing.get(), opener);
-            previousShiftClosed = true;
+            // Si el turno previo no tuvo actividad, closeShiftInternal lo elimina y
+            // retorna null: no corresponde avisar que se cerró un turno previo.
+            WorkShiftSummary closedSummary = closeShiftInternal(existing.get(), opener);
+            previousShiftClosed = closedSummary != null;
         }
 
         WorkShift newShift = WorkShift.builder()
@@ -96,11 +98,44 @@ public class WorkShiftService {
             .orElseThrow(() -> new IllegalStateException("Authenticated user not found: " + userId));
         WorkShift shift = workShiftRepository.findByBranchIdAndStatus(branchId, ShiftStatus.OPEN)
             .orElseThrow(() -> new BusinessException("No hay turno activo para esta sucursal"));
-        return closeShiftInternal(shift, closer);
+
+        // 1) No permitir cerrar con la recepción de pedidos activa.
+        Branch branch = branchRepository.findById(branchId)
+            .orElseThrow(() -> new BranchNotFoundException(branchId));
+        if (branch.isAcceptingOrders()) {
+            throw new BusinessException("Desactivá la recepción de pedidos antes de cerrar el turno");
+        }
+
+        // 2) No permitir cerrar con pedidos activos sin resolver del turno actual.
+        boolean hasActiveOrders = orderRepository.existsByBranchIdAndStatusInAndCreatedAtGreaterThanEqual(
+            branchId,
+            List.of(OrderStatus.RECEIVED, OrderStatus.IN_PREPARATION,
+                    OrderStatus.ON_THE_WAY, OrderStatus.READY_FOR_PICKUP),
+            shift.getOpenedAt().toLocalDateTime());
+        if (hasActiveOrders) {
+            throw new BusinessException("Hay pedidos activos sin resolver. Resolválos antes de cerrar el turno.");
+        }
+
+        WorkShiftSummary summary = closeShiftInternal(shift, closer);
+        // 3) Turno sin actividad: closeShiftInternal lo eliminó y devolvió null.
+        if (summary == null) {
+            throw new BusinessException("El turno no registró actividad y fue eliminado");
+        }
+        return summary;
     }
 
     WorkShiftSummary closeShiftInternal(WorkShift shift, StaffUser closer) {
         WorkShiftSummary summary = calculateSummary(shift);
+        // Turno sin actividad (delivered + cancelled == 0): no se persiste summary,
+        // se elimina el turno y se retorna null para que el caller lo maneje.
+        if (summary.getTotalOrders() == 0) {
+            // Cerrar turno siempre deshabilita la recepción de pedidos, también
+            // cuando el turno vacío se elimina (cubre el cierre forzado al abrir
+            // un turno nuevo con un previo vacío y accepting_orders activo).
+            branchRepository.updateAcceptingOrders(shift.getBranch().getId(), false);
+            workShiftRepository.delete(shift);
+            return null;
+        }
         WorkShiftSummary saved = workShiftSummaryRepository.save(summary);
         shift.setClosedAt(OffsetDateTime.now());
         shift.setClosedBy(closer);
