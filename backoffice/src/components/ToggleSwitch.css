@@ -1,0 +1,61 @@
+.toggle-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.toggle-switch--disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.toggle-label {
+  font-family: 'Inter', sans-serif;
+  font-size: 9px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.35);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+/* Hidden but accessible — keyboard focus and space toggle still work */
+.toggle-input {
+  position: absolute;
+  width: 0;
+  height: 0;
+  margin: 0;
+  opacity: 0;
+}
+
+.toggle-track {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+  border-radius: 12px;
+  background-color: rgba(255, 255, 255, 0.15);
+  transition: background-color 0.2s ease-in-out;
+  flex-shrink: 0;
+}
+
+.toggle-thumb {
+  position: absolute;
+  top: 50%;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.6);
+  transform: translateY(-50%);
+  transition: transform 0.2s ease-in-out, background-color 0.2s ease-in-out;
+}
+
+.toggle-input:checked + .toggle-track {
+  background-color: #22c55e;
+}
+
+.toggle-input:checked + .toggle-track .toggle-thumb {
+  background-color: #fff;
+  transform: translate(22px, -50%);
+}

@@ -79,7 +79,7 @@ class NotificationServiceTest {
         service.register(1, emitterBranch1);
         service.register(2, emitterBranch2);
 
-        service.sendOrderUpdatedEvent(1, orderDto(UUID.randomUUID()));
+        service.sendOrderUpdatedEvent(1, orderDto(UUID.randomUUID()), "BACKOFFICE");
 
         verify(emitterBranch1).send(any(SseEmitter.SseEventBuilder.class));
         verify(emitterBranch2, never()).send(any(SseEmitter.SseEventBuilder.class));
@@ -87,7 +87,7 @@ class NotificationServiceTest {
 
     @Test
     void sendOrderUpdatedEvent_noSubscribers_doesNotThrow() {
-        service.sendOrderUpdatedEvent(99, orderDto(UUID.randomUUID()));
+        service.sendOrderUpdatedEvent(99, orderDto(UUID.randomUUID()), "BACKOFFICE");
     }
 
     @Test
@@ -101,7 +101,7 @@ class NotificationServiceTest {
         service.register(1, dead);
         service.register(1, alive);
 
-        service.sendOrderUpdatedEvent(1, orderDto(UUID.randomUUID()));
+        service.sendOrderUpdatedEvent(1, orderDto(UUID.randomUUID()), "BACKOFFICE");
 
         verify(alive).send(any(SseEmitter.SseEventBuilder.class));
     }

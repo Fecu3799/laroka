@@ -5,6 +5,7 @@
   flex-direction: column;
   height: 100%;
   overflow: hidden;
+  position: relative;
 }
 
 /* ── Top bar ─────────────────────────────────────────────────── */
@@ -103,7 +104,6 @@
 /* ── Refresh button ──────────────────────────────────────────── */
 
 .orders-refresh-btn {
-  position: relative;
   display: flex;
   align-items: center;
   gap: 7px;
@@ -122,38 +122,6 @@
 }
 
 .orders-refresh-btn:hover { border-color: rgba(254, 205, 24, 0.5); }
-
-.orders-refresh-btn--notify { border-color: rgba(239, 68, 68, 0.5); }
-
-.orders-refresh-badges {
-  position: absolute;
-  top: -7px;
-  right: -7px;
-  display: flex;
-  gap: 3px;
-}
-
-.orders-refresh-badge {
-  min-width: 18px;
-  height: 18px;
-  padding: 0 4px;
-  font-size: 10px;
-  font-weight: 700;
-  border-radius: 9px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.orders-refresh-badge--received {
-  background: #2563eb;
-  color: #fff;
-}
-
-.orders-refresh-badge--cancel {
-  background: #b91c1c;
-  color: #fecaca;
-}
 
 /* ── Tabs ────────────────────────────────────────────────────── */
 
@@ -298,7 +266,13 @@
 
 /* ── Order row ───────────────────────────────────────────────── */
 
+@keyframes row-flash {
+  0%   { box-shadow: inset 0 0 0 1px rgba(255,255,255,0.6), inset 0 0 12px 2px rgba(255,255,255,0.25); }
+  100% { box-shadow: inset 0 0 0 1px rgba(255,255,255,0), inset 0 0 12px 2px rgba(255,255,255,0); }
+}
+
 .orders-row {
+  position: relative;
   padding: 14px 18px;
   border-bottom: 1px solid rgba(101, 163, 105, 0.08);
   border-left: 3px solid transparent;
@@ -307,12 +281,24 @@
   flex-shrink: 0;
 }
 
+.orders-row--flash { animation: row-flash 1000ms ease-out forwards; }
+
 .orders-row:hover                { background: #132019; }
 .orders-row--selected            { border-left-color: #fecd18; background: rgba(254, 205, 24, 0.04); }
 .orders-row--selected:hover      { background: rgba(254, 205, 24, 0.06); }
 .orders-row--cancelled           { opacity: 0.65; }
-.orders-row--cancel-request      { border-left-color: #fb923c; background: rgba(251, 146, 60, 0.04); }
-.orders-row--cancel-request:hover { background: rgba(251, 146, 60, 0.07); }
+.orders-row--cancel-request      { border-left-color: #fb923c; }
+
+.orders-row--pending::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  background: var(--pending-color, transparent);
+  border-radius: 0 2px 2px 0;
+}
 
 /* ── Col: PEDIDO ─────────────────────────────────────────────── */
 
@@ -1304,4 +1290,80 @@
 .detail-cancel-reason-actions {
   display: flex;
   gap: 8px;
+}
+
+/* ── FAB Nueva Orden ─────────────────────────────────────────── */
+
+.orders-fab {
+  position: absolute;
+  bottom: 40px;
+  right: 40px;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: #fecd18;
+  border: none;
+  color: #0b1610;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(254, 205, 24, 0.28);
+  z-index: 50;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.orders-fab:hover {
+  transform: scale(1.07);
+  box-shadow: 0 6px 22px rgba(254, 205, 24, 0.45);
+}
+
+.orders-fab-tooltip {
+  position: absolute;
+  right: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%);
+  white-space: nowrap;
+  background: #0d1a11;
+  border: 1px solid rgba(101, 163, 105, 0.2);
+  color: #e8f0ea;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 6px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.orders-fab:hover .orders-fab-tooltip {
+  opacity: 1;
+}
+
+/* ── Shift banner ────────────────────────────────────────────── */
+
+.orders-shift-banner {
+  position: sticky;
+  bottom: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 1.25rem;
+  height: 30px;
+  background: rgba(34, 197, 94, 0.04);
+  border-top: 1px solid rgba(34, 197, 94, 0.1);
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  color: rgba(34, 197, 94, 0.75);
+  flex-shrink: 0;
+}
+
+.orders-shift-banner-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #22c55e;
+  flex-shrink: 0;
 }

@@ -49,6 +49,7 @@ public class BranchMapper {
 			.openingTime(branch.getOpeningTime())
 			.closingTime(branch.getClosingTime())
 			.openDays(branch.getOpenDays())
+			.acceptingOrders(branch.isAcceptingOrders())
 			.build();
 	}
 

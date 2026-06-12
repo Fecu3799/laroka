@@ -3,7 +3,9 @@ package com.laroka.backend.shift.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -28,15 +30,21 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import org.springframework.test.util.ReflectionTestUtils;
+
 import com.laroka.backend.branch.entity.Branch;
 import com.laroka.backend.branch.repository.BranchRepository;
+import com.laroka.backend.branch.service.BranchService;
 import com.laroka.backend.shared.exception.BusinessException;
 import com.laroka.backend.order.entity.Order;
 import com.laroka.backend.order.entity.OrderStatus;
+import com.laroka.backend.order.entity.OrderType;
 import com.laroka.backend.order.entity.PaymentMethod;
+import com.laroka.backend.order.repository.OrderItemRepository;
 import com.laroka.backend.order.repository.OrderRepository;
 import com.laroka.backend.payment.entity.Payment;
 import com.laroka.backend.payment.repository.PaymentRepository;
+import com.laroka.backend.shift.dto.TopProductDTO;
 import com.laroka.backend.shift.entity.ShiftStatus;
 import com.laroka.backend.shift.entity.WorkShift;
 import com.laroka.backend.shift.entity.WorkShiftSummary;
@@ -51,9 +59,11 @@ class WorkShiftServiceTest {
     @Mock private WorkShiftRepository workShiftRepository;
     @Mock private WorkShiftSummaryRepository workShiftSummaryRepository;
     @Mock private OrderRepository orderRepository;
+    @Mock private OrderItemRepository orderItemRepository;
     @Mock private PaymentRepository paymentRepository;
     @Mock private StaffUserRepository staffUserRepository;
     @Mock private BranchRepository branchRepository;
+    @Mock private BranchService branchService;
 
     @InjectMocks
     private WorkShiftService workShiftService;
@@ -105,6 +115,7 @@ class WorkShiftServiceTest {
         Order deliveredOrder = Order.builder()
             .id(deliveredOrderId)
             .status(OrderStatus.DELIVERED)
+            .orderType(OrderType.DELIVERY)
             .totalAmount(new BigDecimal("1500.00"))
             .build();
         Payment payment = Payment.builder()
@@ -122,6 +133,7 @@ class WorkShiftServiceTest {
         when(paymentRepository.findByOrderIdIn(anyCollection()))
             .thenReturn(List.of(payment));
         when(workShiftRepository.save(any(WorkShift.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(workShiftSummaryRepository.save(any(WorkShiftSummary.class))).thenAnswer(inv -> inv.getArgument(0));
 
         OpenShiftResult result = workShiftService.openShift(1, 10);
 
@@ -138,10 +150,13 @@ class WorkShiftServiceTest {
         assertThat(summary.getMpRevenue()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(summary.getQrRevenue()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(summary.getAverageTicket()).isEqualByComparingTo("1500.00");
+        assertThat(summary.getDeliveryOrders()).isEqualTo(1);
+        assertThat(summary.getTakeawayOrders()).isZero();
+        assertThat(summary.getCancellationRate()).isEqualByComparingTo(BigDecimal.ZERO);
     }
 
     @Test
-    void openShift_withExistingShiftAndNoOrders_summaryIsAllZero() {
+    void openShift_withEmptyPreviousShift_deletesPreviousAndCreatesNew() {
         Branch branch = branch();
         StaffUser opener = staffUser();
         WorkShift existing = openShift(branch, opener);
@@ -155,17 +170,15 @@ class WorkShiftServiceTest {
             .thenReturn(List.of());
         when(workShiftRepository.save(any(WorkShift.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        workShiftService.openShift(1, 10);
+        OpenShiftResult result = workShiftService.openShift(1, 10);
 
-        ArgumentCaptor<WorkShiftSummary> captor = ArgumentCaptor.forClass(WorkShiftSummary.class);
-        verify(workShiftSummaryRepository).save(captor.capture());
-        WorkShiftSummary summary = captor.getValue();
-        assertThat(summary.getTotalOrders()).isZero();
-        assertThat(summary.getDeliveredOrders()).isZero();
-        assertThat(summary.getCancelledOrders()).isZero();
-        assertThat(summary.getTotalRevenue()).isEqualByComparingTo(BigDecimal.ZERO);
-        assertThat(summary.getAverageTicket()).isEqualByComparingTo(BigDecimal.ZERO);
-        verify(paymentRepository, never()).findByOrderIdIn(anyCollection());
+        // Turno previo sin actividad: se elimina y NO se avisa cierre de turno previo.
+        assertThat(result.previousShiftClosed()).isFalse();
+        assertThat(result.shift().getStatus()).isEqualTo(ShiftStatus.OPEN);
+        verify(workShiftRepository).delete(existing);
+        verify(workShiftSummaryRepository, never()).save(any());
+        // Aun eliminando el turno vacío, la recepción de pedidos queda deshabilitada.
+        verify(branchRepository).updateAcceptingOrders(1, false);
     }
 
     @Test
@@ -179,9 +192,9 @@ class WorkShiftServiceTest {
         UUID cancelledId = UUID.randomUUID();
 
         Order delivered1 = Order.builder().id(deliveredId1).status(OrderStatus.DELIVERED)
-            .totalAmount(new BigDecimal("900.00")).build();
+            .orderType(OrderType.DELIVERY).totalAmount(new BigDecimal("900.00")).build();
         Order delivered2 = Order.builder().id(deliveredId2).status(OrderStatus.DELIVERED)
-            .totalAmount(new BigDecimal("600.00")).build();
+            .orderType(OrderType.TAKEAWAY).totalAmount(new BigDecimal("600.00")).build();
         Order cancelled = Order.builder().id(cancelledId).status(OrderStatus.CANCELLED)
             .totalAmount(new BigDecimal("300.00")).build();
 
@@ -191,6 +204,7 @@ class WorkShiftServiceTest {
         when(staffUserRepository.findById(10)).thenReturn(Optional.of(closer));
         when(workShiftRepository.findByBranchIdAndStatus(1, ShiftStatus.OPEN))
             .thenReturn(Optional.of(shift));
+        when(branchRepository.findById(1)).thenReturn(Optional.of(branch));
         when(orderRepository.findByBranchIdAndStatusInAndCreatedAtBetween(
             eq(1), anyCollection(), any(), any()))
             .thenReturn(List.of(delivered1, delivered2, cancelled));
@@ -209,10 +223,14 @@ class WorkShiftServiceTest {
         assertThat(result.getMpRevenue()).isEqualByComparingTo("600.00");
         assertThat(result.getQrRevenue()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(result.getAverageTicket()).isEqualByComparingTo("750.00");
+        assertThat(result.getDeliveryOrders()).isEqualTo(1);
+        assertThat(result.getTakeawayOrders()).isEqualTo(1);
+        // cancellationRate: 1 cancelled / 3 total * 100 = 33.33
+        assertThat(result.getCancellationRate()).isEqualByComparingTo("33.33");
     }
 
     @Test
-    void closeShift_withNoOrders_summaryIsAllZero() {
+    void closeShift_emptyShift_deletesShiftAndThrows422() {
         Branch branch = branch();
         StaffUser closer = staffUser();
         WorkShift shift = openShift(branch, closer);
@@ -220,18 +238,18 @@ class WorkShiftServiceTest {
         when(staffUserRepository.findById(10)).thenReturn(Optional.of(closer));
         when(workShiftRepository.findByBranchIdAndStatus(1, ShiftStatus.OPEN))
             .thenReturn(Optional.of(shift));
+        when(branchRepository.findById(1)).thenReturn(Optional.of(branch));
         when(orderRepository.findByBranchIdAndStatusInAndCreatedAtBetween(
             eq(1), anyCollection(), any(), any()))
             .thenReturn(List.of());
-        when(workShiftRepository.save(any(WorkShift.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(workShiftSummaryRepository.save(any(WorkShiftSummary.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        WorkShiftSummary result = workShiftService.closeShift(1, 10);
+        assertThatThrownBy(() -> workShiftService.closeShift(1, 10))
+            .isInstanceOf(BusinessException.class)
+            .hasMessage("El turno no registró actividad y fue eliminado");
 
-        assertThat(result.getTotalOrders()).isZero();
-        assertThat(result.getTotalRevenue()).isEqualByComparingTo(BigDecimal.ZERO);
-        assertThat(result.getAverageTicket()).isEqualByComparingTo(BigDecimal.ZERO);
-        verify(paymentRepository, never()).findByOrderIdIn(anyCollection());
+        verify(workShiftRepository).delete(shift);
+        verify(workShiftSummaryRepository, never()).save(any());
+        verify(branchRepository).updateAcceptingOrders(1, false);
     }
 
     @Test
@@ -299,5 +317,236 @@ class WorkShiftServiceTest {
         assertThatThrownBy(() -> workShiftService.closeShift(1, 10))
             .isInstanceOf(BusinessException.class)
             .hasMessage("No hay turno activo para esta sucursal");
+    }
+
+    @Test
+    void closeShift_acceptingOrdersActive_throwsBusinessException() {
+        Branch branch = Branch.builder().id(1).name("Playa Unión").acceptingOrders(true).build();
+        StaffUser closer = staffUser();
+        WorkShift shift = openShift(branch, closer);
+
+        when(staffUserRepository.findById(10)).thenReturn(Optional.of(closer));
+        when(workShiftRepository.findByBranchIdAndStatus(1, ShiftStatus.OPEN))
+            .thenReturn(Optional.of(shift));
+        when(branchRepository.findById(1)).thenReturn(Optional.of(branch));
+
+        assertThatThrownBy(() -> workShiftService.closeShift(1, 10))
+            .isInstanceOf(BusinessException.class)
+            .hasMessage("Desactivá la recepción de pedidos antes de cerrar el turno");
+
+        verify(workShiftSummaryRepository, never()).save(any());
+        verify(workShiftRepository, never()).delete(any(WorkShift.class));
+    }
+
+    @Test
+    void closeShift_withActiveOrders_throwsBusinessException() {
+        Branch branch = branch(); // acceptingOrders = false
+        StaffUser closer = staffUser();
+        WorkShift shift = openShift(branch, closer);
+
+        when(staffUserRepository.findById(10)).thenReturn(Optional.of(closer));
+        when(workShiftRepository.findByBranchIdAndStatus(1, ShiftStatus.OPEN))
+            .thenReturn(Optional.of(shift));
+        when(branchRepository.findById(1)).thenReturn(Optional.of(branch));
+        when(orderRepository.existsByBranchIdAndStatusInAndCreatedAtGreaterThanEqual(
+            eq(1), any(), any()))
+            .thenReturn(true);
+
+        assertThatThrownBy(() -> workShiftService.closeShift(1, 10))
+            .isInstanceOf(BusinessException.class)
+            .hasMessage("Hay pedidos activos sin resolver. Resolválos antes de cerrar el turno.");
+
+        verify(workShiftSummaryRepository, never()).save(any());
+        verify(workShiftRepository, never()).delete(any(WorkShift.class));
+    }
+
+    @Test
+    void getCurrentShiftSummary_activeShiftWithOrders_returnsSummaryWithoutPersisting() {
+        Branch branch = branch();
+        StaffUser opener = staffUser();
+        WorkShift shift = openShift(branch, opener);
+
+        UUID orderId = UUID.randomUUID();
+        Order delivered = Order.builder()
+            .id(orderId)
+            .status(OrderStatus.DELIVERED)
+            .orderType(OrderType.DELIVERY)
+            .totalAmount(new BigDecimal("1200.00"))
+            .build();
+        Payment payment = Payment.builder()
+            .method(PaymentMethod.CASH)
+            .order(delivered)
+            .build();
+
+        when(workShiftRepository.findByBranchIdAndStatus(1, ShiftStatus.OPEN))
+            .thenReturn(Optional.of(shift));
+        when(orderRepository.findByBranchIdAndStatusInAndCreatedAtBetween(
+            eq(1), anyCollection(), any(), any()))
+            .thenReturn(List.of(delivered));
+        when(paymentRepository.findByOrderIdIn(anyCollection()))
+            .thenReturn(List.of(payment));
+
+        WorkShiftSummary result = workShiftService.getCurrentShiftSummary(1);
+
+        assertThat(result.getDeliveredOrders()).isEqualTo(1);
+        assertThat(result.getCancelledOrders()).isZero();
+        assertThat(result.getTotalRevenue()).isEqualByComparingTo("1200.00");
+        assertThat(result.getCashRevenue()).isEqualByComparingTo("1200.00");
+        assertThat(result.getAverageTicket()).isEqualByComparingTo("1200.00");
+        assertThat(result.getDeliveryOrders()).isEqualTo(1);
+        assertThat(result.getCalculatedAt()).isNotNull();
+        verify(workShiftSummaryRepository, never()).save(any());
+    }
+
+    @Test
+    void getTopProducts_closedShift_returnsMappedList() {
+        Branch branch = branch();
+        UUID shiftId = UUID.randomUUID();
+        WorkShift shift = WorkShift.builder()
+            .id(shiftId)
+            .branch(branch)
+            .openedAt(OffsetDateTime.now().minusHours(4))
+            .closedAt(OffsetDateTime.now().minusHours(1))
+            .status(ShiftStatus.CLOSED)
+            .build();
+
+        List<Object[]> rawRows = List.of(
+            new Object[]{10, "Pizza Muzzarella", 8L},
+            new Object[]{11, "Fugazza", 5L}
+        );
+
+        when(workShiftRepository.findById(shiftId)).thenReturn(Optional.of(shift));
+        when(orderItemRepository.findTopProducts(eq(1), eq(OrderStatus.DELIVERED), any(), any(), any()))
+            .thenReturn(rawRows);
+
+        List<TopProductDTO> result = workShiftService.getTopProducts(shiftId, 1);
+
+        assertThat(result).hasSize(2);
+        assertThat(result.get(0).getProductId()).isEqualTo(10);
+        assertThat(result.get(0).getProductName()).isEqualTo("Pizza Muzzarella");
+        assertThat(result.get(0).getQuantitySold()).isEqualTo(8L);
+        assertThat(result.get(1).getProductName()).isEqualTo("Fugazza");
+    }
+
+    @Test
+    void toggleAcceptingOrders_activeShiftWithinHours_flipsValue() {
+        Branch branch = Branch.builder().id(1).name("Playa Unión").acceptingOrders(false).build();
+        WorkShift shift = openShift(branch, staffUser());
+
+        when(workShiftRepository.findByBranchIdAndStatus(1, ShiftStatus.OPEN))
+            .thenReturn(Optional.of(shift));
+        when(branchRepository.findById(1)).thenReturn(Optional.of(branch));
+        when(branchService.isOpen(1)).thenReturn(true);
+
+        boolean result = workShiftService.toggleAcceptingOrders(1);
+
+        assertThat(result).isTrue();
+        verify(branchRepository).updateAcceptingOrders(1, true);
+    }
+
+    @Test
+    void toggleAcceptingOrders_activatingOutsideHours_throwsBusinessException() {
+        Branch branch = Branch.builder().id(1).name("Playa Unión").acceptingOrders(false).build();
+        WorkShift shift = openShift(branch, staffUser());
+
+        when(workShiftRepository.findByBranchIdAndStatus(1, ShiftStatus.OPEN))
+            .thenReturn(Optional.of(shift));
+        when(branchRepository.findById(1)).thenReturn(Optional.of(branch));
+        when(branchService.isOpen(1)).thenReturn(false);
+
+        assertThatThrownBy(() -> workShiftService.toggleAcceptingOrders(1))
+            .isInstanceOf(BusinessException.class)
+            .hasMessage("La sucursal está fuera de su horario operativo");
+
+        verify(branchRepository, never()).updateAcceptingOrders(anyInt(), anyBoolean());
+    }
+
+    @Test
+    void toggleAcceptingOrders_activatingOutsideHoursWithBypass_flipsValue() {
+        ReflectionTestUtils.setField(workShiftService, "bypassBranchHours", true);
+        Branch branch = Branch.builder().id(1).name("Playa Unión").acceptingOrders(false).build();
+        WorkShift shift = openShift(branch, staffUser());
+
+        when(workShiftRepository.findByBranchIdAndStatus(1, ShiftStatus.OPEN))
+            .thenReturn(Optional.of(shift));
+        when(branchRepository.findById(1)).thenReturn(Optional.of(branch));
+
+        boolean result = workShiftService.toggleAcceptingOrders(1);
+
+        assertThat(result).isTrue();
+        verify(branchRepository).updateAcceptingOrders(1, true);
+        verify(branchService, never()).isOpen(anyInt());
+    }
+
+    @Test
+    void toggleAcceptingOrders_activeShiftAlreadyAccepting_flipsToFalse() {
+        Branch branch = Branch.builder().id(1).name("Playa Unión").acceptingOrders(true).build();
+        WorkShift shift = openShift(branch, staffUser());
+
+        when(workShiftRepository.findByBranchIdAndStatus(1, ShiftStatus.OPEN))
+            .thenReturn(Optional.of(shift));
+        when(branchRepository.findById(1)).thenReturn(Optional.of(branch));
+
+        boolean result = workShiftService.toggleAcceptingOrders(1);
+
+        assertThat(result).isFalse();
+        verify(branchRepository).updateAcceptingOrders(1, false);
+    }
+
+    @Test
+    void toggleAcceptingOrders_noActiveShift_throwsBusinessException() {
+        when(workShiftRepository.findByBranchIdAndStatus(1, ShiftStatus.OPEN))
+            .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> workShiftService.toggleAcceptingOrders(1))
+            .isInstanceOf(BusinessException.class)
+            .hasMessage("No hay turno activo para esta sucursal");
+
+        verify(branchRepository, never()).updateAcceptingOrders(anyInt(), anyBoolean());
+    }
+
+    @Test
+    void closeShift_disablesAcceptingOrders() {
+        Branch branch = branch();
+        StaffUser closer = staffUser();
+        WorkShift shift = openShift(branch, closer);
+
+        Order delivered = Order.builder().id(UUID.randomUUID()).status(OrderStatus.DELIVERED)
+            .orderType(OrderType.DELIVERY).totalAmount(new BigDecimal("500.00")).build();
+        Payment payment = Payment.builder().method(PaymentMethod.CASH).order(delivered).build();
+
+        when(staffUserRepository.findById(10)).thenReturn(Optional.of(closer));
+        when(workShiftRepository.findByBranchIdAndStatus(1, ShiftStatus.OPEN))
+            .thenReturn(Optional.of(shift));
+        when(branchRepository.findById(1)).thenReturn(Optional.of(branch));
+        when(orderRepository.findByBranchIdAndStatusInAndCreatedAtBetween(
+            eq(1), anyCollection(), any(), any()))
+            .thenReturn(List.of(delivered));
+        when(paymentRepository.findByOrderIdIn(anyCollection()))
+            .thenReturn(List.of(payment));
+        when(workShiftRepository.save(any(WorkShift.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(workShiftSummaryRepository.save(any(WorkShiftSummary.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        workShiftService.closeShift(1, 10);
+
+        verify(branchRepository).updateAcceptingOrders(1, false);
+    }
+
+    @Test
+    void getTopProducts_wrongBranch_throwsBusinessException() {
+        Branch branch = branch(); // id=1
+        UUID shiftId = UUID.randomUUID();
+        WorkShift shift = WorkShift.builder()
+            .id(shiftId)
+            .branch(branch)
+            .openedAt(OffsetDateTime.now().minusHours(4))
+            .closedAt(OffsetDateTime.now().minusHours(1))
+            .status(ShiftStatus.CLOSED)
+            .build();
+
+        when(workShiftRepository.findById(shiftId)).thenReturn(Optional.of(shift));
+
+        assertThatThrownBy(() -> workShiftService.getTopProducts(shiftId, 99))
+            .isInstanceOf(BusinessException.class);
     }
 }

@@ -1,21 +1,26 @@
 package com.laroka.backend.shift.controller;
 
+import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.laroka.backend.shared.exception.BusinessException;
 import com.laroka.backend.shift.dto.CloseShiftResponseDTO;
 import com.laroka.backend.shift.dto.CurrentShiftResponseDTO;
 import com.laroka.backend.shift.dto.OpenShiftResponseDTO;
 import com.laroka.backend.shift.dto.ShiftHistoryItemDTO;
+import com.laroka.backend.shift.dto.TopProductDTO;
 import com.laroka.backend.shift.entity.WorkShift;
 import com.laroka.backend.shift.entity.WorkShiftSummary;
 import com.laroka.backend.shift.service.OpenShiftResult;
@@ -106,18 +111,37 @@ public class WorkShiftController {
         Integer branchId = securityUtils.resolveBranchId(principal, request);
         WorkShiftSummary summary = workShiftService.closeShift(branchId, principal.getUserId());
 
-        return ResponseEntity.ok(CloseShiftResponseDTO.builder()
-            .shiftId(summary.getShift().getId())
-            .totalOrders(summary.getTotalOrders())
-            .deliveredOrders(summary.getDeliveredOrders())
-            .cancelledOrders(summary.getCancelledOrders())
-            .totalRevenue(summary.getTotalRevenue())
-            .cashRevenue(summary.getCashRevenue())
-            .mpRevenue(summary.getMpRevenue())
-            .qrRevenue(summary.getQrRevenue())
-            .averageTicket(summary.getAverageTicket())
-            .calculatedAt(summary.getCalculatedAt())
-            .build());
+        return ResponseEntity.ok(toCloseShiftResponse(summary.getShift().getId(), summary));
+    }
+
+    @GetMapping("/current/summary")
+    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+    @Operation(summary = "Get live summary of current active shift",
+            description = "Returns a calculated (non-persisted) summary of the currently open shift. Returns 404 if no active shift exists.")
+    public ResponseEntity<CloseShiftResponseDTO> getCurrentShiftSummary(
+            @AuthenticationPrincipal CustomUserDetails principal,
+            HttpServletRequest request) {
+
+        Integer branchId = securityUtils.resolveBranchId(principal, request);
+        try {
+            WorkShiftSummary summary = workShiftService.getCurrentShiftSummary(branchId);
+            return ResponseEntity.ok(toCloseShiftResponse(summary.getShift().getId(), summary));
+        } catch (BusinessException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    @GetMapping("/{shiftId}/top-products")
+    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+    @Operation(summary = "Get top 5 products sold in a shift",
+            description = "Returns the 5 most sold products (by quantity) for the given shift, calculated on-demand from DELIVERED orders.")
+    public ResponseEntity<List<TopProductDTO>> getTopProducts(
+            @PathVariable UUID shiftId,
+            @AuthenticationPrincipal CustomUserDetails principal,
+            HttpServletRequest request) {
+
+        Integer branchId = securityUtils.resolveBranchId(principal, request);
+        return ResponseEntity.ok(workShiftService.getTopProducts(shiftId, branchId));
     }
 
     private ShiftHistoryItemDTO toHistoryItem(WorkShift ws) {
@@ -128,18 +152,25 @@ public class WorkShiftController {
             .closedAt(ws.getClosedAt())
             .openedBy(ws.getOpenedBy().getName())
             .closedBy(ws.getClosedBy() != null ? ws.getClosedBy().getName() : null)
-            .summary(CloseShiftResponseDTO.builder()
-                .shiftId(ws.getId())
-                .totalOrders(s.getTotalOrders())
-                .deliveredOrders(s.getDeliveredOrders())
-                .cancelledOrders(s.getCancelledOrders())
-                .totalRevenue(s.getTotalRevenue())
-                .cashRevenue(s.getCashRevenue())
-                .mpRevenue(s.getMpRevenue())
-                .qrRevenue(s.getQrRevenue())
-                .averageTicket(s.getAverageTicket())
-                .calculatedAt(s.getCalculatedAt())
-                .build())
+            .summary(toCloseShiftResponse(ws.getId(), s))
+            .build();
+    }
+
+    private CloseShiftResponseDTO toCloseShiftResponse(UUID shiftId, WorkShiftSummary s) {
+        return CloseShiftResponseDTO.builder()
+            .shiftId(shiftId)
+            .totalOrders(s.getTotalOrders())
+            .deliveredOrders(s.getDeliveredOrders())
+            .cancelledOrders(s.getCancelledOrders())
+            .totalRevenue(s.getTotalRevenue())
+            .cashRevenue(s.getCashRevenue())
+            .mpRevenue(s.getMpRevenue())
+            .qrRevenue(s.getQrRevenue())
+            .averageTicket(s.getAverageTicket())
+            .deliveryOrders(s.getDeliveryOrders())
+            .takeawayOrders(s.getTakeawayOrders())
+            .cancellationRate(s.getCancellationRate())
+            .calculatedAt(s.getCalculatedAt())
             .build();
     }
 }

@@ -50,3 +50,5 @@ jobs:
       - name: E2E tests (Playwright)
         run: npm run test:e2e
         working-directory: backoffice
+        env:
+          VITE_API_URL: http://localhost:8080

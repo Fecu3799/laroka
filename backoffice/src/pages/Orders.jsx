@@ -2,8 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useOutletContext } from "react-router-dom";
 import useAuth from "../hooks/useAuth";
 import useBranch from "../hooks/useBranch";
-import useOrders from "../hooks/useOrders";
-import useOrderDetail from "../hooks/useOrderDetail";
+import { useOrdersContext } from "../context/OrdersContext";
 import {
   advanceOrderStatus,
   resolveCancelRequest,
@@ -17,6 +16,7 @@ import {
   canGoBack as goBackAllowed,
   canCancel as cancelAllowed,
 } from "../utils/ordersUtils";
+import NewOrderModal from "../components/NewOrderModal";
 import "./Orders.css";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "";
@@ -124,6 +124,11 @@ function formatTime(createdAt) {
     date.toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit" }) +
     ` · ${timeStr}`
   );
+}
+
+function formatHour(iso) {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false })
 }
 
 function formatDateTime(ts) {
@@ -516,69 +521,35 @@ function PaymentStatusIcon({ status }) {
 export default function Orders() {
   const { token } = useAuth();
   const { activeBranchId: branchId } = useBranch();
-  const { newOrderCount, cancelCount, resetCounts, setOpenOrderId } = useOutletContext();
+  const { resetCounts } = useOutletContext();
   const {
     orders,
     loading,
     error,
+    shift,
+    selectedId,
+    setSelectedId,
     refresh,
-    clearOrders,
     dismissOrder,
     dismissedIds,
     updateOrderInList,
     updatePaymentInList,
-    replaceOrderInList,
-  } = useOrders(token, branchId);
+    pendingOrderIds,
+    flashedIds,
+    flashOrder,
+    detail,
+    refetchDetail,
+  } = useOrdersContext();
 
   const [activeTab, setActiveTab] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedId, setSelectedId] = useState(null);
   const [advancing, setAdvancing] = useState(null);
-  const { detail, refetchDetail } = useOrderDetail(selectedId, token, branchId);
-  // ── Refresh when a new order is created via the modal ────────
-  useEffect(() => {
-    function handleOrderCreated() {
-      refresh();
-    }
-    window.addEventListener("laroka:order-created", handleOrderCreated);
-    return () =>
-      window.removeEventListener("laroka:order-created", handleOrderCreated);
-  }, [refresh]);
+  const [newOrderModalOpen, setNewOrderModalOpen] = useState(false);
 
-  // ── Sync open panel ID to Layout ref ─────────────────────────
-  useEffect(() => { setOpenOrderId(selectedId) }, [selectedId, setOpenOrderId])
-
-  // ── SSE: actualiza lista en tiempo real; refresca detalle si el panel está abierto ─
-  useEffect(() => {
-    function handleOrderUpdated(e) {
-      const { orderId, type, order } = e.detail;
-      if (type === 'ORDER_UPDATED' && order) {
-        replaceOrderInList(order);
-        if (selectedId === orderId) refetchDetail();
-      } else if (type === 'CANCELLATION_REQUESTED') {
-        if (selectedId && orderId === selectedId) {
-          updateOrderInList(orderId, 'CANCELLATION_REQUESTED');
-          refetchDetail();
-        }
-      }
-    }
-    window.addEventListener("laroka:order-updated", handleOrderUpdated);
-    return () =>
-      window.removeEventListener("laroka:order-updated", handleOrderUpdated);
-  }, [selectedId, refetchDetail, updateOrderInList, replaceOrderInList]);
-
-  // ── Clear list and close panel synchronously on branch change ─
-  useEffect(() => {
-    clearOrders();
-    setSelectedId(null);
-  }, [branchId, clearOrders]);
-
-  // ── Auto-clear selected if order leaves visible list ─────────
-  useEffect(() => {
-    if (selectedId && !orders.find((o) => o.id === selectedId)) {
-      setSelectedId(null);
-    }
-  }, [selectedId, orders]);
+  // ── Clear PEDIDOS badge counter al entrar a /orders ──────────
+  // Se mantiene en Orders (no en el provider) para que el badge se limpie
+  // cada vez que el operador navega a /orders, no solo al iniciar sesión.
+  useEffect(() => { resetCounts() }, [resetCounts])
 
   // ── handleAdvance ────────────────────────────────────────────
   const handleAdvance = useCallback(
@@ -664,22 +635,12 @@ export default function Orders() {
         </div>
 
         <button
-          className={`orders-refresh-btn${(newOrderCount > 0 || cancelCount > 0) ? ' orders-refresh-btn--notify' : ''}`}
+          className="orders-refresh-btn"
           type="button"
-          onClick={() => { resetCounts(); refresh(); if (selectedId) refetchDetail(); }}
+          onClick={() => { pendingOrderIds.forEach((_, orderId) => flashOrder(orderId)); refresh(); resetCounts(); if (selectedId) refetchDetail(); window.dispatchEvent(new CustomEvent('laroka:clear-feed')); }}
         >
           <RefreshIcon />
           Actualizar lista
-          {(newOrderCount > 0 || cancelCount > 0) && (
-            <span className="orders-refresh-badges">
-              {newOrderCount > 0 && (
-                <span className="orders-refresh-badge orders-refresh-badge--received">{newOrderCount}</span>
-              )}
-              {cancelCount > 0 && (
-                <span className="orders-refresh-badge orders-refresh-badge--cancel">{cancelCount}</span>
-              )}
-            </span>
-          )}
         </button>
       </div>
 
@@ -753,6 +714,8 @@ export default function Orders() {
                       isSelected={order.id === selectedId}
                       advancing={advancing}
                       contracted={contracted}
+                      isFlashing={flashedIds.has(order.id)}
+                      pendingColor={pendingOrderIds.get(order.id) ?? null}
                       onSelect={() =>
                         setSelectedId(order.id === selectedId ? null : order.id)
                       }
@@ -783,6 +746,34 @@ export default function Orders() {
           </>
         )}
       </div>
+
+      {/* ── FAB Nueva Orden ──────────────────────────────────── */}
+      {!panelOpen && (
+        <button
+          className="orders-fab"
+          type="button"
+          onClick={() => setNewOrderModalOpen(true)}
+          aria-label="Nueva orden"
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+          </svg>
+          <span className="orders-fab-tooltip">Nueva orden</span>
+        </button>
+      )}
+
+      {/* ── Shift banner ─────────────────────────────────────── */}
+      {shift && (
+        <div className="orders-shift-banner">
+          <span className="orders-shift-banner-dot" />
+          Mostrando pedidos del turno actual desde {formatHour(shift.openedAt)}
+        </div>
+      )}
+
+      <NewOrderModal
+        open={newOrderModalOpen}
+        onClose={() => setNewOrderModalOpen(false)}
+      />
     </div>
   );
 }
@@ -794,6 +785,8 @@ function OrderRow({
   isSelected,
   advancing,
   contracted,
+  isFlashing,
+  pendingColor,
   onSelect,
   onAdvance,
   onDismiss,
@@ -801,6 +794,8 @@ function OrderRow({
   const cfg = STATUS_CONFIG[order.status] ?? {};
   const next = getNextStatus(order.status, order.orderType);
   const isTerminal = TERMINAL.has(order.status);
+
+  const rowStyle = pendingColor ? { '--pending-color': pendingColor } : undefined;
 
   return (
     <div
@@ -812,9 +807,12 @@ function OrderRow({
         order.status === "CANCELLATION_REQUESTED"
           ? "orders-row--cancel-request"
           : "",
+        isFlashing ? "orders-row--flash" : "",
+        pendingColor ? "orders-row--pending" : "",
       ]
         .filter(Boolean)
         .join(" ")}
+      style={rowStyle}
       onClick={onSelect}
     >
       {/* PEDIDO */}

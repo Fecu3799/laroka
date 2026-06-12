@@ -3,6 +3,7 @@ import styles from './CheckoutScreen.module.css'
 import { usePreferredBranch } from '../hooks/usePreferredBranch'
 
 const _DEBUG_COUNT_KEY = 'laroka_debug_fill_count'
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080'
 
 function formatPrice(amount) {
   return `$${Number(amount).toLocaleString('es-AR')}`
@@ -73,7 +74,7 @@ function MercadoPagoIcon() {
 }
 
 export function CheckoutScreen({ onBack, onConfirm, items = [], initialData = null, onMpReturn = null }) {
-  const { deliveryFee, serviceFee } = usePreferredBranch()
+  const { deliveryFee, serviceFee, preferredBranchId } = usePreferredBranch()
   const [orderType, setOrderType] = useState(initialData?.orderType || 'delivery')
   const [nombre, setNombre] = useState(initialData?.nombre || '')
   const [telefono, setTelefono] = useState(initialData?.telefono || '')
@@ -85,6 +86,7 @@ export function CheckoutScreen({ onBack, onConfirm, items = [], initialData = nu
   const [submitting, setSubmitting] = useState(false)
   const [mpRedirecting, setMpRedirecting] = useState(false)
   const [mpError, setMpError] = useState(null)
+  const [blockMsg, setBlockMsg] = useState(null)
 
   const isDelivery = orderType === 'delivery'
   const isEfectivo = paymentMethod === 'efectivo'
@@ -135,7 +137,23 @@ export function CheckoutScreen({ onBack, onConfirm, items = [], initialData = nu
     setErrors(newErrors)
     if (Object.values(newErrors).some(Boolean)) return
     setMpError(null)
+    setBlockMsg(null)
     setSubmitting(true)
+    // Verificar que el local esté aceptando pedidos (puede cambiar en tiempo real).
+    // Usamos fetch directo para fallar en abierto silenciosamente si la consulta falla.
+    if (preferredBranchId != null) {
+      try {
+        const res = await fetch(`${API_BASE}/branches/${preferredBranchId}`)
+        if (res.ok) {
+          const branch = await res.json()
+          if (branch?.acceptingOrders === false) {
+            setBlockMsg('El local no está aceptando pedidos en este momento')
+            setSubmitting(false)
+            return
+          }
+        }
+      } catch { /* fail-open: si la verificación falla, continuar el flujo normal */ }
+    }
     if (!isEfectivo) setMpRedirecting(true)
     try {
       await onConfirm({
@@ -317,6 +335,9 @@ export function CheckoutScreen({ onBack, onConfirm, items = [], initialData = nu
       <div className={styles.ctaWrapper}>
         {mpError && (
           <p className={styles.mpError}>{mpError}</p>
+        )}
+        {blockMsg && (
+          <p className={styles.mpError}>{blockMsg}</p>
         )}
         <div className={styles.ctaTotalRow}>
           <span className={styles.ctaTotalLabel}>TOTAL</span>

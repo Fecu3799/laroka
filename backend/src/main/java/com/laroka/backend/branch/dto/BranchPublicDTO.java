@@ -30,4 +30,5 @@ public class BranchPublicDTO {
 	private LocalTime closingTime;
 
 	private String openDays;
+	private boolean acceptingOrders;
 }

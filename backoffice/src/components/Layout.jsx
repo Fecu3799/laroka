@@ -4,22 +4,14 @@ import logo from '../assets/logo.png'
 import useAuth from '../hooks/useAuth'
 import useBranch from '../hooks/useBranch'
 import { logout } from '../services/authService'
-import NewOrderModal from './NewOrderModal'
+import SubHeader from './SubHeader'
 import { Toast } from './Toast'
+import { OrdersProvider } from '../context/OrdersContext'
 import './Layout.css'
 
 const API_URL = import.meta.env.VITE_API_URL ?? ''
 
 const NAV = [
-  {
-    action: 'new-order',
-    label: 'NUEVA ORDEN',
-    icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
-      </svg>
-    ),
-  },
   {
     to: '/summary',
     label: 'RESUMEN',
@@ -58,13 +50,12 @@ const NAV = [
 export default function Layout() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { token, role, tenantName } = useAuth()
-  const { activeBranchId, activeBranchName, setActiveBranch } = useBranch()
+  const { token, tenantName } = useAuth()
+  const { activeBranchId, setActiveBranch } = useBranch()
   const [time, setTime] = useState(new Date())
   const [connectionStatus, setConnectionStatus] = useState('disconnected')
   const [newOrderCount, setNewOrderCount] = useState(0)
   const [cancelCount, setCancelCount] = useState(0)
-  const [newOrderModalOpen, setNewOrderModalOpen] = useState(false)
   const openOrderIdRef = useRef(null)
   const setOpenOrderId = useCallback(id => { openOrderIdRef.current = id }, [])
 
@@ -118,7 +109,7 @@ export default function Layout() {
                   const orderId = json.orderId ?? json.order?.id
                   if (orderId) {
                     window.dispatchEvent(new CustomEvent('laroka:order-updated', {
-                      detail: { orderId, type: json.type, order: json.order ?? null },
+                      detail: { orderId, type: json.type, order: json.order ?? null, origin: json.origin ?? null, actionOrigin: json.actionOrigin ?? null },
                     }))
                     if (orderId !== openOrderIdRef.current) {
                       if (json.type === 'NEW_ORDER' && json.origin !== 'BACKOFFICE') setNewOrderCount(prev => prev + 1)
@@ -170,63 +161,29 @@ export default function Layout() {
         </div>
 
         <nav className="layout-sidebar-nav" aria-label="Navegación principal">
-          {NAV.map(({ to, label, icon, end, action }) =>
-            action === 'new-order' ? (
-              <button
-                key="new-order"
-                type="button"
-                className="layout-nav-item layout-nav-btn"
-                onClick={() => setNewOrderModalOpen(true)}
-              >
-                <span className="layout-nav-icon">{icon}</span>
-                <span className="layout-nav-label">{label}</span>
-              </button>
-            ) : (
-              <NavLink
-                key={to}
-                to={to}
-                end={end}
-                className={({ isActive }) =>
-                  `layout-nav-item${isActive ? ' layout-nav-item--active' : ''}`
-                }
-              >
-                <span className="layout-nav-icon">
-                  {to === '/orders' ? (
-                    <div style={{ position: 'relative' }}>
-                      {icon}
-                      {(newOrderCount + cancelCount) > 0 && location.pathname !== '/orders' && (
-                        <span className="layout-nav-badge">{newOrderCount + cancelCount}</span>
-                      )}
-                    </div>
-                  ) : icon}
-                </span>
-                <span className="layout-nav-label">{label}</span>
-              </NavLink>
-            )
-          )}
-        </nav>
-
-        <div className="layout-sidebar-branch" aria-label="Sucursal activa">
-          <div className="layout-branch-info">
-            <span className="layout-branch-label">SUCURSAL</span>
-            <span className="layout-branch-name">{activeBranchName ?? '—'}</span>
-          </div>
-          {role === 'ADMIN' && (
-            <button
-              className="layout-branch-change-btn"
-              onClick={() => { setActiveBranch(null, null); navigate('/branch-select') }}
-              title="Cambiar sucursal"
-              aria-label="Cambiar sucursal"
+          {NAV.map(({ to, label, icon, end }) => (
+            <NavLink
+              key={to}
+              to={to}
+              end={end}
+              className={({ isActive }) =>
+                `layout-nav-item${isActive ? ' layout-nav-item--active' : ''}`
+              }
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="M17 1l4 4-4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M3 11V9a4 4 0 0 1 4-4h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                <path d="M7 23l-4-4 4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M21 13v2a4 4 0 0 1-4 4H3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-              </svg>
-            </button>
-          )}
-        </div>
+              <span className="layout-nav-icon">
+                {to === '/orders' ? (
+                  <div style={{ position: 'relative' }}>
+                    {icon}
+                    {(newOrderCount + cancelCount) > 0 && location.pathname !== '/orders' && (
+                      <span className="layout-nav-badge">{newOrderCount + cancelCount}</span>
+                    )}
+                  </div>
+                ) : icon}
+              </span>
+              <span className="layout-nav-label">{label}</span>
+            </NavLink>
+          ))}
+        </nav>
 
         <button className="layout-logout-btn" onClick={handleLogout} aria-label="Cerrar sesión">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -273,15 +230,15 @@ export default function Layout() {
           </div>
         </header>
 
+        <SubHeader />
+
         <main className="layout-main">
-          <Outlet context={{ newOrderCount, cancelCount, resetCounts, setOpenOrderId }} />
+          <OrdersProvider setOpenOrderId={setOpenOrderId}>
+            <Outlet context={{ newOrderCount, cancelCount, resetCounts, setOpenOrderId }} />
+          </OrdersProvider>
         </main>
       </div>
 
-      <NewOrderModal
-        open={newOrderModalOpen}
-        onClose={() => setNewOrderModalOpen(false)}
-      />
       <Toast />
     </div>
   )

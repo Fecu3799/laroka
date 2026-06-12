@@ -86,14 +86,6 @@
   background-color: rgba(254, 205, 24, 0.1);
 }
 
-.layout-nav-btn {
-  background: none;
-  border: none;
-  border-left: 3px solid transparent;
-  cursor: pointer;
-  width: 100%;
-}
-
 .layout-nav-icon {
   display: flex;
   align-items: center;
@@ -114,63 +106,6 @@
   line-height: 1.2;
 }
 
-/* Branch badge (bottom of sidebar) */
-.layout-sidebar-branch {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 5px;
-  padding: 0.75rem 8px;
-  margin: 0 6px 0.875rem;
-  background-color: rgba(101, 163, 105, 0.05);
-  border: 1px solid rgba(101, 163, 105, 0.12);
-  border-radius: 10px;
-  width: calc(100% - 12px);
-  flex-shrink: 0;
-}
-
-.layout-branch-info {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-}
-
-.layout-branch-label {
-  font-family: 'Inter', sans-serif;
-  font-size: 9px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.4);
-  letter-spacing: 1px;
-}
-
-.layout-branch-name {
-  font-family: 'Inter', sans-serif;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--color-accent);
-  text-align: center;
-  line-height: 1.3;
-}
-
-.layout-branch-change-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 4px 6px;
-  margin-top: 4px;
-  background: transparent;
-  border: 1px solid rgba(245, 197, 24, 0.25);
-  border-radius: 5px;
-  color: rgba(245, 197, 24, 0.6);
-  cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
-}
-
-.layout-branch-change-btn:hover {
-  color: var(--color-accent);
-  border-color: var(--color-accent);
-}
 
 .layout-logout-btn {
   display: flex;

@@ -24,5 +24,8 @@ public class CloseShiftResponseDTO {
     private BigDecimal mpRevenue;
     private BigDecimal qrRevenue;
     private BigDecimal averageTicket;
+    private Integer deliveryOrders;
+    private Integer takeawayOrders;
+    private BigDecimal cancellationRate;
     private OffsetDateTime calculatedAt;
 }

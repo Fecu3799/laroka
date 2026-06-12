@@ -57,6 +57,14 @@ test.describe('US-06-F-05 · ciclo de vida del pedido', () => {
       route.fulfill({ status: 200, body: '' })
     )
 
+    // Hermético: turno y sucursal mockeados para no depender de un backend real.
+    await page.route('**/backoffice/shifts/current', route =>
+      route.fulfill({ json: { active: false } })
+    )
+    await page.route('**/branches/**', route =>
+      route.fulfill({ json: { id: 1, name: 'Puerto Madryn', acceptingOrders: false } })
+    )
+
     // Auth
     await page.route('**/auth/login', route =>
       route.fulfill({ json: { token: DEMO_TOKEN } })

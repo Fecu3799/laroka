@@ -19,7 +19,7 @@ export default function BranchProvider({ children }) {
   const [activeBranchName, setActiveBranchName] = useState(() => readSession()?.name ?? null)
 
   useEffect(() => {
-    if (role === 'STAFF' && branchId != null) {
+    if ((role === 'STAFF' || role === 'MANAGER') && branchId != null) {
       setActiveBranchId(branchId)
       setActiveBranchName(branchName)
     }

@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -19,13 +20,17 @@ import org.springframework.transaction.annotation.Transactional;
 import com.laroka.backend.branch.entity.Branch;
 import com.laroka.backend.branch.exception.BranchNotFoundException;
 import com.laroka.backend.branch.repository.BranchRepository;
+import com.laroka.backend.branch.service.BranchService;
 import com.laroka.backend.shared.exception.BusinessException;
 import com.laroka.backend.order.entity.Order;
 import com.laroka.backend.order.entity.OrderStatus;
+import com.laroka.backend.order.entity.OrderType;
 import com.laroka.backend.order.entity.PaymentMethod;
+import com.laroka.backend.order.repository.OrderItemRepository;
 import com.laroka.backend.order.repository.OrderRepository;
 import com.laroka.backend.payment.entity.Payment;
 import com.laroka.backend.payment.repository.PaymentRepository;
+import com.laroka.backend.shift.dto.TopProductDTO;
 import com.laroka.backend.shift.entity.ShiftStatus;
 import com.laroka.backend.shift.entity.WorkShift;
 import com.laroka.backend.shift.entity.WorkShiftSummary;
@@ -43,9 +48,14 @@ public class WorkShiftService {
     private final WorkShiftRepository workShiftRepository;
     private final WorkShiftSummaryRepository workShiftSummaryRepository;
     private final OrderRepository orderRepository;
+    private final OrderItemRepository orderItemRepository;
     private final PaymentRepository paymentRepository;
     private final StaffUserRepository staffUserRepository;
     private final BranchRepository branchRepository;
+    private final BranchService branchService;
+
+    @Value("${order.bypass-branch-hours:false}")
+    private boolean bypassBranchHours;
 
     @Transactional
     public OpenShiftResult openShift(Integer branchId, Integer userId) {
@@ -57,8 +67,10 @@ public class WorkShiftService {
         boolean previousShiftClosed = false;
         Optional<WorkShift> existing = workShiftRepository.findByBranchIdAndStatus(branchId, ShiftStatus.OPEN);
         if (existing.isPresent()) {
-            closeShiftInternal(existing.get(), opener);
-            previousShiftClosed = true;
+            // Si el turno previo no tuvo actividad, closeShiftInternal lo elimina y
+            // retorna null: no corresponde avisar que se cerró un turno previo.
+            WorkShiftSummary closedSummary = closeShiftInternal(existing.get(), opener);
+            previousShiftClosed = closedSummary != null;
         }
 
         WorkShift newShift = WorkShift.builder()
@@ -86,17 +98,71 @@ public class WorkShiftService {
             .orElseThrow(() -> new IllegalStateException("Authenticated user not found: " + userId));
         WorkShift shift = workShiftRepository.findByBranchIdAndStatus(branchId, ShiftStatus.OPEN)
             .orElseThrow(() -> new BusinessException("No hay turno activo para esta sucursal"));
-        return closeShiftInternal(shift, closer);
+
+        // 1) No permitir cerrar con la recepción de pedidos activa.
+        Branch branch = branchRepository.findById(branchId)
+            .orElseThrow(() -> new BranchNotFoundException(branchId));
+        if (branch.isAcceptingOrders()) {
+            throw new BusinessException("Desactivá la recepción de pedidos antes de cerrar el turno");
+        }
+
+        // 2) No permitir cerrar con pedidos activos sin resolver del turno actual.
+        boolean hasActiveOrders = orderRepository.existsByBranchIdAndStatusInAndCreatedAtGreaterThanEqual(
+            branchId,
+            List.of(OrderStatus.RECEIVED, OrderStatus.IN_PREPARATION,
+                    OrderStatus.ON_THE_WAY, OrderStatus.READY_FOR_PICKUP),
+            shift.getOpenedAt().toLocalDateTime());
+        if (hasActiveOrders) {
+            throw new BusinessException("Hay pedidos activos sin resolver. Resolválos antes de cerrar el turno.");
+        }
+
+        WorkShiftSummary summary = closeShiftInternal(shift, closer);
+        // 3) Turno sin actividad: closeShiftInternal lo eliminó y devolvió null.
+        if (summary == null) {
+            throw new BusinessException("El turno no registró actividad y fue eliminado");
+        }
+        return summary;
     }
 
     WorkShiftSummary closeShiftInternal(WorkShift shift, StaffUser closer) {
         WorkShiftSummary summary = calculateSummary(shift);
+        // Turno sin actividad (delivered + cancelled == 0): no se persiste summary,
+        // se elimina el turno y se retorna null para que el caller lo maneje.
+        if (summary.getTotalOrders() == 0) {
+            // Cerrar turno siempre deshabilita la recepción de pedidos, también
+            // cuando el turno vacío se elimina (cubre el cierre forzado al abrir
+            // un turno nuevo con un previo vacío y accepting_orders activo).
+            branchRepository.updateAcceptingOrders(shift.getBranch().getId(), false);
+            workShiftRepository.delete(shift);
+            return null;
+        }
         WorkShiftSummary saved = workShiftSummaryRepository.save(summary);
         shift.setClosedAt(OffsetDateTime.now());
         shift.setClosedBy(closer);
         shift.setStatus(ShiftStatus.CLOSED);
         workShiftRepository.save(shift);
+        // Cerrar turno siempre deshabilita la recepción de pedidos, sin importar
+        // el estado actual del toggle (cubre también el cierre forzado al abrir
+        // un turno nuevo, ya que openShift delega en este método).
+        branchRepository.updateAcceptingOrders(shift.getBranch().getId(), false);
         return saved;
+    }
+
+    @Transactional
+    public boolean toggleAcceptingOrders(Integer branchId) {
+        if (workShiftRepository.findByBranchIdAndStatus(branchId, ShiftStatus.OPEN).isEmpty()) {
+            throw new BusinessException("No hay turno activo para esta sucursal");
+        }
+        Branch branch = branchRepository.findById(branchId)
+            .orElseThrow(() -> new BranchNotFoundException(branchId));
+        boolean next = !branch.isAcceptingOrders();
+        // Al activar la recepción, la sucursal debe estar dentro de su horario
+        // operativo (salvo que el bypass de dev esté habilitado).
+        if (next && !bypassBranchHours && !branchService.isOpen(branchId)) {
+            throw new BusinessException("La sucursal está fuera de su horario operativo");
+        }
+        branchRepository.updateAcceptingOrders(branchId, next);
+        return next;
     }
 
     private WorkShiftSummary calculateSummary(WorkShift shift) {
@@ -136,20 +202,62 @@ public class WorkShiftService {
         }
 
         int deliveredCount = delivered.size();
+        int cancelledCount = (int) orders.stream().filter(o -> o.getStatus() == OrderStatus.CANCELLED).count();
+        int totalCount = orders.size();
+
         BigDecimal averageTicket = deliveredCount == 0
             ? BigDecimal.ZERO
             : totalRevenue.divide(BigDecimal.valueOf(deliveredCount), 2, RoundingMode.HALF_UP);
 
+        int deliveryOrders = (int) delivered.stream().filter(o -> o.getOrderType() == OrderType.DELIVERY).count();
+        int takeawayOrders = (int) delivered.stream().filter(o -> o.getOrderType() == OrderType.TAKEAWAY).count();
+
+        BigDecimal cancellationRate = totalCount == 0
+            ? BigDecimal.ZERO
+            : BigDecimal.valueOf(cancelledCount)
+                .multiply(BigDecimal.valueOf(100))
+                .divide(BigDecimal.valueOf(totalCount), 2, RoundingMode.HALF_UP);
+
         return WorkShiftSummary.builder()
             .shift(shift)
-            .totalOrders(orders.size())
+            .totalOrders(totalCount)
             .deliveredOrders(deliveredCount)
-            .cancelledOrders((int) orders.stream().filter(o -> o.getStatus() == OrderStatus.CANCELLED).count())
+            .cancelledOrders(cancelledCount)
             .totalRevenue(totalRevenue)
             .cashRevenue(revenueByMethod.getOrDefault(PaymentMethod.CASH, BigDecimal.ZERO))
             .mpRevenue(revenueByMethod.getOrDefault(PaymentMethod.MERCADOPAGO, BigDecimal.ZERO))
             .qrRevenue(revenueByMethod.getOrDefault(PaymentMethod.QR_CODE, BigDecimal.ZERO))
             .averageTicket(averageTicket)
+            .deliveryOrders(deliveryOrders)
+            .takeawayOrders(takeawayOrders)
+            .cancellationRate(cancellationRate)
             .build();
+    }
+
+    public WorkShiftSummary getCurrentShiftSummary(Integer branchId) {
+        WorkShift shift = workShiftRepository.findByBranchIdAndStatus(branchId, ShiftStatus.OPEN)
+            .orElseThrow(() -> new BusinessException("No hay turno activo"));
+        WorkShiftSummary summary = calculateSummary(shift);
+        summary.setCalculatedAt(OffsetDateTime.now());
+        return summary;
+    }
+
+    public List<TopProductDTO> getTopProducts(UUID shiftId, Integer branchId) {
+        WorkShift shift = workShiftRepository.findById(shiftId)
+            .orElseThrow(() -> new BusinessException("Turno no encontrado"));
+        if (!shift.getBranch().getId().equals(branchId)) {
+            throw new BusinessException("El turno no pertenece a esta sucursal");
+        }
+        LocalDateTime from = shift.getOpenedAt().toLocalDateTime();
+        LocalDateTime to = shift.getClosedAt() != null
+            ? shift.getClosedAt().toLocalDateTime()
+            : LocalDateTime.now();
+
+        List<Object[]> rows = orderItemRepository.findTopProducts(
+            branchId, OrderStatus.DELIVERED, from, to, PageRequest.of(0, 5));
+
+        return rows.stream()
+            .map(r -> new TopProductDTO((Integer) r[0], (String) r[1], (Long) r[2]))
+            .toList();
     }
 }

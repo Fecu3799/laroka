@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react'
 const API_URL = import.meta.env.VITE_API_URL ?? ''
 
-export default function useOrders(token, branchId = null) {
+export default function useOrders(token, branchId = null, dateFrom = null, shiftReady = true) {
   const [orders, setOrders]           = useState([])
   const [loading, setLoading]         = useState(true)
   const [error, setError]             = useState(null)
@@ -19,7 +19,9 @@ export default function useOrders(token, branchId = null) {
     try {
       const headers = { Authorization: `Bearer ${token}` }
       if (branchId != null) headers['X-Branch-Id'] = String(branchId)
-      const res = await fetch(`${API_URL}/backoffice/orders`, { headers })
+      const url = new URL(`${API_URL}/backoffice/orders`)
+      if (dateFrom) url.searchParams.set('dateFrom', dateFrom)
+      const res = await fetch(url.toString(), { headers })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       setOrders(await res.json())
     } catch (e) {
@@ -27,9 +29,11 @@ export default function useOrders(token, branchId = null) {
     } finally {
       setLoading(false)
     }
-  }, [token, branchId])
+  }, [token, branchId, dateFrom])
 
-  useEffect(() => { fetchOrders() }, [fetchOrders])
+  // No disparamos hasta que el estado del turno haya resuelto en useCurrentShift,
+  // así evitamos el doble fetch null → openedAt (loading se mantiene en true mientras tanto).
+  useEffect(() => { if (shiftReady) fetchOrders() }, [fetchOrders, shiftReady])
 
   useEffect(() => {
     try {
@@ -65,5 +69,5 @@ export default function useOrders(token, branchId = null) {
     })
   }, [])
 
-  return { orders, loading, error, refresh, clearOrders, dismissOrder, dismissedIds, updateOrderInList, updatePaymentInList, replaceOrderInList }
+  return { orders, loading, error, refresh, clearOrders, dismissOrder, dismissedIds, updateOrderInList, updatePaymentInList, replaceOrderInList, updateSingleOrder: replaceOrderInList }
 }

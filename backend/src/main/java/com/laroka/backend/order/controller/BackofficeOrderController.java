@@ -133,7 +133,7 @@ public class BackofficeOrderController {
                 branchId, principal.getUserId());
         BackofficeOrderRow updatedRow = orderService.findOrderRowById(id);
         notificationService.sendOrderUpdatedEvent(branchId,
-                orderMapper.toBackofficeResponseDTO(updatedRow.order(), updatedRow.payment()));
+                orderMapper.toBackofficeResponseDTO(updatedRow.order(), updatedRow.payment()), "BACKOFFICE");
         return ResponseEntity.noContent().build();
     }
 
@@ -150,7 +150,7 @@ public class BackofficeOrderController {
         orderService.transitionToPreviousStatusForBackoffice(id, branchId, principal.getUserId());
         BackofficeOrderRow updatedRow = orderService.findOrderRowById(id);
         notificationService.sendOrderUpdatedEvent(branchId,
-                orderMapper.toBackofficeResponseDTO(updatedRow.order(), updatedRow.payment()));
+                orderMapper.toBackofficeResponseDTO(updatedRow.order(), updatedRow.payment()), "BACKOFFICE");
         return ResponseEntity.noContent().build();
     }
 
@@ -168,7 +168,7 @@ public class BackofficeOrderController {
         orderService.resolveCancellationRequest(id, dto.getAction(), branchId, principal.getUserId());
         BackofficeOrderRow updatedRow = orderService.findOrderRowById(id);
         notificationService.sendOrderUpdatedEvent(branchId,
-                orderMapper.toBackofficeResponseDTO(updatedRow.order(), updatedRow.payment()));
+                orderMapper.toBackofficeResponseDTO(updatedRow.order(), updatedRow.payment()), "BACKOFFICE");
         return ResponseEntity.noContent().build();
     }
 
@@ -190,7 +190,7 @@ public class BackofficeOrderController {
         Payment payment = paymentService.confirmCashPayment(id, branchId);
         BackofficeOrderRow updatedRow = orderService.findOrderRowById(id);
         notificationService.sendOrderUpdatedEvent(branchId,
-                orderMapper.toBackofficeResponseDTO(updatedRow.order(), payment));
+                orderMapper.toBackofficeResponseDTO(updatedRow.order(), payment), "BACKOFFICE");
         return ResponseEntity.ok(PaymentStatusResponseDTO.builder()
                 .status(payment.getStatus())
                 .method(payment.getMethod())
