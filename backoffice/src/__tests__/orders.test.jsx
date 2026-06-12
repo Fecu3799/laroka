@@ -1,6 +1,7 @@
 import { render, screen, fireEvent, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import Orders from '../pages/Orders'
+import { OrdersProvider } from '../context/OrdersContext'
 import useOrders from '../hooks/useOrders'
 import { STATUS_CONFIG } from '../utils/ordersUtils'
 
@@ -96,7 +97,13 @@ function hexToRgb(hex) {
 
 function renderOrders(orders) {
   useOrders.mockReturnValue({ ...DEFAULT_HOOK, orders })
-  render(<MemoryRouter><Orders /></MemoryRouter>)
+  render(
+    <MemoryRouter>
+      <OrdersProvider setOpenOrderId={vi.fn()}>
+        <Orders />
+      </OrdersProvider>
+    </MemoryRouter>
+  )
 }
 
 beforeEach(() => {

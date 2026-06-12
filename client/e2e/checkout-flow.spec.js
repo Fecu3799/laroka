@@ -95,6 +95,10 @@ test.describe('US-06-F-04 · checkout en efectivo con seguimiento', () => {
     await page.route(`**/branches/${BRANCH_ID}/menu`, route =>
       route.fulfill({ json: DEMO_MENU })
     )
+    // El checkout (US-08-10) verifica acceptingOrders del branch antes de confirmar.
+    await page.route(`**/branches/${BRANCH_ID}`, route =>
+      route.fulfill({ json: { ...DEMO_BRANCHES[0], acceptingOrders: true } })
+    )
     await page.route('**/branches', route =>
       route.fulfill({ json: DEMO_BRANCHES })
     )
@@ -146,6 +150,48 @@ test.describe('US-06-F-04 · checkout en efectivo con seguimiento', () => {
 
     // Después de 3 s se vuelve al menú; el banner de seguimiento muestra RECEIVED
     await expect(page.locator('[data-status="RECEIVED"]')).toBeVisible({ timeout: 8_000 })
+  })
+
+  test('bloquea la confirmación cuando acceptingOrders es false (US-08-10)', async ({ page }) => {
+    // El local dejó de aceptar pedidos: override del branch a acceptingOrders:false.
+    await page.route(`**/branches/${BRANCH_ID}`, route =>
+      route.fulfill({ json: { ...DEMO_BRANCHES[0], acceptingOrders: false } })
+    )
+    // Si la confirmación se bloquea correctamente, POST /orders nunca debe dispararse.
+    let orderPosted = false
+    page.on('request', req => {
+      if (req.method() === 'POST' && new URL(req.url()).pathname.endsWith('/orders')) {
+        orderPosted = true
+      }
+    })
+
+    await page.goto('/')
+
+    const branchBtn = page.getByRole('button', { name: 'Seleccionar sucursal Puerto Madryn' })
+    await expect(branchBtn).toBeVisible({ timeout: 10_000 })
+    await branchBtn.click()
+
+    const addBtn = page.getByRole('button', { name: 'Agregar Muzzarella', exact: true })
+    await expect(addBtn).toBeVisible({ timeout: 5_000 })
+    await addBtn.click()
+
+    await page.getByRole('button', { name: 'Cart' }).click()
+    await page.getByRole('button', { name: /IR A PAGAR/ }).click()
+
+    await page.getByPlaceholder('¿Cómo te llamás?').fill('Cliente Demo')
+    await page.getByPlaceholder('11 0000-0000').fill('2804000000')
+    await page.getByPlaceholder('Calle y número, piso, depto').fill('Av. Roca 123')
+
+    await page.getByRole('button', { name: /CONFIRMAR PEDIDO/ }).click()
+
+    // Aparece el mensaje de bloqueo y NO se navega a la confirmación.
+    await expect(
+      page.getByText('El local no está aceptando pedidos en este momento')
+    ).toBeVisible({ timeout: 5_000 })
+    await expect(
+      page.getByRole('heading', { name: '¡Pedido confirmado!' })
+    ).toHaveCount(0)
+    expect(orderPosted).toBe(false)
   })
 })
 

@@ -1,10 +1,8 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useOutletContext } from "react-router-dom";
 import useAuth from "../hooks/useAuth";
 import useBranch from "../hooks/useBranch";
-import useCurrentShift from "../hooks/useCurrentShift";
-import useOrders from "../hooks/useOrders";
-import useOrderDetail from "../hooks/useOrderDetail";
+import { useOrdersContext } from "../context/OrdersContext";
 import {
   advanceOrderStatus,
   resolveCancelRequest,
@@ -523,126 +521,35 @@ function PaymentStatusIcon({ status }) {
 export default function Orders() {
   const { token } = useAuth();
   const { activeBranchId: branchId } = useBranch();
-  const { setOpenOrderId, resetCounts } = useOutletContext();
-  const { shift, ready } = useCurrentShift();
+  const { resetCounts } = useOutletContext();
   const {
     orders,
     loading,
     error,
+    shift,
+    selectedId,
+    setSelectedId,
     refresh,
-    clearOrders,
     dismissOrder,
     dismissedIds,
     updateOrderInList,
     updatePaymentInList,
-    replaceOrderInList,
-    updateSingleOrder,
-  } = useOrders(token, branchId, shift?.openedAt ?? null, ready);
+    pendingOrderIds,
+    flashedIds,
+    flashOrder,
+    detail,
+    refetchDetail,
+  } = useOrdersContext();
 
   const [activeTab, setActiveTab] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedId, setSelectedId] = useState(null);
   const [advancing, setAdvancing] = useState(null);
   const [newOrderModalOpen, setNewOrderModalOpen] = useState(false);
-  const { detail, refetchDetail } = useOrderDetail(selectedId, token, branchId);
-
-  // ── Flash state ──────────────────────────────────────────────
-  const [flashedIds, setFlashedIds] = useState(new Set());
-  const [pendingOrderIds, setPendingOrderIds] = useState(new Map());
-  const flashTimeoutsRef = useRef(new Map());
-
-  const flashOrder = useCallback((orderId) => {
-    setFlashedIds(prev => new Set([...prev, orderId]));
-    if (flashTimeoutsRef.current.has(orderId)) clearTimeout(flashTimeoutsRef.current.get(orderId));
-    const tid = setTimeout(() => {
-      setFlashedIds(prev => { const s = new Set(prev); s.delete(orderId); return s; });
-      flashTimeoutsRef.current.delete(orderId);
-    }, 600);
-    flashTimeoutsRef.current.set(orderId, tid);
-  }, []);
-
-  useEffect(() => {
-    const map = flashTimeoutsRef.current;
-    return () => map.forEach(clearTimeout);
-  }, []);
-
-  // ── Refresh when a new order is created via the modal ────────
-  useEffect(() => {
-    function handleOrderCreated() {
-      refresh();
-    }
-    window.addEventListener("laroka:order-created", handleOrderCreated);
-    return () =>
-      window.removeEventListener("laroka:order-created", handleOrderCreated);
-  }, [refresh]);
-
-  // ── Feed item pressed in SubHeader → merge + flash ───────────
-  useEffect(() => {
-    function handleOrderInsert(e) {
-      if (e.detail?.order) {
-        const { order } = e.detail;
-        updateSingleOrder(order);
-        flashOrder(order.id);
-      }
-    }
-    window.addEventListener("laroka:order-insert", handleOrderInsert);
-    return () =>
-      window.removeEventListener("laroka:order-insert", handleOrderInsert);
-  }, [updateSingleOrder, flashOrder]);
-
-  // ── Sync pending dot set from SubHeader feed ─────────────────
-  useEffect(() => {
-    function handle(e) { setPendingOrderIds(e.detail?.orderColorMap ?? new Map()); }
-    window.addEventListener("laroka:feed-updated", handle);
-    return () => window.removeEventListener("laroka:feed-updated", handle);
-  }, []);
-
-  // ── Remove pending dot when detail panel opens ───────────────
-  useEffect(() => {
-    if (!selectedId) return;
-    setPendingOrderIds(prev => {
-      if (!prev.has(selectedId)) return prev;
-      const m = new Map(prev); m.delete(selectedId); return m;
-    });
-  }, [selectedId]);
 
   // ── Clear PEDIDOS badge counter al entrar a /orders ──────────
+  // Se mantiene en Orders (no en el provider) para que el badge se limpie
+  // cada vez que el operador navega a /orders, no solo al iniciar sesión.
   useEffect(() => { resetCounts() }, [resetCounts])
-
-  // ── Sync open panel ID to Layout ref ─────────────────────────
-  useEffect(() => { setOpenOrderId(selectedId) }, [selectedId, setOpenOrderId])
-
-  // ── SSE: actualiza lista en tiempo real; refresca detalle si el panel está abierto ─
-  useEffect(() => {
-    function handleOrderUpdated(e) {
-      const { orderId, type, order } = e.detail;
-      if (type === 'ORDER_UPDATED' && order) {
-        replaceOrderInList(order);
-        if (selectedId === orderId) refetchDetail();
-      } else if (type === 'CANCELLATION_REQUESTED') {
-        if (selectedId && orderId === selectedId) {
-          updateOrderInList(orderId, 'CANCELLATION_REQUESTED');
-          refetchDetail();
-        }
-      }
-    }
-    window.addEventListener("laroka:order-updated", handleOrderUpdated);
-    return () =>
-      window.removeEventListener("laroka:order-updated", handleOrderUpdated);
-  }, [selectedId, refetchDetail, updateOrderInList, replaceOrderInList]);
-
-  // ── Clear list and close panel synchronously on branch change ─
-  useEffect(() => {
-    clearOrders();
-    setSelectedId(null);
-  }, [branchId, clearOrders]);
-
-  // ── Auto-clear selected if order leaves visible list ─────────
-  useEffect(() => {
-    if (selectedId && !orders.find((o) => o.id === selectedId)) {
-      setSelectedId(null);
-    }
-  }, [selectedId, orders]);
 
   // ── handleAdvance ────────────────────────────────────────────
   const handleAdvance = useCallback(

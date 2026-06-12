@@ -6,6 +6,7 @@ import useBranch from '../hooks/useBranch'
 import { logout } from '../services/authService'
 import SubHeader from './SubHeader'
 import { Toast } from './Toast'
+import { OrdersProvider } from '../context/OrdersContext'
 import './Layout.css'
 
 const API_URL = import.meta.env.VITE_API_URL ?? ''
@@ -232,7 +233,9 @@ export default function Layout() {
         <SubHeader />
 
         <main className="layout-main">
-          <Outlet context={{ newOrderCount, cancelCount, resetCounts, setOpenOrderId }} />
+          <OrdersProvider setOpenOrderId={setOpenOrderId}>
+            <Outlet context={{ newOrderCount, cancelCount, resetCounts, setOpenOrderId }} />
+          </OrdersProvider>
         </main>
       </div>
 
