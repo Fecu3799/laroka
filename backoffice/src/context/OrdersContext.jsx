@@ -125,6 +125,19 @@ export function OrdersProvider({ setOpenOrderId, children }) {
     setSelectedId(null)
   }, [branchId, clearOrders])
 
+  // ── Clear list when a new shift is opened ────────────────────
+  // El turno se abre desde el sub-header (no desde aquí); detectamos la
+  // transición sin-turno → turno-activo en el estado compartido y vaciamos la
+  // lista local antes de que el nuevo fetch (disparado por openedAt) la repueble.
+  const prevShiftKeyRef = useRef(null)
+  const currentShiftKey = shift?.openedAt ?? null
+  useEffect(() => {
+    if (currentShiftKey && prevShiftKeyRef.current === null) {
+      clearOrders()
+    }
+    prevShiftKeyRef.current = currentShiftKey
+  }, [currentShiftKey, clearOrders])
+
   // ── Auto-clear selected if order leaves visible list ─────────
   useEffect(() => {
     if (selectedId && !orders.find((o) => o.id === selectedId)) {

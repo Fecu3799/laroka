@@ -96,22 +96,17 @@ export default function useCurrentShift() {
     if (!token || activeBranchId == null) return null
     setLoading(true)
     try {
-      const summary = await apiCloseShift(token, activeBranchId)
+      const result = await apiCloseShift(token, activeBranchId)
       setShift(null)
       setAcceptingOrders(false)
-      setCloseSummary(summary)
-      return summary
-    } catch (err) {
-      // El backend elimina un turno sin actividad y responde 422; para el
-      // frontend equivale a un cierre exitoso (turno terminado, sin resumen).
-      if (err?.status === 422 && err?.message?.includes('El turno no registró actividad')) {
-        setShift(null)
-        setAcceptingOrders(false)
-        return null
-      }
-      // Otros errores (p. ej. 422 por pedidos activos / recepción habilitada) se
-      // propagan para que el caller los muestre; apiFetch ya disparó el toast.
-      throw err
+      // Turno sin actividad: el backend lo eliminó y respondió 200 con
+      // { empty: true } (cierre exitoso, sin resumen). Cierre normal: el body es
+      // el resumen del turno.
+      if (result?.empty === true) return null
+      setCloseSummary(result)
+      return result
+      // Errores reales (422 por pedidos activos / recepción habilitada o sin turno
+      // activo) se propagan al caller; apiFetch ya disparó el toast.
     } finally {
       setLoading(false)
     }

@@ -213,7 +213,7 @@ class WorkShiftServiceTest {
         when(workShiftRepository.save(any(WorkShift.class))).thenAnswer(inv -> inv.getArgument(0));
         when(workShiftSummaryRepository.save(any(WorkShiftSummary.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        WorkShiftSummary result = workShiftService.closeShift(1, 10);
+        WorkShiftSummary result = workShiftService.closeShift(1, 10).summary();
 
         assertThat(result.getTotalOrders()).isEqualTo(3);
         assertThat(result.getDeliveredOrders()).isEqualTo(2);
@@ -230,7 +230,7 @@ class WorkShiftServiceTest {
     }
 
     @Test
-    void closeShift_emptyShift_deletesShiftAndThrows422() {
+    void closeShift_emptyShift_deletesShiftAndReturnsWasEmpty() {
         Branch branch = branch();
         StaffUser closer = staffUser();
         WorkShift shift = openShift(branch, closer);
@@ -243,10 +243,12 @@ class WorkShiftServiceTest {
             eq(1), anyCollection(), any(), any()))
             .thenReturn(List.of());
 
-        assertThatThrownBy(() -> workShiftService.closeShift(1, 10))
-            .isInstanceOf(BusinessException.class)
-            .hasMessage("El turno no registró actividad y fue eliminado");
+        // No lanza excepción: devuelve wasEmpty=true para que la transacción
+        // confirme el delete del turno vacío en lugar de revertirlo.
+        CloseShiftResult result = workShiftService.closeShift(1, 10);
 
+        assertThat(result.wasEmpty()).isTrue();
+        assertThat(result.summary()).isNull();
         verify(workShiftRepository).delete(shift);
         verify(workShiftSummaryRepository, never()).save(any());
         verify(branchRepository).updateAcceptingOrders(1, false);

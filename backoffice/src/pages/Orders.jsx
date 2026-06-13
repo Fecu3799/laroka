@@ -642,6 +642,21 @@ export default function Orders() {
           <RefreshIcon />
           Actualizar lista
         </button>
+
+        {orders.some((o) => TERMINAL.has(o.status)) && (
+          <button
+            className="orders-clear-btn"
+            type="button"
+            onClick={() =>
+              orders
+                .filter((o) => TERMINAL.has(o.status))
+                .forEach((o) => dismissOrder(o.id))
+            }
+          >
+            <TrashIcon />
+            Limpiar lista
+          </button>
+        )}
       </div>
 
       {/* ── Tabs ─────────────────────────────────────────────── */}

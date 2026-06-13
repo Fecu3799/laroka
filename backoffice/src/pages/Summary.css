@@ -33,6 +33,13 @@
   gap: 4px;
 }
 
+.summary-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
 .summary-close-btn {
   flex-shrink: 0;
   padding: 9px 18px;
@@ -48,6 +55,29 @@
 
 .summary-close-btn:hover {
   background: color-mix(in srgb, var(--color-danger) 20%, transparent);
+}
+
+.summary-clear-btn {
+  flex-shrink: 0;
+  padding: 9px 18px;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  color: var(--text-secondary);
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--border) 38%, transparent);
+  transition: background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+
+.summary-clear-btn:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--border) 60%, transparent);
+  background: color-mix(in srgb, var(--border) 10%, transparent);
+}
+
+.summary-clear-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 .summary-title {
@@ -69,6 +99,7 @@
 /* ── Estados: loading / error / empty ──────────────────────────── */
 
 .summary-state-center {
+  display: flex;
   align-items: center;
   justify-content: center;
   min-height: 320px;

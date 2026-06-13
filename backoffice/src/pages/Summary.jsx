@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import useShiftSummary from '../hooks/useShiftSummary'
 import { useShift } from '../context/ShiftContext'
+import { useOrdersContext } from '../context/OrdersContext'
 import {
   formatDuration,
   formatCurrency,
@@ -64,81 +65,12 @@ function BreakdownRow({ label, icon, amount, value, total, mod, format }) {
   )
 }
 
-export default function Summary() {
-  const { state, loading, error, refresh } = useShiftSummary()
-  const { shift, closeShift } = useShift()
-
-  const [confirmOpen, setConfirmOpen] = useState(false)
-  const [closing, setClosing] = useState(false)
-  const [closeError, setCloseError] = useState(null)
-
-  async function handleConfirmClose() {
-    setClosing(true)
-    setCloseError(null)
-    try {
-      // Reutiliza la lógica compartida de cierre; al resolver, el estado de turno
-      // compartido pasa a null y el sub-header se actualiza automáticamente.
-      await closeShift()
-      setConfirmOpen(false)
-      // El turno quedó cerrado: recargamos para reemplazar las métricas en vivo
-      // por el summary final persistido del turno.
-      await refresh()
-    } catch (err) {
-      // 422 por pedidos activos / recepción habilitada: mostramos el mensaje del
-      // backend en el modal y no cerramos.
-      setCloseError(err?.message ?? 'No se pudo cerrar el turno.')
-    } finally {
-      setClosing(false)
-    }
-  }
-
-  if (loading) {
-    return (
-      <div className="summary-page summary-state-center">
-        <div className="summary-spinner" />
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="summary-page summary-state-center">
-        <p className="summary-state-error">No se pudo cargar el resumen del turno.</p>
-      </div>
-    )
-  }
-
-  if (!state || state.mode === 'empty') {
-    return (
-      <div className="summary-page summary-state-center">
-        <p className="summary-empty">No hay turnos registrados aún</p>
-      </div>
-    )
-  }
-
+function SummaryContent({ state }) {
   const { mode, label, openedAt, openedBy, closedAt, summary } = state
   const isActive = mode === 'active'
 
   return (
-    <div className="summary-page">
-      <header className="summary-header">
-        <div className="summary-header-text">
-          <h1 className="summary-title">Resumen</h1>
-          <p className="summary-subtitle">
-            {isActive ? 'Turno en curso · abierto a las ' : 'Último turno · abierto a las '}
-            <strong>{formatShiftClock(openedAt)}</strong>
-          </p>
-        </div>
-        {shift && (
-          <button
-            className="summary-close-btn"
-            onClick={() => { setCloseError(null); setConfirmOpen(true) }}
-          >
-            Cerrar turno
-          </button>
-        )}
-      </header>
-
+    <>
       {/* ── Card superior: encargado + período ─────────────────── */}
       <section className="summary-period-card">
         <div className="summary-manager">
@@ -229,6 +161,88 @@ export default function Summary() {
           total={summary.deliveredOrders}
         />
       </section>
+    </>
+  )
+}
+
+export default function Summary() {
+  const { state, loading, error } = useShiftSummary()
+  const { shift, closeShift } = useShift()
+  const { orders, clearOrders } = useOrdersContext()
+
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [closing, setClosing] = useState(false)
+  const [closeError, setCloseError] = useState(null)
+
+  async function handleConfirmClose() {
+    setClosing(true)
+    setCloseError(null)
+    try {
+      // Reutiliza la lógica compartida de cierre. Al resolver, el turno compartido
+      // pasa a null: el sub-header se actualiza y useShiftSummary recarga solo,
+      // reemplazando las métricas en vivo por el último turno cerrado (o empty state).
+      await closeShift()
+      setConfirmOpen(false)
+    } catch (err) {
+      // 422 por pedidos activos / recepción habilitada: mostramos el mensaje del
+      // backend en el modal y no cerramos.
+      setCloseError(err?.message ?? 'No se pudo cerrar el turno.')
+    } finally {
+      setClosing(false)
+    }
+  }
+
+  // Solo se puede limpiar la lista entre turnos (sin turno activo) y si hay algo
+  // que limpiar.
+  const clearDisabled = shift !== null || orders.length === 0
+  const hasData = state && state.mode !== 'empty'
+
+  return (
+    <div className="summary-page">
+      <header className="summary-header">
+        <div className="summary-header-text">
+          <h1 className="summary-title">Resumen</h1>
+          {hasData && (
+            <p className="summary-subtitle">
+              {state.mode === 'active' ? 'Turno en curso · abierto a las ' : 'Último turno · abierto a las '}
+              <strong>{formatShiftClock(state.openedAt)}</strong>
+            </p>
+          )}
+        </div>
+        <div className="summary-header-actions">
+          {shift && (
+            <button
+              className="summary-close-btn"
+              onClick={() => { setCloseError(null); setConfirmOpen(true) }}
+            >
+              Cerrar turno
+            </button>
+          )}
+          <button
+            className="summary-clear-btn"
+            onClick={clearOrders}
+            disabled={clearDisabled}
+          >
+            Limpiar lista de pedidos
+          </button>
+        </div>
+      </header>
+
+      {loading ? (
+        <div className="summary-state-center">
+          <div className="summary-spinner" />
+        </div>
+      ) : error ? (
+        <div className="summary-state-center">
+          <p className="summary-state-error">No se pudo cargar el resumen del turno.</p>
+        </div>
+      ) : !hasData ? (
+        <div className="summary-state-center">
+          <p className="summary-empty">No hay turnos registrados aún</p>
+        </div>
+      ) : (
+        <SummaryContent state={state} />
+      )}
 
       {/* ── Modal de confirmación de cierre ────────────────────── */}
       {confirmOpen && (
