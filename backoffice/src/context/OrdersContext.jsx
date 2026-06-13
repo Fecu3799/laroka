@@ -16,7 +16,7 @@ export function useOrdersContext() {
 
 // Vive en Layout y persiste durante toda la sesión, por lo que la lista, el
 // turno y el feed sobreviven a la navegación entre vistas (Orders se desmonta
-// al ir a /summary o /history pero el estado no se pierde ni se vuelve a fetchear).
+// al ir a /shifts/summary o /history pero el estado no se pierde ni se vuelve a fetchear).
 export function OrdersProvider({ setOpenOrderId, children }) {
   const { token } = useAuth()
   const { activeBranchId: branchId } = useBranch()

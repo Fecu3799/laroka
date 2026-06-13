@@ -100,7 +100,15 @@ export default function useCurrentShift() {
       setShift(null)
       setAcceptingOrders(false)
       setCloseSummary(summary)
-    } catch { /* noop */ } finally {
+    } catch (err) {
+      // El backend elimina un turno sin actividad y responde 422; para el
+      // frontend equivale a un cierre exitoso (turno terminado, sin resumen).
+      if (err?.status === 422 && err?.message?.includes('El turno no registró actividad')) {
+        setShift(null)
+        setAcceptingOrders(false)
+      }
+      // Cualquier otro error mantiene el comportamiento actual (apiFetch ya notificó).
+    } finally {
       setLoading(false)
     }
   }, [token, activeBranchId])

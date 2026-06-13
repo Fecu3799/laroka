@@ -13,7 +13,7 @@ const API_URL = import.meta.env.VITE_API_URL ?? ''
 
 const NAV = [
   {
-    to: '/summary',
+    to: '/shifts/summary',
     label: 'RESUMEN',
     icon: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
