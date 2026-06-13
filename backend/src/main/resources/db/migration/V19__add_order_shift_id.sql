@@ -1,0 +1,1 @@
+ALTER TABLE orders ADD COLUMN shift_id UUID REFERENCES work_shift(id) ON DELETE SET NULL;
