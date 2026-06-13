@@ -1,6 +1,6 @@
 // El estado de la lista de pedidos vive en OrdersProvider (Layout) y persiste
-// entre navegaciones: ir a /summary y volver a /orders NO debe re-fetchear la
-// lista (Orders se desmonta/remonta pero el provider permanece montado).
+// entre navegaciones: ir a /shifts/summary y volver a /orders NO debe re-fetchear
+// la lista (Orders se desmonta/remonta pero el provider permanece montado).
 
 import { test, expect } from '@playwright/test'
 
@@ -61,7 +61,7 @@ test.describe('OrdersContext · persistencia de la lista al navegar', () => {
     await page.route('**/branches/**', route =>
       route.fulfill({ json: { id: 1, name: 'Puerto Madryn', acceptingOrders: false } })
     )
-    // La vista /summary, sin turno activo, consulta el historial.
+    // La vista /shifts/summary, sin turno activo, consulta el historial.
     await page.route('**/backoffice/shifts/history**', route =>
       route.fulfill({ json: { content: [] } })
     )
@@ -74,7 +74,7 @@ test.describe('OrdersContext · persistencia de la lista al navegar', () => {
     })
   })
 
-  test('la lista persiste al navegar a /summary y volver sin re-fetchear', async ({ page }) => {
+  test('la lista persiste al navegar a /shifts/summary y volver sin re-fetchear', async ({ page }) => {
     // Contar SOLO los GET a la lista (no el detalle /backoffice/orders/{id}).
     let listGets = 0
     page.on('request', req => {
@@ -91,9 +91,9 @@ test.describe('OrdersContext · persistencia de la lista al navegar', () => {
     const getsAfterInitialLoad = listGets
     expect(getsAfterInitialLoad).toBeGreaterThanOrEqual(1)
 
-    // ── Navegar a /summary (navegación in-app, Layout permanece montado) ──
+    // ── Navegar a /shifts/summary (navegación in-app, Layout permanece montado) ──
     await page.getByRole('link', { name: 'RESUMEN' }).click()
-    await expect(page).toHaveURL('/summary')
+    await expect(page).toHaveURL('/shifts/summary')
     await expect(page.locator('.summary-page')).toBeVisible({ timeout: 5_000 })
 
     // ── Volver a /orders ─────────────────────────────────────────
