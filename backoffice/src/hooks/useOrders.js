@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react'
 const API_URL = import.meta.env.VITE_API_URL ?? ''
 
-export default function useOrders(token, branchId = null, dateFrom = null, shiftReady = true) {
+export default function useOrders(token, branchId = null, shiftId = null, shiftReady = true) {
   const [orders, setOrders]           = useState([])
   const [loading, setLoading]         = useState(true)
   const [error, setError]             = useState(null)
@@ -20,7 +20,7 @@ export default function useOrders(token, branchId = null, dateFrom = null, shift
       const headers = { Authorization: `Bearer ${token}` }
       if (branchId != null) headers['X-Branch-Id'] = String(branchId)
       const url = new URL(`${API_URL}/backoffice/orders`)
-      if (dateFrom) url.searchParams.set('dateFrom', dateFrom)
+      if (shiftId) url.searchParams.set('shiftId', shiftId)
       const res = await fetch(url.toString(), { headers })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       setOrders(await res.json())
@@ -29,10 +29,10 @@ export default function useOrders(token, branchId = null, dateFrom = null, shift
     } finally {
       setLoading(false)
     }
-  }, [token, branchId, dateFrom])
+  }, [token, branchId, shiftId])
 
   // No disparamos hasta que el estado del turno haya resuelto en useCurrentShift,
-  // así evitamos el doble fetch null → openedAt (loading se mantiene en true mientras tanto).
+  // así evitamos el doble fetch null → shiftId (loading se mantiene en true mientras tanto).
   useEffect(() => { if (shiftReady) fetchOrders() }, [fetchOrders, shiftReady])
 
   useEffect(() => {

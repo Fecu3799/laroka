@@ -34,7 +34,7 @@ export function OrdersProvider({ setOpenOrderId, children }) {
     updatePaymentInList,
     replaceOrderInList,
     updateSingleOrder,
-  } = useOrders(token, branchId, shift?.openedAt ?? null, ready)
+  } = useOrders(token, branchId, shift?.shiftId ?? null, ready)
 
   const [selectedId, setSelectedId] = useState(null)
   const { detail, refetchDetail } = useOrderDetail(selectedId, token, branchId)
@@ -128,9 +128,9 @@ export function OrdersProvider({ setOpenOrderId, children }) {
   // ── Clear list when a new shift is opened ────────────────────
   // El turno se abre desde el sub-header (no desde aquí); detectamos la
   // transición sin-turno → turno-activo en el estado compartido y vaciamos la
-  // lista local antes de que el nuevo fetch (disparado por openedAt) la repueble.
+  // lista local antes de que el nuevo fetch (disparado por shiftId) la repueble.
   const prevShiftKeyRef = useRef(null)
-  const currentShiftKey = shift?.openedAt ?? null
+  const currentShiftKey = shift?.shiftId ?? null
   useEffect(() => {
     if (currentShiftKey && prevShiftKeyRef.current === null) {
       clearOrders()
