@@ -47,6 +47,8 @@ import com.laroka.backend.order.repository.OrderItemRepository;
 import com.laroka.backend.order.repository.OrderRepository;
 import com.laroka.backend.order.mapper.OrderMapper;
 import com.laroka.backend.order.repository.OrderStatusHistoryRepository;
+import com.laroka.backend.shift.entity.ShiftStatus;
+import com.laroka.backend.shift.repository.WorkShiftRepository;
 import com.laroka.backend.shared.exception.BusinessException;
 
 import lombok.RequiredArgsConstructor;
@@ -71,6 +73,7 @@ public class OrderService {
     private final PaymentRepository paymentRepository;
     private final NotificationService notificationService;
     private final OrderMapper orderMapper;
+    private final WorkShiftRepository workShiftRepository;
 
     @Transactional
     public OrderCreationResult createOrder(Order order, List<OrderItem> items,
@@ -331,7 +334,17 @@ public class OrderService {
 
     @Transactional(readOnly = true)
     public List<BackofficeOrderRow> findActiveOrdersByBranch(Integer branchId, OrderFilterParams params) {
-        List<Order> orders = orderRepository.findActiveByBranchId(branchId, List.of());
+        return findActiveOrdersByBranch(branchId, null, params);
+    }
+
+    public List<BackofficeOrderRow> findActiveOrdersByBranch(Integer branchId, UUID shiftId, OrderFilterParams params) {
+        // Con shiftId, la lista del turno (todos sus pedidos) reemplaza al filtrado
+        // por fecha. Sin shiftId, comportamiento original: pedidos no terminados de
+        // la sucursal, acotados opcionalmente por dateFrom/dateTo.
+        boolean byShift = shiftId != null;
+        List<Order> orders = byShift
+                ? orderRepository.findByBranchIdAndShiftId(branchId, shiftId)
+                : orderRepository.findActiveByBranchId(branchId, List.of());
 
         if (orders.isEmpty()) {
             return List.of();
@@ -343,8 +356,8 @@ public class OrderService {
 
         List<Order> filtered = orders.stream()
                 .filter(o -> params.status() == null || o.getStatus() == params.status())
-                .filter(o -> params.dateFrom() == null || !o.getCreatedAt().isBefore(params.dateFrom()))
-                .filter(o -> params.dateTo() == null || !o.getCreatedAt().isAfter(params.dateTo()))
+                .filter(o -> byShift || params.dateFrom() == null || !o.getCreatedAt().isBefore(params.dateFrom()))
+                .filter(o -> byShift || params.dateTo() == null || !o.getCreatedAt().isAfter(params.dateTo()))
                 .sorted(comparator)
                 .toList();
 
@@ -454,6 +467,10 @@ public class OrderService {
             item.setOrder(order);
         }
         order.setItems(resolvedItems);
+
+        // Asociar el pedido al turno OPEN de la sucursal, si lo hay; si no, queda null.
+        workShiftRepository.findByBranchIdAndStatus(branch.getId(), ShiftStatus.OPEN)
+                .ifPresent(order::setShift);
 
         Order saved = orderRepository.save(order);
         recordHistory(saved, null, OrderStatus.PENDING_PAYMENT);

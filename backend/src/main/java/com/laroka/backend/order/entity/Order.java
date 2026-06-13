@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.UUID;
 
 import com.laroka.backend.branch.entity.Branch;
+import com.laroka.backend.shift.entity.WorkShift;
 import com.laroka.backend.tenant.entity.Tenant;
 
 import jakarta.persistence.CascadeType;
@@ -81,6 +82,12 @@ public class Order {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "tenant_id", nullable = false)
     private Tenant tenant;
+
+    // Turno en el que se creó el pedido. Nullable: pedidos creados sin turno
+    // abierto (o datos previos a la migración V19) quedan con shift = null.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "shift_id")
+    private WorkShift shift;
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OrderItem> items;

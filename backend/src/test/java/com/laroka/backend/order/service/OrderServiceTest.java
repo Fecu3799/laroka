@@ -3,6 +3,7 @@ package com.laroka.backend.order.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -49,6 +50,9 @@ import com.laroka.backend.order.repository.OrderStatusHistoryRepository;
 import com.laroka.backend.payment.entity.Payment;
 import com.laroka.backend.payment.entity.PaymentStatus;
 import com.laroka.backend.payment.repository.PaymentRepository;
+import com.laroka.backend.shift.entity.ShiftStatus;
+import com.laroka.backend.shift.entity.WorkShift;
+import com.laroka.backend.shift.repository.WorkShiftRepository;
 import com.laroka.backend.tenant.entity.Tenant;
 import com.laroka.backend.shared.exception.BusinessException;
 import com.laroka.backend.order.dto.OrderFilterParams;
@@ -67,6 +71,7 @@ class OrderServiceTest {
     @Mock private PaymentRepository paymentRepository;
     @Mock private com.laroka.backend.notification.service.NotificationService notificationService;
     @Mock private OrderMapper orderMapper;
+    @Mock private WorkShiftRepository workShiftRepository;
 
     @InjectMocks
     private OrderService service;
@@ -212,6 +217,45 @@ class OrderServiceTest {
         verify(orderRepository).save(captor.capture());
         assertThat(captor.getValue().getDeliveryFee()).isEqualByComparingTo("0");
         assertThat(captor.getValue().getTotalAmount()).isEqualByComparingTo("3000.00");
+    }
+
+    // --- createOrder: asignación de turno (shiftId) ---
+
+    @Test
+    void createOrder_withActiveShift_assignsShiftToOrder() {
+        Tenant p = tenant();
+        Branch branch = branch(p);
+        Product product = product(new BigDecimal("2800.00"));
+        stubBaseCreation(branch, product);
+
+        UUID shiftId = UUID.randomUUID();
+        WorkShift activeShift = WorkShift.builder().id(shiftId).build();
+        when(workShiftRepository.findByBranchIdAndStatus(branch.getId(), ShiftStatus.OPEN))
+                .thenReturn(Optional.of(activeShift));
+
+        service.createOrder(takeawayOrder(branch), List.of(itemFor(1, 1)), PaymentMethod.MERCADOPAGO, "key-shift-1");
+
+        ArgumentCaptor<Order> captor = ArgumentCaptor.forClass(Order.class);
+        verify(orderRepository).save(captor.capture());
+        assertThat(captor.getValue().getShift()).isNotNull();
+        assertThat(captor.getValue().getShift().getId()).isEqualTo(shiftId);
+    }
+
+    @Test
+    void createOrder_noActiveShift_leavesShiftNull() {
+        Tenant p = tenant();
+        Branch branch = branch(p);
+        Product product = product(new BigDecimal("2800.00"));
+        stubBaseCreation(branch, product);
+
+        when(workShiftRepository.findByBranchIdAndStatus(branch.getId(), ShiftStatus.OPEN))
+                .thenReturn(Optional.empty());
+
+        service.createOrder(takeawayOrder(branch), List.of(itemFor(1, 1)), PaymentMethod.MERCADOPAGO, "key-shift-2");
+
+        ArgumentCaptor<Order> captor = ArgumentCaptor.forClass(Order.class);
+        verify(orderRepository).save(captor.capture());
+        assertThat(captor.getValue().getShift()).isNull();
     }
 
     // --- createOrder: validaciones ---
@@ -397,6 +441,27 @@ class OrderServiceTest {
         List<BackofficeOrderRow> result = service.findActiveOrdersByBranch(99, OrderFilterParams.defaults());
 
         assertThat(result).isEmpty();
+    }
+
+    @Test
+    void findActiveOrdersByBranch_withShiftId_filtersByShift() {
+        int branchId = 1;
+        UUID shiftId = UUID.randomUUID();
+        // El path por turno trae todos los pedidos del turno (incluye terminales),
+        // a diferencia del path por fecha que parte de los no terminados.
+        Order received = minimalSavedOrder(OrderStatus.RECEIVED);
+        Order delivered = minimalSavedOrder(OrderStatus.DELIVERED);
+
+        when(orderRepository.findByBranchIdAndShiftId(branchId, shiftId))
+                .thenReturn(List.of(received, delivered));
+        when(paymentRepository.findByOrderIdIn(any(Collection.class))).thenReturn(List.of());
+
+        List<BackofficeOrderRow> result =
+                service.findActiveOrdersByBranch(branchId, shiftId, OrderFilterParams.defaults());
+
+        assertThat(result).hasSize(2);
+        verify(orderRepository).findByBranchIdAndShiftId(branchId, shiftId);
+        verify(orderRepository, never()).findActiveByBranchId(any(), any());
     }
 
     // --- transitionStatusForBackoffice ---

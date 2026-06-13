@@ -27,6 +27,9 @@ public interface OrderRepository extends JpaRepository<Order, UUID>, JpaSpecific
                                      @Param("excluded") Collection<OrderStatus> excluded);
 
     @EntityGraph(attributePaths = {"items", "items.product"})
+    List<Order> findByBranchIdAndShiftId(Integer branchId, UUID shiftId);
+
+    @EntityGraph(attributePaths = {"items", "items.product"})
     @Query("SELECT o FROM Order o WHERE o.id IN :ids")
     List<Order> findByIdsWithItems(@Param("ids") Collection<UUID> ids);
 

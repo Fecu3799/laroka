@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import useAuth from '../hooks/useAuth'
 import useBranch from '../hooks/useBranch'
-import useCurrentShift from '../hooks/useCurrentShift'
+import { useShift } from './ShiftContext'
 import useOrders from '../hooks/useOrders'
 import useOrderDetail from '../hooks/useOrderDetail'
 
@@ -16,11 +16,11 @@ export function useOrdersContext() {
 
 // Vive en Layout y persiste durante toda la sesión, por lo que la lista, el
 // turno y el feed sobreviven a la navegación entre vistas (Orders se desmonta
-// al ir a /summary o /history pero el estado no se pierde ni se vuelve a fetchear).
+// al ir a /shifts/summary o /history pero el estado no se pierde ni se vuelve a fetchear).
 export function OrdersProvider({ setOpenOrderId, children }) {
   const { token } = useAuth()
   const { activeBranchId: branchId } = useBranch()
-  const { shift, ready } = useCurrentShift()
+  const { shift, ready } = useShift()
 
   const {
     orders,
@@ -34,7 +34,7 @@ export function OrdersProvider({ setOpenOrderId, children }) {
     updatePaymentInList,
     replaceOrderInList,
     updateSingleOrder,
-  } = useOrders(token, branchId, shift?.openedAt ?? null, ready)
+  } = useOrders(token, branchId, shift?.shiftId ?? null, ready)
 
   const [selectedId, setSelectedId] = useState(null)
   const { detail, refetchDetail } = useOrderDetail(selectedId, token, branchId)
@@ -124,6 +124,19 @@ export function OrdersProvider({ setOpenOrderId, children }) {
     clearOrders()
     setSelectedId(null)
   }, [branchId, clearOrders])
+
+  // ── Clear list when a new shift is opened ────────────────────
+  // El turno se abre desde el sub-header (no desde aquí); detectamos la
+  // transición sin-turno → turno-activo en el estado compartido y vaciamos la
+  // lista local antes de que el nuevo fetch (disparado por shiftId) la repueble.
+  const prevShiftKeyRef = useRef(null)
+  const currentShiftKey = shift?.shiftId ?? null
+  useEffect(() => {
+    if (currentShiftKey && prevShiftKeyRef.current === null) {
+      clearOrders()
+    }
+    prevShiftKeyRef.current = currentShiftKey
+  }, [currentShiftKey, clearOrders])
 
   // ── Auto-clear selected if order leaves visible list ─────────
   useEffect(() => {

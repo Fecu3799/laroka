@@ -2,16 +2,11 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import useAuth from '../hooks/useAuth'
 import useBranch from '../hooks/useBranch'
-import useCurrentShift from '../hooks/useCurrentShift'
+import { useShift } from '../context/ShiftContext'
 import { fetchOrderDetail } from '../services/ordersService'
 import { STATUS_CONFIG } from '../utils/ordersUtils'
 import ToggleSwitch from './ToggleSwitch'
 import './SubHeader.css'
-
-function fmt(amount) {
-  if (amount == null) return '—'
-  return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(amount)
-}
 
 function formatFeedTime(date) {
   return date.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false })
@@ -22,10 +17,9 @@ export default function SubHeader() {
   const { token, role } = useAuth()
   const { activeBranchName, activeBranchId, setActiveBranch } = useBranch()
   const {
-    shift, loading, warning, confirmWarning, openShift, closeShift, closeSummary, dismissSummary,
+    shift, loading, warning, confirmWarning, openShift,
     acceptingOrders, toggleOrders, suggestOrders, confirmSuggestOrders, dismissSuggestOrders,
-  } = useCurrentShift()
-  const [confirmClose, setConfirmClose] = useState(false)
+  } = useShift()
 
   // ── Feed state ───────────────────────────────────────────────
   const [feedItems, setFeedItems] = useState([])
@@ -107,11 +101,6 @@ export default function SubHeader() {
     setFeedItems(prev => prev.filter(i => i.id !== item.id))
   }
 
-  async function handleConfirmClose() {
-    setConfirmClose(false)
-    await closeShift()
-  }
-
   return (
     <>
       <div className="sub-header">
@@ -140,15 +129,7 @@ export default function SubHeader() {
         <div className="sub-header-shift">
           <span className={`sub-header-shift-dot ${shift ? 'sub-header-shift-dot--open' : 'sub-header-shift-dot--closed'}`} />
           <span className="sub-header-shift-label">{shift ? 'TURNO ABIERTO' : 'TURNO CERRADO'}</span>
-          {shift ? (
-            <button
-              className="sub-header-shift-btn sub-header-shift-btn--close"
-              onClick={() => setConfirmClose(true)}
-              disabled={loading}
-            >
-              Cerrar turno
-            </button>
-          ) : (
+          {!shift && (
             <button
               className="sub-header-shift-btn sub-header-shift-btn--open"
               onClick={openShift}
@@ -265,85 +246,6 @@ export default function SubHeader() {
         </div>
       )}
 
-      {/* Confirmación de cierre */}
-      {confirmClose && (
-        <div className="sub-header-overlay" role="dialog" aria-modal="true" aria-labelledby="close-title">
-          <div className="sub-header-modal">
-            <p className="sub-header-modal-title" id="close-title">Cerrar turno</p>
-            <p className="sub-header-modal-body">
-              ¿Confirmar el cierre del turno? Se calculará el resumen de la jornada.
-            </p>
-            <div className="sub-header-modal-actions">
-              <button
-                className="sub-header-modal-btn sub-header-modal-btn--secondary"
-                onClick={() => setConfirmClose(false)}
-              >
-                Cancelar
-              </button>
-              <button
-                className="sub-header-modal-btn sub-header-modal-btn--primary"
-                onClick={handleConfirmClose}
-                disabled={loading}
-              >
-                Confirmar cierre
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Resumen post-cierre */}
-      {closeSummary && (
-        <div className="sub-header-overlay" role="dialog" aria-modal="true" aria-labelledby="summary-title">
-          <div className="sub-header-modal">
-            <p className="sub-header-modal-title" id="summary-title">Resumen del turno</p>
-            <div className="sub-header-summary-grid">
-              <div className="sub-header-summary-row">
-                <span className="sub-header-summary-key">Pedidos totales</span>
-                <span className="sub-header-summary-val">{closeSummary.totalOrders ?? 0}</span>
-              </div>
-              <div className="sub-header-summary-row">
-                <span className="sub-header-summary-key">Entregados</span>
-                <span className="sub-header-summary-val">{closeSummary.deliveredOrders ?? 0}</span>
-              </div>
-              <div className="sub-header-summary-row">
-                <span className="sub-header-summary-key">Cancelados</span>
-                <span className="sub-header-summary-val">{closeSummary.cancelledOrders ?? 0}</span>
-              </div>
-              <div className="sub-header-summary-row">
-                <span className="sub-header-summary-key">Ticket promedio</span>
-                <span className="sub-header-summary-val">{fmt(closeSummary.averageTicket)}</span>
-              </div>
-              <div className="sub-header-summary-row">
-                <span className="sub-header-summary-key">Efectivo</span>
-                <span className="sub-header-summary-val">{fmt(closeSummary.cashRevenue)}</span>
-              </div>
-              <div className="sub-header-summary-row">
-                <span className="sub-header-summary-key">MercadoPago</span>
-                <span className="sub-header-summary-val">{fmt(closeSummary.mpRevenue)}</span>
-              </div>
-              <div className="sub-header-summary-row" style={{ gridColumn: '1 / -1' }}>
-                <span className="sub-header-summary-key">Total recaudado</span>
-                <span className="sub-header-summary-val sub-header-summary-val--accent">{fmt(closeSummary.totalRevenue)}</span>
-              </div>
-            </div>
-            <div className="sub-header-modal-actions">
-              <button
-                className="sub-header-modal-btn sub-header-modal-btn--secondary"
-                onClick={dismissSummary}
-              >
-                Cerrar
-              </button>
-              <button
-                className="sub-header-modal-btn sub-header-modal-btn--accent"
-                onClick={() => { dismissSummary(); navigate(`/shifts/summary?shiftId=${closeSummary.shiftId}`) }}
-              >
-                Ver resumen completo
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   )
 }

@@ -31,7 +31,7 @@ function App() {
               </ProtectedRoute>
             }
           >
-            <Route path="/summary" element={<Summary />} />
+            <Route path="/shifts/summary" element={<Summary />} />
             <Route path="/orders" element={<Orders />} />
             <Route path="/orders/:id" element={<OrderDetail />} />
           </Route>

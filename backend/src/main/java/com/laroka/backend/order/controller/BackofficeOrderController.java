@@ -57,18 +57,20 @@ public class BackofficeOrderController {
     @GetMapping
     @Operation(summary = "Get active orders",
             description = "Returns active orders for the authenticated user's branch. " +
-                    "Supports optional filters: status, dateFrom, dateTo, orderBy (createdAt_asc | createdAt_desc, default: createdAt_desc).")
+                    "Supports optional filters: status, dateFrom, dateTo, orderBy (createdAt_asc | createdAt_desc, default: createdAt_desc). " +
+                    "When shiftId is present, orders are filtered by shift instead of dateFrom/dateTo.")
     public ResponseEntity<List<BackofficeOrderResponseDTO>> getActiveOrders(
             @RequestParam(required = false) OrderStatus status,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime dateFrom,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime dateTo,
             @RequestParam(required = false, defaultValue = "createdAt_desc") String orderBy,
+            @RequestParam(required = false) UUID shiftId,
             @AuthenticationPrincipal CustomUserDetails principal,
             HttpServletRequest request) {
 
         Integer branchId = securityUtils.resolveBranchId(principal, request);
         OrderFilterParams params = new OrderFilterParams(status, dateFrom, dateTo, orderBy);
-        List<BackofficeOrderRow> rows = orderService.findActiveOrdersByBranch(branchId, params);
+        List<BackofficeOrderRow> rows = orderService.findActiveOrdersByBranch(branchId, shiftId, params);
         List<BackofficeOrderResponseDTO> response = rows.stream()
                 .map(row -> orderMapper.toBackofficeResponseDTO(row.order(), row.payment()))
                 .toList();

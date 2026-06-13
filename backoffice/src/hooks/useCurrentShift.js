@@ -93,14 +93,21 @@ export default function useCurrentShift() {
   const dismissSuggestOrders = useCallback(() => setSuggestOrders(false), [])
 
   const closeShift = useCallback(async () => {
-    if (!token || activeBranchId == null) return
+    if (!token || activeBranchId == null) return null
     setLoading(true)
     try {
-      const summary = await apiCloseShift(token, activeBranchId)
+      const result = await apiCloseShift(token, activeBranchId)
       setShift(null)
       setAcceptingOrders(false)
-      setCloseSummary(summary)
-    } catch { /* noop */ } finally {
+      // Turno sin actividad: el backend lo eliminó y respondió 200 con
+      // { empty: true } (cierre exitoso, sin resumen). Cierre normal: el body es
+      // el resumen del turno.
+      if (result?.empty === true) return null
+      setCloseSummary(result)
+      return result
+      // Errores reales (422 por pedidos activos / recepción habilitada o sin turno
+      // activo) se propagan al caller; apiFetch ya disparó el toast.
+    } finally {
       setLoading(false)
     }
   }, [token, activeBranchId])

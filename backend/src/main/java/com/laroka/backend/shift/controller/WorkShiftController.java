@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.laroka.backend.shared.exception.BusinessException;
+import com.laroka.backend.shift.dto.CloseShiftEmptyResponseDTO;
 import com.laroka.backend.shift.dto.CloseShiftResponseDTO;
 import com.laroka.backend.shift.dto.CurrentShiftResponseDTO;
 import com.laroka.backend.shift.dto.OpenShiftResponseDTO;
@@ -23,6 +24,7 @@ import com.laroka.backend.shift.dto.ShiftHistoryItemDTO;
 import com.laroka.backend.shift.dto.TopProductDTO;
 import com.laroka.backend.shift.entity.WorkShift;
 import com.laroka.backend.shift.entity.WorkShiftSummary;
+import com.laroka.backend.shift.service.CloseShiftResult;
 import com.laroka.backend.shift.service.OpenShiftResult;
 import com.laroka.backend.shift.service.WorkShiftService;
 import com.laroka.backend.shared.security.CustomUserDetails;
@@ -102,15 +104,22 @@ public class WorkShiftController {
     @PostMapping("/close")
     @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
     @Operation(summary = "Close the active work shift",
-            description = "Closes the currently open shift for the authenticated user's branch " +
-                    "and returns the calculated summary. Returns 422 if no active shift exists.")
-    public ResponseEntity<CloseShiftResponseDTO> closeShift(
+            description = "Closes the currently open shift for the authenticated user's branch. " +
+                    "Returns 200 with the calculated summary, or 200 with { empty: true } if the " +
+                    "shift had no activity and was deleted. Returns 422 if no active shift exists.")
+    public ResponseEntity<?> closeShift(
             @AuthenticationPrincipal CustomUserDetails principal,
             HttpServletRequest request) {
 
         Integer branchId = securityUtils.resolveBranchId(principal, request);
-        WorkShiftSummary summary = workShiftService.closeShift(branchId, principal.getUserId());
+        CloseShiftResult result = workShiftService.closeShift(branchId, principal.getUserId());
 
+        if (result.wasEmpty()) {
+            return ResponseEntity.ok(new CloseShiftEmptyResponseDTO(true,
+                "El turno no registró actividad y fue eliminado"));
+        }
+
+        WorkShiftSummary summary = result.summary();
         return ResponseEntity.ok(toCloseShiftResponse(summary.getShift().getId(), summary));
     }
 

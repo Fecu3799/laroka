@@ -7,13 +7,14 @@ import { logout } from '../services/authService'
 import SubHeader from './SubHeader'
 import { Toast } from './Toast'
 import { OrdersProvider } from '../context/OrdersContext'
+import { ShiftProvider } from '../context/ShiftContext'
 import './Layout.css'
 
 const API_URL = import.meta.env.VITE_API_URL ?? ''
 
 const NAV = [
   {
-    to: '/summary',
+    to: '/shifts/summary',
     label: 'RESUMEN',
     icon: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -230,13 +231,15 @@ export default function Layout() {
           </div>
         </header>
 
-        <SubHeader />
+        <ShiftProvider>
+          <SubHeader />
 
-        <main className="layout-main">
-          <OrdersProvider setOpenOrderId={setOpenOrderId}>
-            <Outlet context={{ newOrderCount, cancelCount, resetCounts, setOpenOrderId }} />
-          </OrdersProvider>
-        </main>
+          <main className="layout-main">
+            <OrdersProvider setOpenOrderId={setOpenOrderId}>
+              <Outlet context={{ newOrderCount, cancelCount, resetCounts, setOpenOrderId }} />
+            </OrdersProvider>
+          </main>
+        </ShiftProvider>
       </div>
 
       <Toast />

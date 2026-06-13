@@ -93,7 +93,7 @@ public class WorkShiftService {
     }
 
     @Transactional
-    public WorkShiftSummary closeShift(Integer branchId, Integer userId) {
+    public CloseShiftResult closeShift(Integer branchId, Integer userId) {
         StaffUser closer = staffUserRepository.findById(userId)
             .orElseThrow(() -> new IllegalStateException("Authenticated user not found: " + userId));
         WorkShift shift = workShiftRepository.findByBranchIdAndStatus(branchId, ShiftStatus.OPEN)
@@ -118,10 +118,12 @@ public class WorkShiftService {
 
         WorkShiftSummary summary = closeShiftInternal(shift, closer);
         // 3) Turno sin actividad: closeShiftInternal lo eliminó y devolvió null.
+        // No lanzamos excepción —eso revertiría el delete dentro de esta misma
+        // transacción—: señalamos con wasEmpty para que la transacción confirme.
         if (summary == null) {
-            throw new BusinessException("El turno no registró actividad y fue eliminado");
+            return new CloseShiftResult(null, true);
         }
-        return summary;
+        return new CloseShiftResult(summary, false);
     }
 
     WorkShiftSummary closeShiftInternal(WorkShift shift, StaffUser closer) {
