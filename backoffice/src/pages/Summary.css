@@ -22,8 +22,32 @@
 
 .summary-header {
   display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.summary-header-text {
+  display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.summary-close-btn {
+  flex-shrink: 0;
+  padding: 9px 18px;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  color: var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-danger) 38%, transparent);
+  transition: background 0.15s ease;
+}
+
+.summary-close-btn:hover {
+  background: color-mix(in srgb, var(--color-danger) 20%, transparent);
 }
 
 .summary-title {
@@ -320,6 +344,86 @@
 
 .summary-breakdown-row.is-qr .summary-bar-fill { background: var(--accent); }
 .summary-breakdown-row.is-qr .summary-breakdown-pct { color: var(--accent); }
+
+/* ── Modal de cierre de turno ──────────────────────────────────── */
+
+.summary-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: color-mix(in srgb, var(--color-bg) 72%, transparent);
+  backdrop-filter: blur(2px);
+}
+
+.summary-modal {
+  width: 100%;
+  max-width: 380px;
+  background: var(--color-sidebar-bg);
+  border: 1px solid color-mix(in srgb, var(--border) 32%, transparent);
+  border-radius: 14px;
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.summary-modal-title {
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.summary-modal-body {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.summary-modal-error {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-danger) 30%, transparent);
+  border-radius: 8px;
+  padding: 9px 12px;
+}
+
+.summary-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.summary-modal-btn {
+  padding: 9px 16px;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+
+.summary-modal-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.summary-modal-btn--secondary {
+  color: var(--text-secondary);
+  background: transparent;
+  border-color: color-mix(in srgb, var(--border) 38%, transparent);
+}
+
+.summary-modal-btn--danger {
+  color: #fff;
+  background: var(--color-danger);
+}
 
 /* ── Responsive ────────────────────────────────────────────────── */
 

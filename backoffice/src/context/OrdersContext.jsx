@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import useAuth from '../hooks/useAuth'
 import useBranch from '../hooks/useBranch'
-import useCurrentShift from '../hooks/useCurrentShift'
+import { useShift } from './ShiftContext'
 import useOrders from '../hooks/useOrders'
 import useOrderDetail from '../hooks/useOrderDetail'
 
@@ -20,7 +20,7 @@ export function useOrdersContext() {
 export function OrdersProvider({ setOpenOrderId, children }) {
   const { token } = useAuth()
   const { activeBranchId: branchId } = useBranch()
-  const { shift, ready } = useCurrentShift()
+  const { shift, ready } = useShift()
 
   const {
     orders,

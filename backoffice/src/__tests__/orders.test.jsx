@@ -2,6 +2,7 @@ import { render, screen, fireEvent, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import Orders from '../pages/Orders'
 import { OrdersProvider } from '../context/OrdersContext'
+import { ShiftProvider } from '../context/ShiftContext'
 import useOrders from '../hooks/useOrders'
 import { STATUS_CONFIG } from '../utils/ordersUtils'
 
@@ -99,9 +100,11 @@ function renderOrders(orders) {
   useOrders.mockReturnValue({ ...DEFAULT_HOOK, orders })
   render(
     <MemoryRouter>
-      <OrdersProvider setOpenOrderId={vi.fn()}>
-        <Orders />
-      </OrdersProvider>
+      <ShiftProvider>
+        <OrdersProvider setOpenOrderId={vi.fn()}>
+          <Orders />
+        </OrdersProvider>
+      </ShiftProvider>
     </MemoryRouter>
   )
 }
