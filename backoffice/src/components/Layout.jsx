@@ -25,6 +25,17 @@ const NAV = [
     ),
   },
   {
+    to: '/shifts/history',
+    label: 'HISTORIAL',
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M3 3v5h5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M3 8C4.6 4.4 8.5 2 13 2a10 10 0 1 1-9.9 11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+        <path d="M13 7v5l3 2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
     to: '/orders',
     end: true,
     label: 'PEDIDOS',
