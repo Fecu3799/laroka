@@ -3,6 +3,7 @@ import { MemoryRouter } from 'react-router-dom'
 import Orders from '../pages/Orders'
 import { OrdersProvider } from '../context/OrdersContext'
 import { ShiftProvider } from '../context/ShiftContext'
+import { OperatorMessagesProvider } from '../context/OperatorMessagesContext'
 import useOrders from '../hooks/useOrders'
 import { STATUS_CONFIG } from '../utils/ordersUtils'
 
@@ -101,9 +102,11 @@ function renderOrders(orders) {
   render(
     <MemoryRouter>
       <ShiftProvider>
-        <OrdersProvider setOpenOrderId={vi.fn()}>
-          <Orders />
-        </OrdersProvider>
+        <OperatorMessagesProvider>
+          <OrdersProvider setOpenOrderId={vi.fn()}>
+            <Orders />
+          </OrdersProvider>
+        </OperatorMessagesProvider>
       </ShiftProvider>
     </MemoryRouter>
   )

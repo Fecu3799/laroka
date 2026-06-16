@@ -17,6 +17,8 @@ import {
   canCancel as cancelAllowed,
 } from "../utils/ordersUtils";
 import NewOrderModal from "../components/NewOrderModal";
+import OperatorStatusBar from "../components/OperatorStatusBar";
+import useOperatorMessages from "../hooks/useOperatorMessages";
 import "./Orders.css";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "";
@@ -124,11 +126,6 @@ function formatTime(createdAt) {
     date.toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit" }) +
     ` · ${timeStr}`
   );
-}
-
-function formatHour(iso) {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false })
 }
 
 function formatDateTime(ts) {
@@ -526,7 +523,6 @@ export default function Orders() {
     orders,
     loading,
     error,
-    shift,
     selectedId,
     setSelectedId,
     refresh,
@@ -540,6 +536,8 @@ export default function Orders() {
     detail,
     refetchDetail,
   } = useOrdersContext();
+
+  const { messages, removeMessage } = useOperatorMessages();
 
   const [activeTab, setActiveTab] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
@@ -777,13 +775,8 @@ export default function Orders() {
         </button>
       )}
 
-      {/* ── Shift banner ─────────────────────────────────────── */}
-      {shift && (
-        <div className="orders-shift-banner">
-          <span className="orders-shift-banner-dot" />
-          Mostrando pedidos del turno actual desde {formatHour(shift.openedAt)}
-        </div>
-      )}
+      {/* ── Operator status bar ──────────────────────────────── */}
+      <OperatorStatusBar messages={messages} removeMessage={removeMessage} />
 
       <NewOrderModal
         open={newOrderModalOpen}
