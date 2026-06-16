@@ -13,6 +13,7 @@
   --color-green-primary: #095E2F;
   --color-sidebar-bg: #070d08;
   --color-success: #2ecc71;
+  --color-warning: #f59e0b;
   --color-danger: #ef4444;
   --color-info: #4a9eea;
 }
@@ -30,6 +31,7 @@
   --color-green-primary: #d4e8d9;
   --color-sidebar-bg: #dce8dc;
   --color-success: #16a34a;
+  --color-warning: #d97706;
   --color-danger: #dc2626;
   --color-info: #0284c7;
 }

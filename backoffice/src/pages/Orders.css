@@ -1361,29 +1361,3 @@
   opacity: 1;
 }
 
-/* ── Shift banner ────────────────────────────────────────────── */
-
-.orders-shift-banner {
-  position: sticky;
-  bottom: 0;
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0 1.25rem;
-  height: 30px;
-  background: rgba(34, 197, 94, 0.04);
-  border-top: 1px solid rgba(34, 197, 94, 0.1);
-  font-family: 'Inter', sans-serif;
-  font-size: 11px;
-  color: rgba(34, 197, 94, 0.75);
-  flex-shrink: 0;
-}
-
-.orders-shift-banner-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background-color: #22c55e;
-  flex-shrink: 0;
-}

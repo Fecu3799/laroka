@@ -2,7 +2,6 @@ package com.laroka.backend.shift.service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.util.EnumMap;
 import java.util.List;
@@ -107,11 +106,10 @@ public class WorkShiftService {
         }
 
         // 2) No permitir cerrar con pedidos activos sin resolver del turno actual.
-        boolean hasActiveOrders = orderRepository.existsByBranchIdAndStatusInAndCreatedAtGreaterThanEqual(
-            branchId,
+        boolean hasActiveOrders = orderRepository.existsByShiftIdAndStatusIn(
+            shift.getId(),
             List.of(OrderStatus.RECEIVED, OrderStatus.IN_PREPARATION,
-                    OrderStatus.ON_THE_WAY, OrderStatus.READY_FOR_PICKUP),
-            shift.getOpenedAt().toLocalDateTime());
+                    OrderStatus.ON_THE_WAY, OrderStatus.READY_FOR_PICKUP));
         if (hasActiveOrders) {
             throw new BusinessException("Hay pedidos activos sin resolver. Resolválos antes de cerrar el turno.");
         }
@@ -168,14 +166,9 @@ public class WorkShiftService {
     }
 
     private WorkShiftSummary calculateSummary(WorkShift shift) {
-        Integer branchId = shift.getBranch().getId();
-        LocalDateTime from = shift.getOpenedAt().toLocalDateTime();
-        LocalDateTime to = LocalDateTime.now();
-
-        List<Order> orders = orderRepository.findByBranchIdAndStatusInAndCreatedAtBetween(
-            branchId,
-            List.of(OrderStatus.DELIVERED, OrderStatus.CANCELLED),
-            from, to
+        List<Order> orders = orderRepository.findByShiftIdAndStatusIn(
+            shift.getId(),
+            List.of(OrderStatus.DELIVERED, OrderStatus.CANCELLED)
         );
 
         List<Order> delivered = orders.stream()
@@ -250,13 +243,8 @@ public class WorkShiftService {
         if (!shift.getBranch().getId().equals(branchId)) {
             throw new BusinessException("El turno no pertenece a esta sucursal");
         }
-        LocalDateTime from = shift.getOpenedAt().toLocalDateTime();
-        LocalDateTime to = shift.getClosedAt() != null
-            ? shift.getClosedAt().toLocalDateTime()
-            : LocalDateTime.now();
-
-        List<Object[]> rows = orderItemRepository.findTopProducts(
-            branchId, OrderStatus.DELIVERED, from, to, PageRequest.of(0, 5));
+        List<Object[]> rows = orderItemRepository.findTopProductsByShiftId(
+            shiftId, OrderStatus.DELIVERED, PageRequest.of(0, 5));
 
         return rows.stream()
             .map(r -> new TopProductDTO((Integer) r[0], (String) r[1], (Long) r[2]))
