@@ -48,6 +48,7 @@ import com.laroka.backend.order.repository.OrderRepository;
 import com.laroka.backend.order.mapper.OrderMapper;
 import com.laroka.backend.order.repository.OrderStatusHistoryRepository;
 import com.laroka.backend.shift.entity.ShiftStatus;
+import com.laroka.backend.shift.entity.WorkShift;
 import com.laroka.backend.shift.repository.WorkShiftRepository;
 import com.laroka.backend.shared.exception.BusinessException;
 
@@ -468,9 +469,9 @@ public class OrderService {
         }
         order.setItems(resolvedItems);
 
-        // Asociar el pedido al turno OPEN de la sucursal, si lo hay; si no, queda null.
-        workShiftRepository.findByBranchIdAndStatus(branch.getId(), ShiftStatus.OPEN)
-                .ifPresent(order::setShift);
+        WorkShift shift = workShiftRepository.findByBranchIdAndStatus(branch.getId(), ShiftStatus.OPEN)
+                .orElseThrow(() -> new BusinessException("No hay turno activo para esta sucursal"));
+        order.setShift(shift);
 
         Order saved = orderRepository.save(order);
         recordHistory(saved, null, OrderStatus.PENDING_PAYMENT);
