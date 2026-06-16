@@ -51,3 +51,4 @@ jobs:
           SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/laroka_test
           SPRING_DATASOURCE_USERNAME: postgres
           SPRING_DATASOURCE_PASSWORD: postgres
+          JWT_SECRET: test-secret-minimum-32-chars-for-hmac256-ok
