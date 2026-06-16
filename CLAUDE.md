@@ -78,6 +78,9 @@ Capas obligatorias por módulo:
 | V17     | work_shift_summary analytics columns       |
 | V18     | branch accepting_orders                    |
 | V19     | order shift_id (FK work_shift)             |
+| V20     | work_shift open unique index               |
+| V21     | order shift_id NOT NULL                     |
+| V22     | push_subscription + order push_subscription_id |
 
 Toda migración nueva debe ser la siguiente versión disponible en esta tabla.
 Actualizar esta tabla al agregar una migración.

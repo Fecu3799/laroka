@@ -75,6 +75,10 @@ cache:
   menu:
     ttl-seconds: ${CACHE_MENU_TTL_SECONDS:600}
 
+vapid:
+  public-key: ${VAPID_PUBLIC_KEY:}
+  private-key: ${VAPID_PRIVATE_KEY:}
+
 swagger:
   enabled: ${APP_DEV_SWAGGER_ENABLED:${APP_DEV_MODE:false}}
 

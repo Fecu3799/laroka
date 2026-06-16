@@ -53,6 +53,8 @@ public class SecurityConfig {
 				.requestMatchers(HttpMethod.POST, "/orders/*/cancel").permitAll()
 				.requestMatchers(HttpMethod.POST, "/payments/initiate").permitAll()
 				.requestMatchers(HttpMethod.POST, "/payments/webhook").permitAll()
+				.requestMatchers(HttpMethod.POST, "/push/subscribe").permitAll()
+				.requestMatchers(HttpMethod.DELETE, "/push/subscribe").permitAll()
 				.requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
 				.requestMatchers(HttpMethod.POST, "/auth/login").permitAll()
 				.requestMatchers(HttpMethod.POST, "/auth/refresh").permitAll()
