@@ -136,6 +136,8 @@ class OrderServiceTest {
         when(productRepository.findById(product.getId())).thenReturn(Optional.of(product));
         when(branchProductRepository.findByBranchIdAndProductId(branch.getId(), product.getId()))
                 .thenReturn(Optional.empty());
+        when(workShiftRepository.findByBranchIdAndStatus(branch.getId(), ShiftStatus.OPEN))
+                .thenReturn(Optional.of(WorkShift.builder().id(UUID.randomUUID()).build()));
         when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
         when(orderRepository.findByIdWithDetails(any())).thenReturn(Optional.of(minimalSavedOrder(OrderStatus.PENDING_PAYMENT)));
     }
@@ -174,6 +176,8 @@ class OrderServiceTest {
         when(branchService.isOpen(1)).thenReturn(true);
         when(productRepository.findById(1)).thenReturn(Optional.of(product));
         when(branchProductRepository.findByBranchIdAndProductId(1, 1)).thenReturn(Optional.of(bp));
+        when(workShiftRepository.findByBranchIdAndStatus(branch.getId(), ShiftStatus.OPEN))
+                .thenReturn(Optional.of(WorkShift.builder().id(UUID.randomUUID()).build()));
         when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
         when(orderRepository.findByIdWithDetails(any())).thenReturn(Optional.of(minimalSavedOrder(OrderStatus.PENDING_PAYMENT)));
 
@@ -242,20 +246,25 @@ class OrderServiceTest {
     }
 
     @Test
-    void createOrder_noActiveShift_leavesShiftNull() {
+    void createOrder_noActiveShift_throwsBusinessException() {
         Tenant p = tenant();
         Branch branch = branch(p);
         Product product = product(new BigDecimal("2800.00"));
-        stubBaseCreation(branch, product);
 
+        when(idempotencyStore.get(any())).thenReturn(Optional.empty());
+        when(branchRepository.findById(branch.getId())).thenReturn(Optional.of(branch));
+        when(branchService.isOpen(branch.getId())).thenReturn(true);
+        when(productRepository.findById(product.getId())).thenReturn(Optional.of(product));
+        when(branchProductRepository.findByBranchIdAndProductId(branch.getId(), product.getId()))
+                .thenReturn(Optional.empty());
         when(workShiftRepository.findByBranchIdAndStatus(branch.getId(), ShiftStatus.OPEN))
                 .thenReturn(Optional.empty());
 
-        service.createOrder(takeawayOrder(branch), List.of(itemFor(1, 1)), PaymentMethod.MERCADOPAGO, "key-shift-2");
-
-        ArgumentCaptor<Order> captor = ArgumentCaptor.forClass(Order.class);
-        verify(orderRepository).save(captor.capture());
-        assertThat(captor.getValue().getShift()).isNull();
+        assertThatThrownBy(() ->
+                service.createOrder(takeawayOrder(branch), List.of(itemFor(1, 1)), PaymentMethod.MERCADOPAGO, "key-shift-2"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("turno activo");
+        verify(orderRepository, never()).save(any());
     }
 
     // --- createOrder: validaciones ---

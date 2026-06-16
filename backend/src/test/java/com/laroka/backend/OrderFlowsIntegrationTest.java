@@ -13,14 +13,17 @@ import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
@@ -45,6 +48,7 @@ import io.jsonwebtoken.security.Keys;
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class OrderFlowsIntegrationTest {
 
     private static final String JWT_SECRET = "test-secret-minimum-32-chars-for-hmac256-ok";
@@ -57,8 +61,17 @@ class OrderFlowsIntegrationTest {
     @Autowired OrderRepository orderRepository;
     @Autowired PaymentRepository paymentRepository;
     @Autowired OrderStatusHistoryRepository historyRepository;
+    @Autowired JdbcTemplate jdbcTemplate;
 
     @MockitoBean PaymentGateway paymentGateway;
+
+    @BeforeAll
+    void setupShift() {
+        jdbcTemplate.execute("TRUNCATE TABLE work_shift CASCADE");
+        jdbcTemplate.update(
+            "INSERT INTO work_shift (id, branch_id, opened_by, opened_at, status) VALUES (?, ?, ?, CURRENT_TIMESTAMP, 'OPEN')",
+            UUID.randomUUID(), BRANCH_ID, STAFF_USER_ID);
+    }
 
     @BeforeEach
     void resetMocks() {

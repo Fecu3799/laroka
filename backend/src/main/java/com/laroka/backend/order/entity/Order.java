@@ -83,10 +83,8 @@ public class Order {
     @JoinColumn(name = "tenant_id", nullable = false)
     private Tenant tenant;
 
-    // Turno en el que se creó el pedido. Nullable: pedidos creados sin turno
-    // abierto (o datos previos a la migración V19) quedan con shift = null.
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "shift_id")
+    @JoinColumn(name = "shift_id", nullable = false)
     private WorkShift shift;
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
