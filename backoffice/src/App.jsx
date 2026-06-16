@@ -7,6 +7,7 @@ import BranchSelect from './pages/BranchSelect'
 import Orders from './pages/Orders'
 import OrderDetail from './pages/OrderDetail'
 import Summary from './pages/Summary'
+import History from './pages/History'
 import './App.css'
 
 function App() {
@@ -32,6 +33,7 @@ function App() {
             }
           >
             <Route path="/shifts/summary" element={<Summary />} />
+            <Route path="/shifts/history" element={<History />} />
             <Route path="/orders" element={<Orders />} />
             <Route path="/orders/:id" element={<OrderDetail />} />
           </Route>
