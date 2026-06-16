@@ -33,16 +33,9 @@ public interface OrderRepository extends JpaRepository<Order, UUID>, JpaSpecific
     @Query("SELECT o FROM Order o WHERE o.id IN :ids")
     List<Order> findByIdsWithItems(@Param("ids") Collection<UUID> ids);
 
-    List<Order> findByBranchIdAndStatusInAndCreatedAtBetween(
-            Integer branchId,
-            Collection<OrderStatus> statuses,
-            LocalDateTime from,
-            LocalDateTime to);
+    List<Order> findByShiftIdAndStatusIn(UUID shiftId, Collection<OrderStatus> statuses);
 
-    boolean existsByBranchIdAndStatusInAndCreatedAtGreaterThanEqual(
-            Integer branchId,
-            List<OrderStatus> statuses,
-            LocalDateTime from);
+    boolean existsByShiftIdAndStatusIn(UUID shiftId, Collection<OrderStatus> statuses);
 
     @EntityGraph(attributePaths = {"branch"})
     @Query("SELECT o FROM Order o WHERE o.id = :id")

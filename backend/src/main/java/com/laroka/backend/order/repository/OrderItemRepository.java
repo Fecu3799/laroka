@@ -1,6 +1,5 @@
 package com.laroka.backend.order.repository;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -22,14 +21,11 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, UUID> {
 
     @Query("SELECT oi.product.id, oi.product.name, SUM(oi.quantity) " +
            "FROM OrderItem oi " +
-           "WHERE oi.order.branch.id = :branchId " +
+           "WHERE oi.order.shift.id = :shiftId " +
            "AND oi.order.status = :status " +
-           "AND oi.order.createdAt BETWEEN :from AND :to " +
            "GROUP BY oi.product.id, oi.product.name " +
            "ORDER BY SUM(oi.quantity) DESC")
-    List<Object[]> findTopProducts(@Param("branchId") Integer branchId,
-                                   @Param("status") OrderStatus status,
-                                   @Param("from") LocalDateTime from,
-                                   @Param("to") LocalDateTime to,
-                                   Pageable pageable);
+    List<Object[]> findTopProductsByShiftId(@Param("shiftId") UUID shiftId,
+                                            @Param("status") OrderStatus status,
+                                            Pageable pageable);
 }

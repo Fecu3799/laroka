@@ -21,4 +21,4 @@ node_modules/
 
 # Terraform
 terraform/*.tfvars
-terraform/.terraform/
+terraform/.terraform/backend/src/test/resources/application-test.yml

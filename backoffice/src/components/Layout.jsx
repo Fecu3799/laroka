@@ -8,11 +8,24 @@ import SubHeader from './SubHeader'
 import { Toast } from './Toast'
 import { OrdersProvider } from '../context/OrdersContext'
 import { ShiftProvider } from '../context/ShiftContext'
+import { OperatorMessagesProvider } from '../context/OperatorMessagesContext'
 import './Layout.css'
 
 const API_URL = import.meta.env.VITE_API_URL ?? ''
 
 const NAV = [
+  {
+    to: '/orders',
+    end: true,
+    label: 'PEDIDOS',
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" stroke="currentColor" strokeWidth="1.8" />
+        <rect x="9" y="3" width="6" height="4" rx="1" stroke="currentColor" strokeWidth="1.8" />
+        <path d="M9 12h6M9 16h4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      </svg>
+    ),
+  },
   {
     to: '/shifts/summary',
     label: 'RESUMEN',
@@ -32,18 +45,6 @@ const NAV = [
         <path d="M3 3v5h5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
         <path d="M3 8C4.6 4.4 8.5 2 13 2a10 10 0 1 1-9.9 11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
         <path d="M13 7v5l3 2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-      </svg>
-    ),
-  },
-  {
-    to: '/orders',
-    end: true,
-    label: 'PEDIDOS',
-    icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" stroke="currentColor" strokeWidth="1.8" />
-        <rect x="9" y="3" width="6" height="4" rx="1" stroke="currentColor" strokeWidth="1.8" />
-        <path d="M9 12h6M9 16h4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
       </svg>
     ),
   },
@@ -243,13 +244,15 @@ export default function Layout() {
         </header>
 
         <ShiftProvider>
-          <SubHeader />
+          <OperatorMessagesProvider>
+            <SubHeader />
 
-          <main className="layout-main">
-            <OrdersProvider setOpenOrderId={setOpenOrderId}>
-              <Outlet context={{ newOrderCount, cancelCount, resetCounts, setOpenOrderId }} />
-            </OrdersProvider>
-          </main>
+            <main className="layout-main">
+              <OrdersProvider setOpenOrderId={setOpenOrderId}>
+                <Outlet context={{ newOrderCount, cancelCount, resetCounts, setOpenOrderId }} />
+              </OrdersProvider>
+            </main>
+          </OperatorMessagesProvider>
         </ShiftProvider>
       </div>
 

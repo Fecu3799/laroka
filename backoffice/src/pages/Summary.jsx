@@ -2,6 +2,7 @@ import { useState } from 'react'
 import useShiftSummary from '../hooks/useShiftSummary'
 import { useShift } from '../context/ShiftContext'
 import { useOrdersContext } from '../context/OrdersContext'
+import useOperatorMessages from '../hooks/useOperatorMessages'
 import {
   formatDuration,
   formatCurrency,
@@ -169,6 +170,7 @@ export default function Summary() {
   const { state, loading, error } = useShiftSummary()
   const { shift, closeShift } = useShift()
   const { orders, clearOrders } = useOrdersContext()
+  const { addMessage } = useOperatorMessages()
 
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [closing, setClosing] = useState(false)
@@ -186,7 +188,11 @@ export default function Summary() {
     } catch (err) {
       // 422 por pedidos activos / recepción habilitada: mostramos el mensaje del
       // backend en el modal y no cerramos.
-      setCloseError(err?.message ?? 'No se pudo cerrar el turno.')
+      const msg = err?.message ?? 'No se pudo cerrar el turno.'
+      setCloseError(msg)
+      if (err?.status === 422 && msg.toLowerCase().includes('pedidos activos')) {
+        addMessage({ type: 'danger', text: msg })
+      }
     } finally {
       setClosing(false)
     }
