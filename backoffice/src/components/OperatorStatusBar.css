@@ -1,0 +1,255 @@
+/* ── OperatorStatusBar (US-08-F-10) ─────────────────────────────── */
+
+/* ── Bar ─────────────────────────────────────────────────────────── */
+
+.osb-bar {
+  position: sticky;
+  bottom: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 1.25rem;
+  height: 30px;
+  border-top: 1px solid transparent;
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  cursor: pointer;
+  flex-shrink: 0;
+  user-select: none;
+  transition: background 0.15s ease;
+  overflow: hidden;
+}
+
+.osb-bar:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* Type modifiers — bar */
+.osb-bar.osb--info {
+  background: color-mix(in srgb, var(--color-success) 5%, transparent);
+  border-top-color: color-mix(in srgb, var(--color-success) 12%, transparent);
+  color: color-mix(in srgb, var(--color-success) 75%, transparent);
+}
+
+.osb-bar.osb--warning {
+  background: color-mix(in srgb, var(--color-warning) 8%, transparent);
+  border-top-color: color-mix(in srgb, var(--color-warning) 18%, transparent);
+  color: var(--color-warning);
+}
+
+.osb-bar.osb--danger {
+  background: color-mix(in srgb, var(--color-danger) 8%, transparent);
+  border-top-color: color-mix(in srgb, var(--color-danger) 18%, transparent);
+  color: var(--color-danger);
+}
+
+/* ── Dot ─────────────────────────────────────────────────────────── */
+
+.osb-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+.osb-dot--sm {
+  width: 5px;
+  height: 5px;
+}
+
+/* ── Text (with enter animation on key change) ───────────────────── */
+
+.osb-text-wrapper {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+}
+
+@keyframes osb-slide-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.osb-text {
+  animation: osb-slide-in 0.22s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Inline action button ────────────────────────────────────────── */
+
+.osb-inline-action {
+  flex-shrink: 0;
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  background: transparent;
+  border: none;
+  color: currentColor;
+  cursor: pointer;
+  padding: 0;
+  opacity: 0.9;
+  transition: opacity 0.12s ease;
+}
+
+.osb-inline-action:hover { opacity: 1; }
+
+/* ── More indicator ──────────────────────────────────────────────── */
+
+.osb-more {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 600;
+  opacity: 0.65;
+}
+
+/* ── Panel overlay ───────────────────────────────────────────────── */
+
+.osb-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  display: flex;
+  align-items: flex-end;
+  justify-content: stretch;
+  background: color-mix(in srgb, var(--color-bg) 55%, transparent);
+  backdrop-filter: blur(1px);
+}
+
+/* ── Panel ───────────────────────────────────────────────────────── */
+
+.osb-panel {
+  width: 100%;
+  background: var(--color-sidebar-bg);
+  border-top: 1px solid color-mix(in srgb, var(--border) 25%, transparent);
+  display: flex;
+  flex-direction: column;
+  animation: osb-panel-in 0.2s ease;
+}
+
+@keyframes osb-panel-in {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+.osb-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 18%, transparent);
+}
+
+.osb-panel-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.osb-panel-close {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  border: 1px solid color-mix(in srgb, var(--border) 25%, transparent);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s ease;
+}
+
+.osb-panel-close:hover {
+  background: color-mix(in srgb, var(--border) 12%, transparent);
+  color: var(--text-primary);
+}
+
+/* ── Panel list ──────────────────────────────────────────────────── */
+
+.osb-panel-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.osb-panel-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 20px;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 10%, transparent);
+}
+
+.osb-panel-item:last-child { border-bottom: none; }
+
+/* Type modifiers — panel item text color */
+.osb-panel-item.osb--info    { color: color-mix(in srgb, var(--color-success) 80%, var(--text-secondary)); }
+.osb-panel-item.osb--warning { color: var(--color-warning); }
+.osb-panel-item.osb--danger  { color: var(--color-danger); }
+
+.osb-panel-item-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.osb-panel-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* ── Panel action button (warning) ──────────────────────────────── */
+
+.osb-panel-action-btn {
+  padding: 5px 12px;
+  border-radius: 7px;
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  background: color-mix(in srgb, var(--color-warning) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-warning) 35%, transparent);
+  color: var(--color-warning);
+  transition: background 0.12s ease;
+}
+
+.osb-panel-action-btn:hover {
+  background: color-mix(in srgb, var(--color-warning) 22%, transparent);
+}
+
+/* ── Panel dismiss button (danger) ──────────────────────────────── */
+
+.osb-panel-dismiss-btn {
+  padding: 5px 12px;
+  border-radius: 7px;
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--color-danger) 30%, transparent);
+  color: var(--color-danger);
+  transition: background 0.12s ease;
+}
+
+.osb-panel-dismiss-btn:hover {
+  background: color-mix(in srgb, var(--color-danger) 10%, transparent);
+}

@@ -127,8 +127,8 @@ class WorkShiftServiceTest {
         when(branchRepository.findById(1)).thenReturn(Optional.of(branch));
         when(workShiftRepository.findByBranchIdAndStatus(1, ShiftStatus.OPEN))
             .thenReturn(Optional.of(existing));
-        when(orderRepository.findByBranchIdAndStatusInAndCreatedAtBetween(
-            eq(1), anyCollection(), any(), any()))
+        when(orderRepository.findByShiftIdAndStatusIn(
+            eq(existing.getId()), anyCollection()))
             .thenReturn(List.of(deliveredOrder));
         when(paymentRepository.findByOrderIdIn(anyCollection()))
             .thenReturn(List.of(payment));
@@ -165,8 +165,8 @@ class WorkShiftServiceTest {
         when(branchRepository.findById(1)).thenReturn(Optional.of(branch));
         when(workShiftRepository.findByBranchIdAndStatus(1, ShiftStatus.OPEN))
             .thenReturn(Optional.of(existing));
-        when(orderRepository.findByBranchIdAndStatusInAndCreatedAtBetween(
-            eq(1), anyCollection(), any(), any()))
+        when(orderRepository.findByShiftIdAndStatusIn(
+            eq(existing.getId()), anyCollection()))
             .thenReturn(List.of());
         when(workShiftRepository.save(any(WorkShift.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -205,8 +205,8 @@ class WorkShiftServiceTest {
         when(workShiftRepository.findByBranchIdAndStatus(1, ShiftStatus.OPEN))
             .thenReturn(Optional.of(shift));
         when(branchRepository.findById(1)).thenReturn(Optional.of(branch));
-        when(orderRepository.findByBranchIdAndStatusInAndCreatedAtBetween(
-            eq(1), anyCollection(), any(), any()))
+        when(orderRepository.findByShiftIdAndStatusIn(
+            eq(shift.getId()), anyCollection()))
             .thenReturn(List.of(delivered1, delivered2, cancelled));
         when(paymentRepository.findByOrderIdIn(anyCollection()))
             .thenReturn(List.of(payment1, payment2));
@@ -239,8 +239,8 @@ class WorkShiftServiceTest {
         when(workShiftRepository.findByBranchIdAndStatus(1, ShiftStatus.OPEN))
             .thenReturn(Optional.of(shift));
         when(branchRepository.findById(1)).thenReturn(Optional.of(branch));
-        when(orderRepository.findByBranchIdAndStatusInAndCreatedAtBetween(
-            eq(1), anyCollection(), any(), any()))
+        when(orderRepository.findByShiftIdAndStatusIn(
+            eq(shift.getId()), anyCollection()))
             .thenReturn(List.of());
 
         // No lanza excepción: devuelve wasEmpty=true para que la transacción
@@ -350,8 +350,8 @@ class WorkShiftServiceTest {
         when(workShiftRepository.findByBranchIdAndStatus(1, ShiftStatus.OPEN))
             .thenReturn(Optional.of(shift));
         when(branchRepository.findById(1)).thenReturn(Optional.of(branch));
-        when(orderRepository.existsByBranchIdAndStatusInAndCreatedAtGreaterThanEqual(
-            eq(1), any(), any()))
+        when(orderRepository.existsByShiftIdAndStatusIn(
+            eq(shift.getId()), any()))
             .thenReturn(true);
 
         assertThatThrownBy(() -> workShiftService.closeShift(1, 10))
@@ -382,8 +382,8 @@ class WorkShiftServiceTest {
 
         when(workShiftRepository.findByBranchIdAndStatus(1, ShiftStatus.OPEN))
             .thenReturn(Optional.of(shift));
-        when(orderRepository.findByBranchIdAndStatusInAndCreatedAtBetween(
-            eq(1), anyCollection(), any(), any()))
+        when(orderRepository.findByShiftIdAndStatusIn(
+            eq(shift.getId()), anyCollection()))
             .thenReturn(List.of(delivered));
         when(paymentRepository.findByOrderIdIn(anyCollection()))
             .thenReturn(List.of(payment));
@@ -418,7 +418,7 @@ class WorkShiftServiceTest {
         );
 
         when(workShiftRepository.findById(shiftId)).thenReturn(Optional.of(shift));
-        when(orderItemRepository.findTopProducts(eq(1), eq(OrderStatus.DELIVERED), any(), any(), any()))
+        when(orderItemRepository.findTopProductsByShiftId(eq(shiftId), eq(OrderStatus.DELIVERED), any()))
             .thenReturn(rawRows);
 
         List<TopProductDTO> result = workShiftService.getTopProducts(shiftId, 1);
@@ -521,8 +521,8 @@ class WorkShiftServiceTest {
         when(workShiftRepository.findByBranchIdAndStatus(1, ShiftStatus.OPEN))
             .thenReturn(Optional.of(shift));
         when(branchRepository.findById(1)).thenReturn(Optional.of(branch));
-        when(orderRepository.findByBranchIdAndStatusInAndCreatedAtBetween(
-            eq(1), anyCollection(), any(), any()))
+        when(orderRepository.findByShiftIdAndStatusIn(
+            eq(shift.getId()), anyCollection()))
             .thenReturn(List.of(delivered));
         when(paymentRepository.findByOrderIdIn(anyCollection()))
             .thenReturn(List.of(payment));
