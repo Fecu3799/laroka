@@ -15,6 +15,16 @@
 | Resolución  | Esperar actualización de `vite-plugin-pwa` que actualice `workbox-build`. No usar `npm audit fix --force` — instalaría una versión anterior del plugin y rompería la configuración PWA. |
 | Momento     | Resolver antes del lanzamiento a producción                             |
 
+## DT-03 — push_subscription.order_id deberá migrar a customer_id
+
+**Estado:** Pendiente  
+**US relacionada:** US-EV-01 (registro de clientes)  
+**Descripción:** La tabla `push_subscription` asocia la suscripción al `order_id` (pedido). El modelo correcto a largo plazo es asociarla al cliente registrado (`customer_id`). Actualmente no existe entidad de cliente, por lo que el vínculo por pedido es la solución pragmática.  
+**Impacto:** Cuando se implemente US-EV-01, las suscripciones push deberán migrarse a `customer_id` y el campo `order_id` deprecarse.  
+**Momento:** Resolver al implementar US-EV-01.
+
+---
+
 ## MP Webhook Signature Validation — Sandbox Only
 
 **Estado:** Workaround activo  
