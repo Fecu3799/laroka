@@ -11,5 +11,25 @@ services:
     volumes:
       - laroka-postgres-data:/var/lib/postgresql/data
 
+  # Base de datos efímera para la suite de tests (perfil "test" del backend).
+  # Aislada del postgres de desarrollo: otro puerto, otra DB y datos en tmpfs
+  # (se descartan al detener el contenedor, evitando estado sucio entre corridas).
+  postgres-test:
+    image: postgres:16
+    container_name: laroka-postgres-test
+    environment:
+      POSTGRES_DB: laroka_test
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "55432:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d laroka_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
 volumes:
   laroka-postgres-data:

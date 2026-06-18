@@ -1,6 +1,7 @@
 package com.laroka.backend.order.dto;
 
 import java.util.List;
+import java.util.UUID;
 
 import com.laroka.backend.order.entity.OrderOrigin;
 import com.laroka.backend.order.entity.OrderType;
@@ -37,4 +38,8 @@ public class CreateOrderRequestDTO {
     private PaymentMethod paymentMethod;
 
     private OrderOrigin origin = OrderOrigin.CLIENT;
+
+    // Opcional (US-09-02): id de la suscripción Web Push del dispositivo. Si no
+    // viene o no existe en push_subscription, el pedido se crea igual sin vínculo.
+    private UUID pushSubscriptionId;
 }
