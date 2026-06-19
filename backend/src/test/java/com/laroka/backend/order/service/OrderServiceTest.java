@@ -73,6 +73,7 @@ class OrderServiceTest {
     @Mock private OrderMapper orderMapper;
     @Mock private WorkShiftRepository workShiftRepository;
     @Mock private com.laroka.backend.notification.repository.PushSubscriptionRepository pushSubscriptionRepository;
+    @Mock private com.laroka.backend.notification.service.PushNotificationService pushNotificationService;
 
     @InjectMocks
     private OrderService service;
