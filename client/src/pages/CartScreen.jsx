@@ -3,6 +3,8 @@ import { CheckoutScreen } from './CheckoutScreen'
 import { ConfirmationScreen } from './ConfirmationScreen'
 import { PendingPaymentModal } from '../features/payment/PaymentModals'
 import { usePreferredBranch } from '../hooks/usePreferredBranch'
+import { usePushSubscription } from '../hooks/usePushSubscription'
+import { PushPermissionSheet } from '../components/PushPermissionSheet'
 import { addActiveOrder } from '../utils/activeOrders'
 import { initiatePayment } from '../services/paymentsService'
 import { apiFetch } from '../services/http'
@@ -143,6 +145,14 @@ function ExtraCard({ extra, cartQty, onAdd }) {
 
 export function CartScreen({ items, extras = [], onBack, onRemove, onUpdateQty, onClear, onAddExtra, paymentFailure = null, onPaymentFailureConsumed = () => {}, pendingPayment = null, onPendingPaymentConsumed = () => {} }) {
   const { preferredBranchId } = usePreferredBranch()
+  const {
+    sheet: pushSheet,
+    acceptSheet: acceptPushSheet,
+    dismissSheet: dismissPushSheet,
+    getOrCreateSubscription,
+    requestPermissionAndSubscribe,
+    showInstallInstructions,
+  } = usePushSubscription()
   const [confirmClear, setConfirmClear] = useState(false)
   const [showCheckout, setShowCheckout] = useState(() => !!paymentFailure)
   const [confirmedOrderId, setConfirmedOrderId] = useState(null)
@@ -179,7 +189,33 @@ export function CartScreen({ items, extras = [], onBack, onRemove, onUpdateQty, 
     } catch { /* fetch fallido — usuario ve el checkout sin cambios */ }
   }, [onClear])
 
+  // Decide, según soporte/permiso/plataforma, cómo obtener el subscriptionId
+  // antes de crear el pedido. Nunca bloquea ni lanza: si no hay push, retorna null.
+  const resolvePushSubscriptionId = async () => {
+    if (typeof Notification === 'undefined') return null
+
+    // US-09-F-04: en iOS el Web Push solo funciona desde la PWA instalada en la
+    // pantalla de inicio. Si la app corre en Safari (no standalone) sobre
+    // iPhone/iPad, la suscripción es imposible: mostramos las instrucciones de
+    // instalación paso a paso y NO llamamos a requestPermission() — en iOS Safari
+    // fallaría en silencio. El sheet se autolimita a una vez por sesión
+    // (ver showInstallInstructions en usePushSubscription).
+    const ua = navigator.userAgent.toLowerCase()
+    const iosNotInstalled = !navigator.standalone && /iphone|ipad/i.test(ua)
+    if (iosNotInstalled) {
+      await showInstallInstructions()
+      return null
+    }
+
+    const permission = Notification.permission
+    if (permission === 'denied') return null
+    if (permission === 'granted') return getOrCreateSubscription()
+    // permission === 'default'
+    return requestPermissionAndSubscribe()
+  }
+
   const handleConfirm = async (formData) => {
+    const pushSubscriptionId = await resolvePushSubscriptionId()
     const payload = {
       branchId: preferredBranchId,
       orderType: formData.orderType === 'delivery' ? 'DELIVERY' : 'TAKEAWAY',
@@ -189,6 +225,7 @@ export function CartScreen({ items, extras = [], onBack, onRemove, onUpdateQty, 
       customerPhone: formData.telefono || null,
       paymentMethod: formData.paymentMethod,
       items: items.map(i => ({ productId: i.id, quantity: i.qty })),
+      ...(pushSubscriptionId ? { pushSubscriptionId } : {}),
     }
     const res = await apiFetch(`${API_BASE}/orders`, {
       method: 'POST',
@@ -251,6 +288,12 @@ export function CartScreen({ items, extras = [], onBack, onRemove, onUpdateQty, 
             }}
           />
         )}
+        <PushPermissionSheet
+          open={pushSheet.open}
+          variant={pushSheet.variant}
+          onAccept={acceptPushSheet}
+          onDismiss={dismissPushSheet}
+        />
       </>
     )
   }

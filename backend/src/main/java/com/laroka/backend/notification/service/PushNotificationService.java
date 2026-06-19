@@ -2,11 +2,9 @@ package com.laroka.backend.notification.service;
 
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
-import java.security.Security;
 import java.util.Optional;
 
 import org.apache.http.HttpResponse;
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -34,14 +32,6 @@ import nl.martijndwars.webpush.PushService;
 public class PushNotificationService {
 
     private static final String TITLE = "LaRoka";
-
-    static {
-        // web-push usa el provider "BC" para cargar la clave pública del cliente
-        // y cifrar el payload, pero no lo registra por su cuenta.
-        if (Security.getProvider(BouncyCastleProvider.PROVIDER_NAME) == null) {
-            Security.addProvider(new BouncyCastleProvider());
-        }
-    }
 
     private final PushSubscriptionRepository pushSubscriptionRepository;
     private final PushSubscriptionService pushSubscriptionService;
