@@ -1,0 +1,116 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 1100;
+  animation: push-sheet-fade 0.2s ease;
+}
+
+.sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1101;
+  background: var(--bg-card-product);
+  border-top: 1px solid color-mix(in srgb, var(--border) 25%, transparent);
+  border-radius: 20px 20px 0 0;
+  padding: 12px 24px calc(28px + env(safe-area-inset-bottom)) 24px;
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+  animation: push-sheet-up 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.handle {
+  width: 40px;
+  height: 4px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--text-primary) 22%, transparent);
+  margin-bottom: 6px;
+}
+
+.iconWrapper {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700;
+  font-size: 23px;
+  line-height: 1.15;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.message {
+  font-family: 'Inria Sans', sans-serif;
+  font-size: 15px;
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.steps {
+  font-family: 'Inria Sans', sans-serif;
+  font-size: 14px;
+  color: var(--text-secondary);
+  text-align: left;
+  margin: 4px 0 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-self: stretch;
+  line-height: 1.45;
+}
+
+.btnPrimary {
+  width: 100%;
+  padding: 13px;
+  border-radius: 12px;
+  border: none;
+  background: var(--accent);
+  color: var(--bg-primary);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  margin-top: 6px;
+}
+
+.btnSecondary {
+  background: none;
+  border: none;
+  font-family: 'Inria Sans', sans-serif;
+  font-size: 14px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 4px 8px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+@keyframes push-sheet-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes push-sheet-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
