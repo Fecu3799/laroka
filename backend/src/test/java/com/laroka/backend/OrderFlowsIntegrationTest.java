@@ -44,7 +44,13 @@ import com.laroka.backend.order.entity.OrderStatusHistory;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
+@SpringBootTest(
+    webEnvironment = SpringBootTest.WebEnvironment.MOCK,
+    // El chequeo de horarios de sucursal corre contra el reloj real; en CI esto
+    // rechaza la creación de pedidos (422). Lo deshabilitamos para este test de
+    // flujo. Se define acá (no en application-test.yml) porque ese archivo está
+    // gitignored y no llega a CI.
+    properties = "order.bypass-branch-hours=true")
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
