@@ -5,6 +5,30 @@ const OPTIN_KEY = 'laroka_push_optin_shown'
 const INSTALL_KEY = 'laroka_push_install_shown'
 
 /**
+ * Convierte una clave VAPID pública en Base64 URL-safe (sin padding) al
+ * Uint8Array de bytes crudos que `pushManager.subscribe()` espera como
+ * `applicationServerKey`.
+ *
+ * Pasar el string crudo no es fiable entre browsers: la suscripción puede
+ * quedar firmada con una clave distinta a la que el backend usa para firmar el
+ * push → 403 de FCM al enviar. Convertir explícitamente garantiza los mismos 65
+ * bytes EC P-256 (0x04 + X + Y) que el backend decodifica de la misma Base64.
+ *
+ * Solo traduce los dos caracteres URL-safe (`-`→`+`, `_`→`/`) y re-agrega el
+ * padding; no altera ningún otro carácter.
+ */
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
+  const rawData = atob(base64)
+  const outputArray = new Uint8Array(rawData.length)
+  for (let i = 0; i < rawData.length; i++) {
+    outputArray[i] = rawData.charCodeAt(i)
+  }
+  return outputArray
+}
+
+/**
  * Encapsula la lógica de suscripción Web Push para clientes anónimos
  * (US-09-F-01 / US-09-F-02). La suscripción es por dispositivo/browser.
  *
@@ -52,9 +76,10 @@ export function usePushSubscription() {
         if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return null
         const vapidPublicKey = import.meta.env.VITE_VAPID_PUBLIC_KEY
         if (!vapidPublicKey) return null
+        const applicationServerKey = urlBase64ToUint8Array(vapidPublicKey)
         subscription = await registration.pushManager.subscribe({
           userVisibleOnly: true,
-          applicationServerKey: vapidPublicKey,
+          applicationServerKey,
         })
       }
 

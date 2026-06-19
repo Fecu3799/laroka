@@ -1,7 +1,9 @@
 package com.laroka.backend.shared.config;
 
 import java.security.GeneralSecurityException;
+import java.security.Security;
 
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -46,7 +48,16 @@ public class VapidConfig {
      */
     @Bean
     public PushService pushService() throws GeneralSecurityException {
-        PushService pushService = new PushService();
+        // web-push usa el provider "BC" para decodificar/cargar las claves VAPID,
+        // pero no lo registra por su cuenta. Hay que hacerlo ANTES de construir el
+        // PushService, ya que este bean se instancia antes que PushNotificationService.
+        if (Security.getProvider(BouncyCastleProvider.PROVIDER_NAME) == null) {
+            Security.addProvider(new BouncyCastleProvider());
+        }
+
+        // Subclase que corrige el padding del header Crypto-Key (issue #212 de
+        // web-push) para que Chrome/FCM no responda 403. Ver CryptoKeyPaddingFixPushService.
+        PushService pushService = new CryptoKeyPaddingFixPushService();
         if (isConfigured()) {
             pushService.setPublicKey(publicKey);
             pushService.setPrivateKey(privateKey);

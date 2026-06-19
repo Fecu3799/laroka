@@ -120,6 +120,15 @@
 			<artifactId>httpcore</artifactId>
 			<version>4.4.16</version>
 		</dependency>
+		<!-- CryptoKeyPaddingFixPushService sobreescribe preparePost(), cuyo tipo de
+		     retorno org.apache.http.client.methods.HttpPost vive en httpclient (no
+		     httpcore). Llega como transitiva runtime de web-push; la subimos a
+		     compile para referenciar HttpPost al corregir el header Crypto-Key. -->
+		<dependency>
+			<groupId>org.apache.httpcomponents</groupId>
+			<artifactId>httpclient</artifactId>
+			<version>4.5.14</version>
+		</dependency>
 		<!-- send() declara throws JoseException (checked); jose4j es runtime en
 		     web-push, lo subimos a compile para poder invocarlo. -->
 		<dependency>

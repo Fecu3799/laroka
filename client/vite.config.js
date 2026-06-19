@@ -1,16 +1,17 @@
-import { defineConfig, loadEnv } from 'vite'
+import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
-export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd(), '')
-  const apiBase = env.VITE_API_URL || 'http://localhost:8080'
-  const escapedApiBase = apiBase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-
+export default defineConfig(() => {
   return {
     plugins: [
       react(),
       VitePWA({
+        // injectManifest permite un SW custom (handlers push/notificationclick,
+        // US-09-F-03). El runtimeCaching que antes vivía acá ahora está en src/sw.js.
+        strategies: 'injectManifest',
+        srcDir: 'src',
+        filename: 'sw.js',
         registerType: 'autoUpdate',
         manifest: {
           name: 'LaRoka Pizzería',
@@ -21,33 +22,13 @@ export default defineConfig(({ mode }) => {
           display: 'standalone',
           start_url: '/',
           scope: '/',
-        },
-        workbox: {
-          runtimeCaching: [
-            {
-              urlPattern: ({ request }) => request.destination === 'image',
-              handler: 'CacheFirst',
-              options: {
-                cacheName: 'laroka-images',
-                expiration: {
-                  maxEntries: 150,
-                  maxAgeSeconds: 7 * 24 * 60 * 60,
-                },
-              },
-            },
-            {
-              urlPattern: new RegExp(`^${escapedApiBase}`),
-              handler: 'NetworkFirst',
-              options: {
-                cacheName: 'laroka-api',
-                networkTimeoutSeconds: 10,
-                expiration: {
-                  maxEntries: 50,
-                  maxAgeSeconds: 5 * 60,
-                },
-              },
-            },
+          icons: [
+            { src: '/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
+            { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
           ],
+        },
+        injectManifest: {
+          globPatterns: ['**/*.{js,css,html,svg,ico,woff,woff2}'],
         },
       }),
     ],

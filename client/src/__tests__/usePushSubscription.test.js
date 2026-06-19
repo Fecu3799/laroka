@@ -35,7 +35,13 @@ describe('usePushSubscription', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     sessionStorage.clear()
-    vi.stubEnv('VITE_VAPID_PUBLIC_KEY', 'test-vapid-public-key')
+    // Clave VAPID ficticia con formato Base64 URL-safe válido (decodifica a 65
+    // bytes), sin valor criptográfico — solo para que urlBase64ToUint8Array
+    // funcione sin error. No es la clave real del proyecto.
+    vi.stubEnv(
+      'VITE_VAPID_PUBLIC_KEY',
+      'BDBVep_E6Q4zWH2ix-wRNluApcrvFDleg6jN8hc8YYar0PUaP2SJrtP4HUJnjLHW-yBFao-02f4jSG2St9wBJks=',
+    )
   })
 
   afterEach(() => {
@@ -65,10 +71,13 @@ describe('usePushSubscription', () => {
       let id
       await act(async () => { id = await result.current.getOrCreateSubscription() })
 
-      expect(subscribe).toHaveBeenCalledWith({
-        userVisibleOnly: true,
-        applicationServerKey: 'test-vapid-public-key',
-      })
+      // applicationServerKey debe pasarse como Uint8Array (bytes EC crudos),
+      // nunca como string Base64: pasar el string produce, en algunos browsers,
+      // una suscripción firmada con otra clave → 403 de FCM.
+      const call = subscribe.mock.calls[0][0]
+      expect(call.userVisibleOnly).toBe(true)
+      expect(call.applicationServerKey).toBeInstanceOf(Uint8Array)
+      expect(call.applicationServerKey.length).toBeGreaterThan(0)
       expect(id).toBe(SUB_ID)
     })
 
