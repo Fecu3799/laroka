@@ -192,8 +192,6 @@ export function CartScreen({ items, extras = [], onBack, onRemove, onUpdateQty, 
   // Decide, según soporte/permiso/plataforma, cómo obtener el subscriptionId
   // antes de crear el pedido. Nunca bloquea ni lanza: si no hay push, retorna null.
   const resolvePushSubscriptionId = async () => {
-    if (typeof Notification === 'undefined') return null
-
     // US-09-F-04: en iOS el Web Push solo funciona desde la PWA instalada en la
     // pantalla de inicio. Si la app corre en Safari (no standalone) sobre
     // iPhone/iPad, la suscripción es imposible: mostramos las instrucciones de
@@ -206,6 +204,8 @@ export function CartScreen({ items, extras = [], onBack, onRemove, onUpdateQty, 
       await showInstallInstructions()
       return null
     }
+
+    if (typeof Notification === 'undefined') return null
 
     const permission = Notification.permission
     if (permission === 'denied') return null
