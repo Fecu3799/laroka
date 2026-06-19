@@ -195,6 +195,24 @@ describe('CartScreen — iOS Safari no instalado (US-09-F-04)', () => {
     expect(globalThis.Notification.requestPermission).not.toHaveBeenCalled()
   })
 
+  it('muestra las instrucciones aunque la API Notification no exista (iOS Safari sin PWA)', async () => {
+    const user = userEvent.setup()
+    // Caso real del bug: en iOS Safari sin instalar, la API Notification no
+    // existe. La detección de iOS debe correr ANTES del chequeo de soporte, o el
+    // sheet de instalación nunca se mostraría.
+    delete globalThis.Notification
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ acceptingOrders: true }),
+    })
+
+    renderCart(ITEMS, { paymentFailure: FAILURE_DATA })
+
+    await user.click(screen.getByRole('button', { name: /confirmar pedido/i }))
+
+    expect(await screen.findByText(INSTALL_TEXT)).toBeInTheDocument()
+  })
+
   it('no reabre las instrucciones si ya se mostraron en la sesión y crea el pedido', async () => {
     const user = userEvent.setup()
     // Marca de "ya mostrado en esta sesión".
