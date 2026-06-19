@@ -7,17 +7,21 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer.HstsConfig;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy;
+import org.springframework.security.web.header.writers.StaticHeadersWriter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -42,6 +46,24 @@ public class SecurityConfig {
 	SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 		http
 			.cors(cors -> cors.configurationSource(corsConfigurationSource()))
+			// US-SEC-01: headers de seguridad HTTP en todas las respuestas.
+			.headers(headers -> headers
+				// X-Frame-Options: DENY — anti-clickjacking (default de Spring, explícito).
+				.frameOptions(frame -> frame.deny())
+				// X-Content-Type-Options: nosniff (default de Spring, explícito).
+				.contentTypeOptions(Customizer.withDefaults())
+				// Referrer-Policy: strict-origin-when-cross-origin.
+				.referrerPolicy(referrer -> referrer.policy(ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
+				// Permissions-Policy: deshabilita geolocation, camera y microphone.
+				.permissionsPolicyHeader(permissions -> permissions.policy("geolocation=(), camera=(), microphone=()"))
+				// HSTS: el writer por defecto solo emite sobre HTTPS y con formato
+				// "max-age=... ; includeSubDomains" (espacios alrededor del ';'). En
+				// producción la app corre detrás del proxy TLS de Render (ve HTTP), así
+				// que lo desactivamos y emitimos el valor exacto en toda respuesta.
+				.httpStrictTransportSecurity(HstsConfig::disable)
+				.addHeaderWriter(new StaticHeadersWriter(
+					"Strict-Transport-Security", "max-age=31536000; includeSubDomains"))
+			)
 			.csrf(AbstractHttpConfigurer::disable)
 			.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 			.authorizeHttpRequests(auth -> auth
