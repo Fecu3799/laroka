@@ -3,7 +3,10 @@ package com.laroka.backend.notification.service;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -32,12 +35,11 @@ import nl.martijndwars.webpush.PushService;
 @ExtendWith(MockitoExtension.class)
 class PushNotificationServiceTest {
 
-    // Par p256dh/auth de ejemplo válido (punto EC P-256 sin comprimir) usado
-    // habitualmente en suites de prueba de Web Push. Debe ser válido porque el
-    // constructor de Notification decodifica la clave antes de enviar.
-    private static final String P256DH =
-            "BNcRdreALRFXTkOOUHK1EtK2wtaz5Ry4YfYCA_0QTpQtUbVlUls0VJXg7A8u-Ts1XbjhazAkj7I99e8QcYP7DkM";
-    private static final String AUTH = "tBHItJI5svbpez7KI4CCXg";
+    // Placeholders ficticios: la construcción real de la Notification (que sí
+    // decodifica criptográficamente la clave EC) se sustituye con un spy sobre
+    // buildNotification, así que estos valores nunca se decodifican.
+    private static final String P256DH = "test-public-key";
+    private static final String AUTH = "test-auth-key";
     private static final String ENDPOINT = "https://push.example.com/sub/abc123";
 
     @Mock private PushSubscriptionRepository pushSubscriptionRepository;
@@ -48,8 +50,8 @@ class PushNotificationServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new PushNotificationService(
-                pushSubscriptionRepository, pushSubscriptionService, pushService);
+        service = spy(new PushNotificationService(
+                pushSubscriptionRepository, pushSubscriptionService, pushService));
     }
 
     // --- helpers ---
@@ -71,9 +73,15 @@ class PushNotificationServiceTest {
                 .build();
     }
 
+    /** Evita la construcción real (criptográfica) de la Notification. */
+    private void stubNotificationBuild() throws Exception {
+        doReturn(mock(Notification.class)).when(service).buildNotification(any(), any());
+    }
+
     private void stubSend(int statusCode) throws Exception {
-        HttpResponse response = org.mockito.Mockito.mock(HttpResponse.class);
-        StatusLine statusLine = org.mockito.Mockito.mock(StatusLine.class);
+        stubNotificationBuild();
+        HttpResponse response = mock(HttpResponse.class);
+        StatusLine statusLine = mock(StatusLine.class);
         when(statusLine.getStatusCode()).thenReturn(statusCode);
         when(response.getStatusLine()).thenReturn(statusLine);
         when(pushService.send(any(Notification.class))).thenReturn(response);
@@ -146,6 +154,7 @@ class PushNotificationServiceTest {
         UUID subId = UUID.randomUUID();
         Order order = orderWithSubscription(subId);
         when(pushSubscriptionRepository.findById(subId)).thenReturn(Optional.of(subscription(subId)));
+        stubNotificationBuild();
         when(pushService.send(any(Notification.class))).thenThrow(new RuntimeException("boom"));
 
         assertThatCode(() -> service.sendNotification(order, OrderStatus.DELIVERED))

@@ -1,6 +1,7 @@
 package com.laroka.backend.notification.service;
 
 import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
 import java.security.Security;
 import java.util.Optional;
 
@@ -87,11 +88,7 @@ public class PushNotificationService {
 
         try {
             String payload = buildPayload(order, newStatus, body);
-            Notification notification = new Notification(
-                    endpoint,
-                    subscription.getP256dh(),
-                    subscription.getAuth(),
-                    payload.getBytes(StandardCharsets.UTF_8));
+            Notification notification = buildNotification(subscription, payload.getBytes(StandardCharsets.UTF_8));
 
             HttpResponse response = pushService.send(notification);
             int statusCode = response.getStatusLine().getStatusCode();
@@ -101,6 +98,20 @@ public class PushNotificationService {
             // traga: nunca debe propagarse al flujo de transición de estado.
             log.warn("Push notification failed | orderId={} endpoint={}", order.getId(), endpoint, e);
         }
+    }
+
+    /**
+     * Construye la Notification Web Push a partir de la suscripción. Aislado en
+     * un método protegido para poder sustituirlo en tests sin depender de claves
+     * EC reales (el constructor decodifica criptográficamente la clave pública).
+     */
+    protected Notification buildNotification(PushSubscription subscription, byte[] payload)
+            throws GeneralSecurityException {
+        return new Notification(
+                subscription.getEndpoint(),
+                subscription.getP256dh(),
+                subscription.getAuth(),
+                payload);
     }
 
     private String buildPayload(Order order, OrderStatus status, String body) {
