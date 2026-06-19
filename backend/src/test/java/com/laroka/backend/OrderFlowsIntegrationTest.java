@@ -50,6 +50,7 @@ import io.jsonwebtoken.security.Keys;
     // rechaza la creación de pedidos (422). Lo deshabilitamos para este test de
     // flujo. Se define acá (no en application-test.yml) porque ese archivo está
     // gitignored y no llega a CI.
+    
     properties = "order.bypass-branch-hours=true")
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
