@@ -75,6 +75,11 @@ cache:
   menu:
     ttl-seconds: ${CACHE_MENU_TTL_SECONDS:600}
 
+vapid:
+  public-key: ${VAPID_PUBLIC_KEY:}
+  private-key: ${VAPID_PRIVATE_KEY:}
+  subject: ${VAPID_SUBJECT:mailto:soporte@laroka.app}
+
 swagger:
   enabled: ${APP_DEV_SWAGGER_ENABLED:${APP_DEV_MODE:false}}
 

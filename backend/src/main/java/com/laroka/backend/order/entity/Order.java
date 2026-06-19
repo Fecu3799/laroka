@@ -75,6 +75,12 @@ public class Order {
     @Column(name = "origin", nullable = false, length = 20)
     private OrderOrigin origin;
 
+    // FK opcional a push_subscription (US-09-02). Se almacena como UUID plano
+    // para no acoplar el módulo order a la entidad de notification; la integridad
+    // referencial la garantiza el constraint fk_orders_push_subscription.
+    @Column(name = "push_subscription_id")
+    private UUID pushSubscriptionId;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "branch_id", nullable = false)
     private Branch branch;

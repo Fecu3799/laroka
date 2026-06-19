@@ -34,6 +34,7 @@ public class OrderMapper {
                 .customerName(dto.getCustomerName())
                 .customerPhone(dto.getCustomerPhone())
                 .origin(dto.getOrigin() != null ? dto.getOrigin() : OrderOrigin.CLIENT)
+                .pushSubscriptionId(dto.getPushSubscriptionId())
                 .build();
     }
 

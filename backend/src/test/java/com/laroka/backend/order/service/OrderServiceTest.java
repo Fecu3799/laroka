@@ -72,6 +72,8 @@ class OrderServiceTest {
     @Mock private com.laroka.backend.notification.service.NotificationService notificationService;
     @Mock private OrderMapper orderMapper;
     @Mock private WorkShiftRepository workShiftRepository;
+    @Mock private com.laroka.backend.notification.repository.PushSubscriptionRepository pushSubscriptionRepository;
+    @Mock private com.laroka.backend.notification.service.PushNotificationService pushNotificationService;
 
     @InjectMocks
     private OrderService service;
@@ -108,6 +110,15 @@ class OrderServiceTest {
                 .branch(Branch.builder().id(branch.getId()).build())
                 .orderType(OrderType.TAKEAWAY)
                 .origin(OrderOrigin.CLIENT)
+                .build();
+    }
+
+    private Order takeawayOrderWithPush(Branch branch, UUID pushSubscriptionId) {
+        return Order.builder()
+                .branch(Branch.builder().id(branch.getId()).build())
+                .orderType(OrderType.TAKEAWAY)
+                .origin(OrderOrigin.CLIENT)
+                .pushSubscriptionId(pushSubscriptionId)
                 .build();
     }
 
@@ -265,6 +276,61 @@ class OrderServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("turno activo");
         verify(orderRepository, never()).save(any());
+    }
+
+    // --- createOrder: vínculo con suscripción push (US-09-02) ---
+
+    @Test
+    void createOrder_withValidPushSubscriptionId_linksItToOrder() {
+        Tenant p = tenant();
+        Branch branch = branch(p);
+        Product product = product(new BigDecimal("2800.00"));
+        stubBaseCreation(branch, product);
+
+        UUID pushId = UUID.randomUUID();
+        when(pushSubscriptionRepository.existsById(pushId)).thenReturn(true);
+
+        service.createOrder(takeawayOrderWithPush(branch, pushId), List.of(itemFor(1, 1)),
+                PaymentMethod.MERCADOPAGO, "key-push-1");
+
+        ArgumentCaptor<Order> captor = ArgumentCaptor.forClass(Order.class);
+        verify(orderRepository).save(captor.capture());
+        assertThat(captor.getValue().getPushSubscriptionId()).isEqualTo(pushId);
+    }
+
+    @Test
+    void createOrder_withNonExistentPushSubscriptionId_createsOrderWithoutLinkAndNoError() {
+        Tenant p = tenant();
+        Branch branch = branch(p);
+        Product product = product(new BigDecimal("2800.00"));
+        stubBaseCreation(branch, product);
+
+        UUID pushId = UUID.randomUUID();
+        when(pushSubscriptionRepository.existsById(pushId)).thenReturn(false);
+
+        OrderCreationResult result = service.createOrder(takeawayOrderWithPush(branch, pushId),
+                List.of(itemFor(1, 1)), PaymentMethod.MERCADOPAGO, "key-push-2");
+
+        assertThat(result.order()).isNotNull();
+        ArgumentCaptor<Order> captor = ArgumentCaptor.forClass(Order.class);
+        verify(orderRepository).save(captor.capture());
+        assertThat(captor.getValue().getPushSubscriptionId()).isNull();
+    }
+
+    @Test
+    void createOrder_withoutPushSubscriptionId_createsOrderWithoutLink() {
+        Tenant p = tenant();
+        Branch branch = branch(p);
+        Product product = product(new BigDecimal("2800.00"));
+        stubBaseCreation(branch, product);
+
+        service.createOrder(takeawayOrder(branch), List.of(itemFor(1, 1)),
+                PaymentMethod.MERCADOPAGO, "key-push-3");
+
+        ArgumentCaptor<Order> captor = ArgumentCaptor.forClass(Order.class);
+        verify(orderRepository).save(captor.capture());
+        assertThat(captor.getValue().getPushSubscriptionId()).isNull();
+        verify(pushSubscriptionRepository, never()).existsById(any());
     }
 
     // --- createOrder: validaciones ---

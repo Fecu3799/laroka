@@ -107,6 +107,34 @@
 			<groupId>com.github.ben-manes.caffeine</groupId>
 			<artifactId>caffeine</artifactId>
 		</dependency>
+		<dependency>
+			<groupId>nl.martijndwars</groupId>
+			<artifactId>web-push</artifactId>
+			<version>5.1.2</version>
+		</dependency>
+		<!-- web-push expone org.apache.http.HttpResponse en send(); httpcore solo
+		     llega como dependencia runtime de web-push, así que lo declaramos a
+		     nivel compile para poder inspeccionar el status code (US-09-03). -->
+		<dependency>
+			<groupId>org.apache.httpcomponents</groupId>
+			<artifactId>httpcore</artifactId>
+			<version>4.4.16</version>
+		</dependency>
+		<!-- send() declara throws JoseException (checked); jose4j es runtime en
+		     web-push, lo subimos a compile para poder invocarlo. -->
+		<dependency>
+			<groupId>org.bitbucket.b_c</groupId>
+			<artifactId>jose4j</artifactId>
+			<version>0.7.9</version>
+		</dependency>
+		<!-- web-push declara BouncyCastle como optional (no transitivo); es
+		     imprescindible para construir/encriptar la Notification y debe estar
+		     en compile porque registramos el provider explícitamente. -->
+		<dependency>
+			<groupId>org.bouncycastle</groupId>
+			<artifactId>bcprov-jdk18on</artifactId>
+			<version>1.81</version>
+		</dependency>
 
 <dependency>
 			<groupId>org.springframework.boot</groupId>

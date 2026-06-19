@@ -16,7 +16,9 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 
+import com.laroka.backend.notification.repository.PushSubscriptionRepository;
 import com.laroka.backend.notification.service.NotificationService;
+import com.laroka.backend.notification.service.PushNotificationService;
 import com.laroka.backend.order.dto.OrderFilterParams;
 import com.laroka.backend.order.repository.OrderSpecification;
 import com.laroka.backend.payment.entity.Payment;
@@ -75,6 +77,8 @@ public class OrderService {
     private final NotificationService notificationService;
     private final OrderMapper orderMapper;
     private final WorkShiftRepository workShiftRepository;
+    private final PushSubscriptionRepository pushSubscriptionRepository;
+    private final PushNotificationService pushNotificationService;
 
     @Transactional
     public OrderCreationResult createOrder(Order order, List<OrderItem> items,
@@ -473,6 +477,16 @@ public class OrderService {
                 .orElseThrow(() -> new BusinessException("No hay turno activo para esta sucursal"));
         order.setShift(shift);
 
+        // US-09-02: vínculo opcional con la suscripción Web Push del dispositivo.
+        // Si el id no existe en push_subscription, se descarta silenciosamente y
+        // el pedido se crea sin vínculo (sin error ni advertencia al cliente).
+        if (order.getPushSubscriptionId() != null
+                && !pushSubscriptionRepository.existsById(order.getPushSubscriptionId())) {
+            log.debug("Push subscription not found, order created without link | pushSubscriptionId={}",
+                    order.getPushSubscriptionId());
+            order.setPushSubscriptionId(null);
+        }
+
         Order saved = orderRepository.save(order);
         recordHistory(saved, null, OrderStatus.PENDING_PAYMENT);
 
@@ -538,5 +552,10 @@ public class OrderService {
                 .staffUserId(staffUserId)
                 .cancellationReason(cancellationReason)
                 .build());
+
+        // Notificación push al cliente (US-09-03). Fire-and-forget: corre en otro
+        // hilo y nunca propaga errores. Los estados sin mensaje definido no
+        // disparan envío (lo resuelve el propio servicio).
+        pushNotificationService.sendNotification(order, toStatus);
     }
 }
