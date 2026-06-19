@@ -194,6 +194,12 @@ export function CartScreen({ items, extras = [], onBack, onRemove, onUpdateQty, 
   const resolvePushSubscriptionId = async () => {
     if (typeof Notification === 'undefined') return null
 
+    // US-09-F-04: en iOS el Web Push solo funciona desde la PWA instalada en la
+    // pantalla de inicio. Si la app corre en Safari (no standalone) sobre
+    // iPhone/iPad, la suscripción es imposible: mostramos las instrucciones de
+    // instalación paso a paso y NO llamamos a requestPermission() — en iOS Safari
+    // fallaría en silencio. El sheet se autolimita a una vez por sesión
+    // (ver showInstallInstructions en usePushSubscription).
     const ua = navigator.userAgent.toLowerCase()
     const iosNotInstalled = !navigator.standalone && /iphone|ipad/i.test(ua)
     if (iosNotInstalled) {

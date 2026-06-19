@@ -141,3 +141,77 @@ describe('CartScreen — paymentFailure recovery', () => {
     })
   })
 })
+
+// US-09-F-04: en iOS el Web Push solo funciona desde la PWA instalada. Al
+// confirmar el pedido sobre iOS Safari (no standalone), CartScreen debe mostrar
+// las instrucciones de instalación SIN llamar a requestPermission(), y no debe
+// reabrirlas si ya se mostraron en la misma sesión.
+describe('CartScreen — iOS Safari no instalado (US-09-F-04)', () => {
+  const INSTALL_KEY = 'laroka_push_install_shown'
+  const IOS_UA =
+    'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 ' +
+    '(KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'
+  const INSTALL_TEXT = /instalá la app desde Safari usando el ícono compartir/i
+
+  const FAILURE_DATA = {
+    orderId: 'order-ios',
+    formData: { orderType: 'takeaway', nombre: 'Juan', telefono: '1122334455', direccion: '', notas: '' },
+  }
+
+  const ORIGINAL_UA = navigator.userAgent
+
+  beforeEach(() => {
+    sessionStorage.clear()
+    vi.mocked(fetch).mockReset()
+    // UA de iPhone; navigator.standalone queda undefined → !standalone = true,
+    // es decir, Safari (no instalado como PWA).
+    Object.defineProperty(navigator, 'userAgent', { value: IOS_UA, configurable: true })
+    // Notification existe (typeof !== 'undefined') pero NO debe invocarse en iOS.
+    globalThis.Notification = { permission: 'default', requestPermission: vi.fn() }
+  })
+
+  afterEach(() => {
+    Object.defineProperty(navigator, 'userAgent', { value: ORIGINAL_UA, configurable: true })
+    delete globalThis.Notification
+    sessionStorage.clear()
+  })
+
+  it('muestra las instrucciones de instalación sin llamar a requestPermission()', async () => {
+    const user = userEvent.setup()
+    // CheckoutScreen verifica acceptingOrders del branch antes de onConfirm.
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ acceptingOrders: true }),
+    })
+
+    renderCart(ITEMS, { paymentFailure: FAILURE_DATA })
+
+    // efectivo es el método por defecto → botón "CONFIRMAR PEDIDO".
+    await user.click(screen.getByRole('button', { name: /confirmar pedido/i }))
+
+    // Aparece el bottom sheet de instalación con el texto de US-09-F-04.
+    expect(await screen.findByText(INSTALL_TEXT)).toBeInTheDocument()
+    // En iOS Safari nunca se pide permiso (fallaría en silencio).
+    expect(globalThis.Notification.requestPermission).not.toHaveBeenCalled()
+  })
+
+  it('no reabre las instrucciones si ya se mostraron en la sesión y crea el pedido', async () => {
+    const user = userEvent.setup()
+    // Marca de "ya mostrado en esta sesión".
+    sessionStorage.setItem(INSTALL_KEY, '1')
+    // 1) acceptingOrders del branch, 2) creación del pedido (el flujo continúa
+    //    porque el sheet no vuelve a mostrarse).
+    vi.mocked(fetch)
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ acceptingOrders: true }) })
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ orderId: 'order-ios' }) })
+
+    renderCart(ITEMS, { paymentFailure: FAILURE_DATA })
+    await user.click(screen.getByRole('button', { name: /confirmar pedido/i }))
+
+    // El flujo avanza hasta crear el pedido (branches + POST /orders = 2 fetches).
+    await waitFor(() => expect(vi.mocked(fetch)).toHaveBeenCalledTimes(2))
+    // El sheet no se mostró y no se pidió permiso.
+    expect(screen.queryByText(INSTALL_TEXT)).not.toBeInTheDocument()
+    expect(globalThis.Notification.requestPermission).not.toHaveBeenCalled()
+  })
+})

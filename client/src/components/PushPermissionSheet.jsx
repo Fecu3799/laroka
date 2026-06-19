@@ -14,7 +14,9 @@ function BellIcon() {
  * Bottom sheet para el flujo de notificaciones push (US-09-F-01).
  * Dos variantes:
  *  - 'optin'   : pide activar notificaciones (Sí, activar / Ahora no)
- *  - 'install' : instrucciones para instalar la PWA en iOS Safari
+ *  - 'install' : instrucciones ilustradas paso a paso para instalar la PWA en
+ *                iOS Safari: ícono compartir → "Agregar a pantalla de inicio" →
+ *                "Abrir desde el ícono". No pide permiso.
  *
  * Consistente con el sistema de diseño (mismas variables de paleta y tipografías
  * que PaymentModals).
