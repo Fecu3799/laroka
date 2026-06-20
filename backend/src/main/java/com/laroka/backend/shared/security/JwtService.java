@@ -14,6 +14,7 @@ import com.laroka.backend.staffuser.entity.UserRole;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtBuilder;
+import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.MalformedJwtException;
 import io.jsonwebtoken.UnsupportedJwtException;
@@ -25,6 +26,12 @@ public class JwtService {
 
 	@Value("${jwt.secret}")
 	private String secret;
+
+	// US-SEC-05: secret secundario opcional para grace period durante la rotación
+	// de JWT_SECRET. Vacío por defecto. Si no está configurado, no se intenta el
+	// fallback y solo se valida contra el secret primario.
+	@Value("${jwt.secret-previous:}")
+	private String secretPrevious;
 
 	@Value("${jwt.expiration}")
 	private long expirationMs;
@@ -40,7 +47,7 @@ public class JwtService {
 			.claim("tenantName", user.getBranch().getTenant().getName())
 			.issuedAt(now)
 			.expiration(expiry)
-			.signWith(secretKey());
+			.signWith(secretKey(secret));
 
 		if (user.getRole() != UserRole.ADMIN) {
 			builder.claim("branchId", user.getBranch().getId());
@@ -76,15 +83,31 @@ public class JwtService {
 		return parseClaims(token).get("tenantId", Integer.class);
 	}
 
+	// US-SEC-05: verifica primero contra el secret primario. Si falla y hay un
+	// secret secundario configurado (JWT_SECRET_PREVIOUS), reintenta con él. Esto
+	// permite rotar JWT_SECRET sin invalidar sesiones activas abruptamente: durante
+	// el grace period los tokens firmados con el secret anterior siguen siendo
+	// válidos. Si ambos fallan (o no hay secundario), el token es inválido.
 	private Claims parseClaims(String token) {
+		try {
+			return parseClaimsWith(token, secret);
+		} catch (JwtException | IllegalArgumentException primaryFailure) {
+			if (secretPrevious != null && !secretPrevious.isBlank()) {
+				return parseClaimsWith(token, secretPrevious);
+			}
+			throw primaryFailure;
+		}
+	}
+
+	private Claims parseClaimsWith(String token, String signingSecret) {
 		return Jwts.parser()
-			.verifyWith(secretKey())
+			.verifyWith(secretKey(signingSecret))
 			.build()
 			.parseSignedClaims(token)
 			.getPayload();
 	}
 
-	private SecretKey secretKey() {
-		return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+	private SecretKey secretKey(String signingSecret) {
+		return Keys.hmacShaKeyFor(signingSecret.getBytes(StandardCharsets.UTF_8));
 	}
 }

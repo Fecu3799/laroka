@@ -149,6 +149,9 @@ MERCADOPAGO_WEBHOOK_SECRET=
  
 # JWT
 JWT_SECRET=
+# Opcional — solo durante una rotación de JWT_SECRET (grace period).
+# Vacío en operación normal. Ver "Seguridad — Rotación de Secretos".
+JWT_SECRET_PREVIOUS=
 JWT_EXPIRATION=28800000
 ```
  
@@ -279,6 +282,90 @@ Todo merge a main requiere PR con CI en verde.
 
 CD se implementa al terminar el desarrollo del MVP
  
+---
+ 
+## Seguridad — Rotación de Secretos
+
+Procedimiento para rotar cada secreto crítico. Salvo que se indique lo
+contrario, "actualizar en Render" significa editar la variable de entorno en
+el dashboard de Render (Environment) y disparar un redeploy del servicio
+backend.
+
+### JWT_SECRET (con grace period, sin cortar sesiones activas)
+
+El backend soporta un segundo secret opcional `JWT_SECRET_PREVIOUS`. Durante la
+validación se intenta primero con `JWT_SECRET`; si falla y `JWT_SECRET_PREVIOUS`
+está configurado, se reintenta con él. Esto permite rotar sin invalidar de
+golpe los tokens ya emitidos.
+
+Pasos:
+
+1. Generar un nuevo secret seguro (≥32 bytes para HMAC-SHA256), por ejemplo:
+   `openssl rand -base64 48`.
+2. En Render, setear `JWT_SECRET_PREVIOUS` = valor **actual** de `JWT_SECRET`.
+3. En Render, setear `JWT_SECRET` = nuevo secret generado en el paso 1.
+4. Redeploy. A partir de acá los tokens nuevos se firman con el secret nuevo y
+   los viejos (firmados con el anterior) siguen validando vía
+   `JWT_SECRET_PREVIOUS`.
+5. Esperar a que expire el TTL de los tokens viejos (`JWT_EXPIRATION`, default
+   8 horas / `28800000` ms). Pasado ese plazo ya no quedan tokens firmados con
+   el secret anterior en circulación.
+6. Limpiar `JWT_SECRET_PREVIOUS` (dejarlo vacío) y redeploy. Fin del grace
+   period.
+
+> **Advertencia (riesgo conocido y acotado).** La blacklist de JWT es
+> in-memory y no persiste entre reinicios del servidor. Durante una rotación
+> que implique redeploy, los tokens previamente revocados por logout —firmados
+> con el secret anterior— pueden volver a ser aceptados por el grace period
+> durante el TTL restante del token. El riesgo está acotado por el TTL
+> configurado (`JWT_EXPIRATION`, default 8 horas): vencido el TTL, esos tokens
+> dejan de ser válidos de todos modos. No es un gate de seguridad nuevo, es una
+> consecuencia conocida de combinar grace period + blacklist no persistente.
+
+### MERCADOPAGO_WEBHOOK_SECRET
+
+1. En el panel de MercadoPago (Tus integraciones → la aplicación → Webhooks /
+   Notificaciones), generar/regenerar la firma secreta del webhook.
+2. Copiar el nuevo valor de la clave secreta.
+3. En Render, actualizar `MERCADOPAGO_WEBHOOK_SECRET` con el nuevo valor y
+   redeploy.
+4. Validar que un evento de prueba del webhook se procese correctamente (firma
+   verificada).
+
+> Nota: en sandbox la validación de firma puede estar deshabilitada
+> (`SKIP_WEBHOOK_SIGNATURE_VALIDATION=true`). La rotación de la firma solo
+> tiene efecto real con la validación activa (producción).
+
+### R2_ACCESS_KEY / R2_SECRET_KEY (Cloudflare R2)
+
+Estas dos siempre se rotan juntas (un token R2 emite ambas).
+
+1. En Cloudflare (R2 → Manage R2 API Tokens), crear un **nuevo** API token con
+   los mismos permisos que el actual. Esto genera un nuevo par
+   Access Key ID / Secret Access Key.
+2. En Render, actualizar `R2_ACCESS_KEY` y `R2_SECRET_KEY` con el nuevo par y
+   redeploy.
+3. Verificar que upload/lectura de imágenes funciona con las credenciales
+   nuevas.
+4. Recién entonces, en Cloudflare, **revocar/eliminar** el token anterior.
+
+### VAPID_PRIVATE_KEY / VAPID_PUBLIC_KEY (Web Push)
+
+> **Advertencia.** Rotar las claves VAPID **invalida todas las suscripciones
+> push existentes**. Las suscripciones de los navegadores están atadas al par
+> de claves anterior; tras la rotación dejarán de recibir notificaciones y los
+> clientes **deben re-suscribirse** (re-otorgar el permiso / re-registrar la
+> suscripción). No hay grace period posible para VAPID.
+
+1. Generar un nuevo par de claves VAPID (por ejemplo con
+   `npx web-push generate-vapid-keys`).
+2. En Render, actualizar `VAPID_PUBLIC_KEY` y `VAPID_PRIVATE_KEY` con el nuevo
+   par y redeploy. Actualizar también la clave pública donde el frontend la
+   consuma.
+3. Asumir que todas las suscripciones previas quedan inválidas: el flujo de
+   re-suscripción del cliente debe volver a registrar a cada usuario.
+4. Opcional: limpiar las `push_subscription` viejas que ya no recibirán envíos.
+
 ---
  
 ## Flujo de trabajo
