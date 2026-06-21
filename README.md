@@ -10,6 +10,14 @@ LaRoka digitaliza y centraliza el flujo de pedidos entre clientes y sucursales, 
  
 ---
  
+## Estado actual
+
+En producción: flujo completo de pedido cliente → pago (MercadoPago / efectivo) → gestión operativa en backoffice con actualizaciones en tiempo real (SSE) y Web Push, soporte multi-sucursal con roles ADMIN/MANAGER/STAFF, y turnos con cierre de caja por sucursal. Deploy automatizado vía CI/CD (backend en Render, frontends en Vercel).
+
+> Deuda técnica y limitaciones conocidas documentadas en `docs/DEUDA_TECNICA.md`.
+
+---
+ 
 ## Stack Tecnológico
  
 | Componente | Tecnología |
@@ -21,9 +29,11 @@ LaRoka digitaliza y centraliza el flujo de pedidos entre clientes y sucursales, 
 | Frontend backoffice | React + Vite |
 | Storage multimedia | Cloudflare R2 |
 | Proveedor de pagos | MercadoPago |
+| Cache | Caffeine (Spring Cache) |
+| Notificaciones | SSE (backoffice) + Web Push / VAPID (cliente) |
 | Hosting backend | Render |
 | Hosting frontends | Vercel |
-| CI | GitHub Actions |
+| CI/CD | GitHub Actions |
  
 ---
  
@@ -35,21 +45,24 @@ Monolito modular. El backend centraliza toda la lógica de negocio organizado en
 laroka/
 ├── backend/                  # Spring Boot — API REST
 │   └── src/main/java/com/laroka/backend/
-│       ├── auth/             # Autenticación JWT
+│       ├── auth/             # Autenticación JWT y refresh tokens
 │       ├── branch/           # Sucursales
 │       ├── catalog/          # Productos y categorías
-│       ├── notification/     # Eventos SSE al backoffice
+│       ├── notification/     # SSE al backoffice + Web Push al cliente
 │       ├── order/            # Ciclo de vida del pedido
 │       ├── payment/          # Integración MercadoPago
-│       ├── pizzeria/         # Entidad raíz multi-pizzería
-│       ├── shared/           # Excepciones y utilidades comunes
-│       └── staffuser/        # Usuarios internos
+│       ├── shift/            # Turnos y cierre de caja por sucursal
+│       ├── staffuser/        # Usuarios internos
+│       ├── tenant/           # Entidad raíz multi-tenant (multi-pizzería)
+│       └── shared/           # Excepciones y utilidades comunes
 ├── client/                   # React PWA — Interfaz del cliente
 ├── backoffice/               # React — Interfaz del personal
 └── docs/                     # Documentación del proyecto
     ├── BACKLOG.md
     ├── DEUDA_TECNICA.md
-    └── informe_tecnico.pdf
+    ├── AUDIT_DEV_FLAGS.md
+    ├── COLORS.md
+    └── informe_tecnico.md
 ```
  
 ### Capas por módulo
@@ -67,6 +80,21 @@ Controller → Service → Repository
 - **Repository**: acceso a datos vía Spring Data JPA
 - **DTO**: objetos de transferencia, nunca se exponen entidades directamente
 - **Mapper**: conversión entidad ↔ DTO en el Controller
+
+### Roles y autorización
+
+Tres roles activos: **ADMIN**, **MANAGER**, **STAFF**.
+
+| Rol | Alcance | branchId |
+|---|---|---|
+| ADMIN | Dueño del tenant, opera sobre cualquier sucursal | JWT sin branchId; envía `X-Branch-Id` por request |
+| MANAGER | Encargado de sucursal: abre/cierra turnos, ve resúmenes y cierre de caja | branchId en el JWT |
+| STAFF | Empleado operativo: solo gestión de pedidos | branchId en el JWT |
+
+La resolución del branchId está centralizada en `SecurityUtils.resolveBranchId`:
+STAFF/MANAGER lo leen del token; ADMIN lo toma del header `X-Branch-Id`
+(400 si falta o es inválido, 403 si no pertenece al tenant del token).
+
 ---
  
 ## Requisitos
@@ -153,6 +181,10 @@ JWT_SECRET=
 # Vacío en operación normal. Ver "Seguridad — Rotación de Secretos".
 JWT_SECRET_PREVIOUS=
 JWT_EXPIRATION=28800000
+ 
+# Web Push (VAPID)
+VAPID_PUBLIC_KEY=
+VAPID_PRIVATE_KEY=
 ```
  
 ```env
@@ -270,21 +302,40 @@ docker compose down -v    # Detener y borrar volúmenes (reset completo)
  
 ## CI/CD
  
-El proyecto tiene tres workflows de GitHub Actions:
- 
+El proyecto tiene workflows de CI (en PR) y CD (en push a main) por componente.
+
+**CI** — corre en cada PR a `main` con cambios en el path correspondiente:
+
 | Workflow | Trigger | Steps |
 |---|---|---|
-| ci-backend.yml | PR a main con cambios en backend/ | build → linting (Checkstyle) → tests |
-| ci-client.yml | PR a main con cambios en client/ | build → linting (ESLint) |
-| ci-backoffice.yml | PR a main con cambios en backoffice/ | build → linting (ESLint) |
+| ci-backend.yml | PR con cambios en backend/ | build → linting (Checkstyle) → tests |
+| ci-client.yml | PR con cambios en client/ | build → linting (ESLint) |
+| ci-backoffice.yml | PR con cambios en backoffice/ | build → linting (ESLint) |
  
 Todo merge a main requiere PR con CI en verde.
 
-CD se implementa al terminar el desarrollo del MVP
+**CD** — corre en push a `main` con cambios en el path correspondiente:
+
+| Workflow | Trigger | Acción |
+|---|---|---|
+| cd-backend.yml | push a main en backend/ | build & push de imagen Docker (taggeada por SHA + digest SHA256) → deploy a Render |
+| cd-client.yml | push a main en client/ | deploy a Vercel (PWA) |
+| cd-backoffice.yml | push a main en backoffice/ | deploy a Vercel |
  
 ---
  
-## Seguridad — Rotación de Secretos
+## Seguridad
+
+### Content Security Policy (CSP)
+
+Ambos frontends se sirven en Vercel con cabeceras de seguridad definidas en
+`client/vercel.json` y `backoffice/vercel.json`, incluyendo una CSP restrictiva
+(`default-src 'self'`, `frame-ancestors 'none'`, etc.). Las fuentes de
+`@fontsource` se embeben como data URIs en el CSS compilado, por lo que la CSP
+incluye `font-src 'self' data:`. El cliente además permite los orígenes de
+MercadoPago necesarios para el checkout (`script-src`, `frame-src`, `connect-src`).
+
+### Rotación de Secretos
 
 Procedimiento para rotar cada secreto crítico. Salvo que se indique lo
 contrario, "actualizar en Render" significa editar la variable de entorno en
@@ -402,19 +453,10 @@ refactor: refactor de código sin cambio funcional
  
 ## Migraciones de base de datos
  
-| Versión | Contenido |
-|---|---|
-| V1 | pizzeria |
-| V2 | branch |
-| V3 | category |
-| V4 | product |
-| V5 | staff_user |
-| V6 | order + order_item |
-| V7 | order_status_history |
-| V8 | delivery_address (columna en order) |
-| V9 | payment |
-| V10 | branch operating hours |
- 
+El historial de migraciones vive en `backend/src/main/resources/db/migration/`
+— Flyway es la única fuente de verdad. Cada cambio de esquema es una migración
+versionada nueva (`V{n}__descripcion.sql`).
+
 **Regla estricta:** nunca usar `ddl-auto=create` ni `ddl-auto=update`. Todo cambio de esquema va en una migración Flyway versionada.
  
 ---
@@ -427,16 +469,20 @@ refactor: refactor de código sin cambio funcional
 - Armado de pedido y carrito
 - Pago vía MercadoPago o efectivo
 - Seguimiento del pedido en tiempo real
+- Notificaciones Web Push del estado del pedido
 ### Subsistema Backoffice
 - Visualización y gestión de pedidos de la sucursal
 - Avance del estado operativo
 - Notificaciones en tiempo real (SSE)
 - Gestión de catálogo (productos, categorías)
+- Apertura/cierre de turnos y cierre de caja por sucursal (MANAGER)
+- Selección de sucursal activa (ADMIN) vía `X-Branch-Id`
 ### Backend
 - API REST documentada con OpenAPI
-- Autenticación JWT por rol y sucursal
+- Autenticación JWT por rol y sucursal, con refresh tokens
 - Integración con MercadoPago vía Adapter pattern
 - Almacenamiento multimedia en Cloudflare R2
+- Cache de menú con Caffeine (Spring Cache)
 - Migraciones de esquema con Flyway
 ---
  
@@ -457,7 +503,9 @@ IN_PREPARATION → CANCELLATION_REQUESTED → CANCELLED
  
 - **Backlog completo**: `docs/BACKLOG.md`
 - **Deuda técnica activa**: `docs/DEUDA_TECNICA.md`
-- **Informe técnico**: `docs/informe_tecnico.pdf`
+- **Flags de desarrollo / auditoría**: `docs/AUDIT_DEV_FLAGS.md`
+- **Paleta de colores**: `docs/COLORS.md`
+- **Informe técnico**: `docs/informe_tecnico.md`
 - **API (local)**: `http://localhost:8080/swagger-ui.html`
 
 ---
