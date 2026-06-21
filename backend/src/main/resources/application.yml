@@ -35,6 +35,9 @@ management:
 
 jwt:
   secret: ${JWT_SECRET}
+  # US-SEC-05: secret previo opcional para grace period durante rotación. Vacío
+  # por defecto. Ver README → "Seguridad — Rotación de Secretos".
+  secret-previous: ${JWT_SECRET_PREVIOUS:}
   expiration: ${JWT_EXPIRATION:1800000}
 
 refresh:

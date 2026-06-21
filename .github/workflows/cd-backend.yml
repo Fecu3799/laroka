@@ -54,6 +54,21 @@ jobs:
             ${{ secrets.DOCKER_USER }}/laroka-backend:${{ github.sha }}
             ${{ secrets.DOCKER_USER }}/laroka-backend:latest
 
+      - name: Record image digest
+        run: |
+          IMAGE="${{ secrets.DOCKER_USER }}/laroka-backend:${{ github.sha }}"
+          if ! docker pull "$IMAGE" > /dev/null 2>&1; then
+            echo "ERROR: no se pudo descargar la imagen $IMAGE para obtener su digest"
+            exit 1
+          fi
+          DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' "$IMAGE" 2>/dev/null) || true
+          if [ -z "$DIGEST" ]; then
+            echo "ERROR: no se pudo obtener el digest SHA256 de la imagen $IMAGE"
+            exit 1
+          fi
+          echo "### Docker Image Digest" >> $GITHUB_STEP_SUMMARY
+          echo "$DIGEST" >> $GITHUB_STEP_SUMMARY
+
   deploy:
     name: Deploy to Render
     runs-on: ubuntu-latest
