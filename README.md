@@ -1,15 +1,15 @@
 # LaRoka — Sistema de Gestión de Pedidos
- 
+
 Sistema de gestión digital de pedidos para pizzería multi-sucursal, concebido como base evolutiva hacia una plataforma multi-comercio.
- 
+
 ---
- 
+
 ## Descripción
- 
+
 LaRoka digitaliza y centraliza el flujo de pedidos entre clientes y sucursales, cubriendo desde la selección del menú hasta el seguimiento operativo en tiempo real. El sistema está compuesto por una aplicación cliente (PWA mobile-first), un backoffice para el personal del local y un backend centralizado con lógica de negocio.
- 
+
 ---
- 
+
 ## Estado actual
 
 En producción: flujo completo de pedido cliente → pago (MercadoPago / efectivo) → gestión operativa en backoffice con actualizaciones en tiempo real (SSE) y Web Push, soporte multi-sucursal con roles ADMIN/MANAGER/STAFF, y turnos con cierre de caja por sucursal. Deploy automatizado vía CI/CD (backend en Render, frontends en Vercel).
@@ -17,30 +17,30 @@ En producción: flujo completo de pedido cliente → pago (MercadoPago / efectiv
 > Deuda técnica y limitaciones conocidas documentadas en `docs/DEUDA_TECNICA.md`.
 
 ---
- 
+
 ## Stack Tecnológico
- 
-| Componente | Tecnología |
-|---|---|
-| Backend | Java 21 + Spring Boot 3.4 |
-| Base de datos | PostgreSQL 16 |
-| Migraciones | Flyway |
-| Frontend cliente | React + Vite (PWA) |
-| Frontend backoffice | React + Vite |
-| Storage multimedia | Cloudflare R2 |
-| Proveedor de pagos | MercadoPago |
-| Cache | Caffeine (Spring Cache) |
-| Notificaciones | SSE (backoffice) + Web Push / VAPID (cliente) |
-| Hosting backend | Render |
-| Hosting frontends | Vercel |
-| CI/CD | GitHub Actions |
- 
+
+| Componente          | Tecnología                                    |
+| ------------------- | --------------------------------------------- |
+| Backend             | Java 21 + Spring Boot 3.4                     |
+| Base de datos       | PostgreSQL 16                                 |
+| Migraciones         | Flyway                                        |
+| Frontend cliente    | React + Vite (PWA)                            |
+| Frontend backoffice | React + Vite                                  |
+| Storage multimedia  | Cloudflare R2                                 |
+| Proveedor de pagos  | MercadoPago                                   |
+| Cache               | Caffeine (Spring Cache)                       |
+| Notificaciones      | SSE (backoffice) + Web Push / VAPID (cliente) |
+| Hosting backend     | Render                                        |
+| Hosting frontends   | Vercel                                        |
+| CI/CD               | GitHub Actions                                |
+
 ---
- 
+
 ## Arquitectura
- 
+
 Monolito modular. El backend centraliza toda la lógica de negocio organizado en módulos independientes con separación explícita de capas.
- 
+
 ```
 laroka/
 ├── backend/                  # Spring Boot — API REST
@@ -64,9 +64,9 @@ laroka/
     ├── COLORS.md
     └── informe_tecnico.md
 ```
- 
+
 ### Capas por módulo
- 
+
 ```
 Controller → Service → Repository
      ↕           ↕
@@ -74,7 +74,7 @@ Controller → Service → Repository
      ↕
   Mapper
 ```
- 
+
 - **Controller**: expone endpoints REST, sin lógica de negocio
 - **Service**: toda la lógica de negocio, recibe y retorna entidades
 - **Repository**: acceso a datos vía Spring Data JPA
@@ -85,35 +85,36 @@ Controller → Service → Repository
 
 Tres roles activos: **ADMIN**, **MANAGER**, **STAFF**.
 
-| Rol | Alcance | branchId |
-|---|---|---|
-| ADMIN | Dueño del tenant, opera sobre cualquier sucursal | JWT sin branchId; envía `X-Branch-Id` por request |
-| MANAGER | Encargado de sucursal: abre/cierra turnos, ve resúmenes y cierre de caja | branchId en el JWT |
-| STAFF | Empleado operativo: solo gestión de pedidos | branchId en el JWT |
+| Rol     | Alcance                                                                  | branchId                                          |
+| ------- | ------------------------------------------------------------------------ | ------------------------------------------------- |
+| ADMIN   | Dueño del tenant, opera sobre cualquier sucursal                         | JWT sin branchId; envía `X-Branch-Id` por request |
+| MANAGER | Encargado de sucursal: abre/cierra turnos, ve resúmenes y cierre de caja | branchId en el JWT                                |
+| STAFF   | Empleado operativo: solo gestión de pedidos                              | branchId en el JWT                                |
 
 La resolución del branchId está centralizada en `SecurityUtils.resolveBranchId`:
 STAFF/MANAGER lo leen del token; ADMIN lo toma del header `X-Branch-Id`
 (400 si falta o es inválido, 403 si no pertenece al tenant del token).
 
 ---
- 
+
 ## Requisitos
- 
+
 - Java 21
 - Docker Desktop
 - Node.js 18+
 - Maven (incluido via Maven Wrapper)
+
 ---
- 
+
 ## Configuración local
- 
+
 ### 1. Clonar el repositorio
- 
+
 ```bash
 git clone https://github.com/tu-usuario/laroka.git
 cd laroka
 ```
- 
+
 ### 2. Variables de entorno
 
 Crear `client/.env.local`, `backoffice/.env.local` basándose en los archivo de ejemplo:
@@ -121,11 +122,12 @@ Crear `client/.env.local`, `backoffice/.env.local` basándose en los archivo de 
 ```bash
 cp client/.env.example client/.env.local
 ```
+
 ```bash
 cp backoffice/.env.example backoffice/.env.local
 ```
 
-Para el backend, las variables se configuran en 
+Para el backend, las variables se configuran en
 `backend/src/main/resources/application-local.yml`:
 
 ```yaml
@@ -153,83 +155,83 @@ jwt:
   expiration: 28800000
 ```
 
-Las variables sensibles (R2, MercadoPago, JWT) se 
-configuran como variables de entorno del sistema o 
+Las variables sensibles (R2, MercadoPago, JWT) se
+configuran como variables de entorno del sistema o
 en el archivo `.env` en la raíz del repo (ignorado por git).
- 
+
 Variables requeridas:
- 
+
 ```env
 # Base de datos
 DB_URL=jdbc:postgresql://localhost:5432/laroka
 DB_USER=postgres
 DB_PASS=postgres
- 
+
 # Cloudflare R2
 R2_ACCESS_KEY=
 R2_SECRET_KEY=
 R2_BUCKET_NAME=laroka-dev
 R2_ENDPOINT=
- 
+
 # MercadoPago
 MERCADOPAGO_KEY=
 MERCADOPAGO_WEBHOOK_SECRET=
- 
+
 # JWT
 JWT_SECRET=
 # Opcional — solo durante una rotación de JWT_SECRET (grace period).
 # Vacío en operación normal. Ver "Seguridad — Rotación de Secretos".
 JWT_SECRET_PREVIOUS=
 JWT_EXPIRATION=28800000
- 
+
 # Web Push (VAPID)
 VAPID_PUBLIC_KEY=
 VAPID_PRIVATE_KEY=
 ```
- 
+
 ```env
 # client/.env.local
 VITE_API_URL=http://localhost:8080
 ```
- 
+
 ### 3. Levantar la base de datos
- 
+
 ```bash
 docker compose up -d
 ```
- 
+
 ### 4. Levantar el backend
- 
+
 ```bash
 make run-back
 ```
- 
+
 El backend queda disponible en `http://localhost:8080`.
- 
+
 Documentación de la API disponible en `http://localhost:8080/swagger-ui.html`.
- 
+
 ### 5. Levantar el frontend cliente
- 
+
 ```bash
 cd client
 npm install
 npm run dev
 ```
- 
+
 Disponible en `http://localhost:5173`.
- 
+
 ### 6. Levantar el backoffice
- 
+
 ```bash
 cd backoffice
 npm install
 npm run dev
 ```
- 
+
 Disponible en `http://localhost:5174`.
- 
+
 ---
- 
+
 ## Desarrollo local — webhooks
 
 Para recibir webhooks de MercadoPago en local se necesita exponer el backend con ngrok.
@@ -275,6 +277,7 @@ ngrok muestra una URL pública del tipo `https://xxxx-xxxx.ngrok-free.app`.
 ### 5. Testear en local sin credenciales MP
 
 Si `MERCADOPAGO_KEY` está vacío, el adapter opera en modo dev:
+
 - `POST /payments/initiate` retorna una URL de sandbox simulada.
 - `POST /payments/webhook` con `{"type":"payment","data":{"id":"<orderId>"}}` activa el pedido directamente (el `id` se trata como `orderId`).
 - La validación de firma se omite cuando `MERCADOPAGO_WEBHOOK_SECRET` está vacío.
@@ -282,7 +285,7 @@ Si `MERCADOPAGO_KEY` está vacío, el adapter opera en modo dev:
 ---
 
 ## Comandos útiles
- 
+
 ```bash
 # Backend
 make run-back   # Levantar backend con perfil local
@@ -291,39 +294,39 @@ make build      # Build sin tests
 
 make run-client       # Levantar frontend cliente con perfil local
 make run-backoffice   # Levantar frontend backoffice con perfil local
- 
+
 # Base de datos
 docker compose up -d      # Levantar PostgreSQL
 docker compose down       # Detener
 docker compose down -v    # Detener y borrar volúmenes (reset completo)
 ```
- 
+
 ---
- 
+
 ## CI/CD
- 
+
 El proyecto tiene workflows de CI (en PR) y CD (en push a main) por componente.
 
 **CI** — corre en cada PR a `main` con cambios en el path correspondiente:
 
-| Workflow | Trigger | Steps |
-|---|---|---|
-| ci-backend.yml | PR con cambios en backend/ | build → linting (Checkstyle) → tests |
-| ci-client.yml | PR con cambios en client/ | build → linting (ESLint) |
-| ci-backoffice.yml | PR con cambios en backoffice/ | build → linting (ESLint) |
- 
+| Workflow          | Trigger                       | Steps                                                       |
+| ----------------- | ----------------------------- | ----------------------------------------------------------- |
+| ci-backend.yml    | PR con cambios en backend/    | lint (Checkstyle) → build → tests (JUnit + IntegrationTest) |
+| ci-client.yml     | PR con cambios en client/     | lint (ESLint) → build → unit (Vitest) → E2E (Playwright)    |
+| ci-backoffice.yml | PR con cambios en backoffice/ | lint (ESLint) → build → unit (Vitest) → E2E (Playwright)    |
+
 Todo merge a main requiere PR con CI en verde.
 
 **CD** — corre en push a `main` con cambios en el path correspondiente:
 
-| Workflow | Trigger | Acción |
-|---|---|---|
-| cd-backend.yml | push a main en backend/ | build & push de imagen Docker (taggeada por SHA + digest SHA256) → deploy a Render |
-| cd-client.yml | push a main en client/ | deploy a Vercel (PWA) |
-| cd-backoffice.yml | push a main en backoffice/ | deploy a Vercel |
- 
+| Workflow          | Trigger                    | Acción                                                                             |
+| ----------------- | -------------------------- | ---------------------------------------------------------------------------------- |
+| cd-backend.yml    | push a main en backend/    | build & push de imagen Docker (taggeada por SHA + digest SHA256) → deploy a Render |
+| cd-client.yml     | push a main en client/     | deploy a Vercel (PWA)                                                              |
+| cd-backoffice.yml | push a main en backoffice/ | deploy a Vercel                                                                    |
+
 ---
- 
+
 ## Seguridad
 
 ### Content Security Policy (CSP)
@@ -418,15 +421,15 @@ Estas dos siempre se rotan juntas (un token R2 emite ambas).
 4. Opcional: limpiar las `push_subscription` viejas que ya no recibirán envíos.
 
 ---
- 
+
 ## Flujo de trabajo
- 
+
 ```bash
 # Arrancar una nueva historia
 git checkout main
 git pull origin main
 git checkout -b feature/US-XX-XX-descripcion
- 
+
 # Al terminar
 git add .
 git commit -m "feat: descripción (US-XX-XX)"
@@ -437,9 +440,9 @@ git push origin feature/US-XX-XX-descripcion
 git checkout main
 git branch -d feature/US-XX-XX-descripcion
 ```
- 
+
 ### Convención de commits
- 
+
 ```
 feat:     nueva funcionalidad
 fix:      corrección de bug
@@ -448,46 +451,52 @@ test:     agregado o corrección de tests
 docs:     documentación
 refactor: refactor de código sin cambio funcional
 ```
- 
+
 ---
- 
+
 ## Migraciones de base de datos
- 
+
 El historial de migraciones vive en `backend/src/main/resources/db/migration/`
 — Flyway es la única fuente de verdad. Cada cambio de esquema es una migración
 versionada nueva (`V{n}__descripcion.sql`).
 
 **Regla estricta:** nunca usar `ddl-auto=create` ni `ddl-auto=update`. Todo cambio de esquema va en una migración Flyway versionada.
- 
+
 ---
- 
+
 ## Módulos del sistema
- 
+
 ### Subsistema Cliente (PWA)
+
 - Selección de sucursal
 - Consulta de menú por categorías
 - Armado de pedido y carrito
 - Pago vía MercadoPago o efectivo
 - Seguimiento del pedido en tiempo real
 - Notificaciones Web Push del estado del pedido
+
 ### Subsistema Backoffice
+
 - Visualización y gestión de pedidos de la sucursal
 - Avance del estado operativo
 - Notificaciones en tiempo real (SSE)
 - Gestión de catálogo (productos, categorías)
 - Apertura/cierre de turnos y cierre de caja por sucursal (MANAGER)
 - Selección de sucursal activa (ADMIN) vía `X-Branch-Id`
+
 ### Backend
+
 - API REST documentada con OpenAPI
 - Autenticación JWT por rol y sucursal, con refresh tokens
 - Integración con MercadoPago vía Adapter pattern
 - Almacenamiento multimedia en Cloudflare R2
 - Cache de menú con Caffeine (Spring Cache)
 - Migraciones de esquema con Flyway
+
 ---
- 
+
 ## Estados del pedido
- 
+
 ```
 PENDING_PAYMENT → RECEIVED → IN_PREPARATION → ON_THE_WAY → DELIVERED
                                            ↘ READY (TAKEAWAY) ↗
@@ -496,11 +505,11 @@ RECEIVED → CANCELLED
 IN_PREPARATION → CANCELLATION_REQUESTED → CANCELLED
                                        → IN_PREPARATION (rechazado)
 ```
- 
+
 ---
- 
+
 ## Documentación
- 
+
 - **Backlog completo**: `docs/BACKLOG.md`
 - **Deuda técnica activa**: `docs/DEUDA_TECNICA.md`
 - **Flags de desarrollo / auditoría**: `docs/AUDIT_DEV_FLAGS.md`
@@ -509,7 +518,7 @@ IN_PREPARATION → CANCELLATION_REQUESTED → CANCELLED
 - **API (local)**: `http://localhost:8080/swagger-ui.html`
 
 ---
- 
+
 ## Licencia
- 
+
 Proyecto privado — todos los derechos reservados.
