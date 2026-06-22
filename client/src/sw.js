@@ -4,6 +4,15 @@ import { CacheFirst, NetworkFirst } from 'workbox-strategies'
 import { ExpirationPlugin } from 'workbox-expiration'
 import { clientsClaim } from 'workbox-core'
 
+// ─── Versión del Service Worker ──────────────────────────────────────────────
+// El SW liga su CSP (la que gobierna sus fetch() de runtime caching) al momento
+// en que se instala. Cuando cambia algo fuera del build —p. ej. la CSP en
+// vercel.json— el sw.js compilado queda byte-idéntico y el navegador NO dispara
+// un update, dejando a los clientes con la CSP vieja. Bumpear esta constante
+// fuerza un sw.js distinto → update → reinstalación con la CSP nueva.
+const SW_VERSION = '2026-06-21-csp-r2dev'
+console.info('[SW] version', SW_VERSION)
+
 // ─── Precache ────────────────────────────────────────────────────────────────
 // vite-plugin-pwa (injectManifest) reemplaza self.__WB_MANIFEST por la lista de
 // assets buildeados (js/css/html). Mantiene el precache que tenía generateSW.

@@ -195,6 +195,15 @@ src/
   como limitación conocida.
 - SSE selective update (US-MT-02) tiene historial de stale closures — área
   frágil. No modificar sin tests previos.
+- CSP del client (PWA): la CSP vive en `client/vercel.json` (header HTTP), no
+  en un `<meta>`. El Service Worker liga su CSP al instalarse y hace `fetch()`
+  de imágenes (CacheFirst) sujeto a esa CSP. Como `vercel.json` no entra al
+  build, cambiar la CSP deja el `sw.js` compilado byte-idéntico y los clientes
+  con SW ya instalado NO toman la CSP nueva. **Regla: al cambiar la CSP en
+  `client/vercel.json`, bumpear `SW_VERSION` en `client/src/sw.js`** (cualquier
+  valor distinto) para forzar la reinstalación del SW. Las imágenes de R2 se
+  sirven desde `*.r2.dev`, presente en `img-src` y `connect-src` (este último
+  porque el SW las trae por `fetch()`).
 
 ## Cómo trabajar con este repo
 
