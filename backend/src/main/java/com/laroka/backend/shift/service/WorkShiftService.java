@@ -249,9 +249,25 @@ public class WorkShiftService {
 
     @Transactional
     public void autoCloseShift(UUID shiftId) {
-        workShiftRepository.findById(shiftId)
-            .filter(s -> s.getStatus() == ShiftStatus.OPEN)
-            .ifPresent(s -> closeShiftInternal(s, null));
+        WorkShift shift = workShiftRepository.findById(shiftId).orElse(null);
+        if (shift == null || shift.getStatus() != ShiftStatus.OPEN) {
+            return;
+        }
+
+        // Nunca eliminar el turno en cierre automático — pueden existir pedidos
+        // activos referenciando este turno. closeShiftInternal elimina el turno
+        // cuando totalOrders == 0, lo cual viola shift_id NOT NULL en orders.
+        // El auto-cierre siempre persiste el turno como CLOSED.
+        WorkShiftSummary summary = calculateSummary(shift);
+        if (summary.getTotalOrders() > 0) {
+            workShiftSummaryRepository.save(summary);
+        }
+
+        shift.setClosedAt(OffsetDateTime.now());
+        shift.setClosedBy(null);
+        shift.setStatus(ShiftStatus.CLOSED);
+        workShiftRepository.save(shift);
+        branchRepository.updateAcceptingOrders(shift.getBranch().getId(), false);
     }
 
     public List<TopProductDTO> getTopProducts(UUID shiftId, Integer branchId) {
