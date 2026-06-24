@@ -3,6 +3,9 @@ package com.laroka.backend.staffuser.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -13,18 +16,25 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.web.server.ResponseStatusException;
 
 import com.laroka.backend.branch.entity.Branch;
 import com.laroka.backend.branch.exception.BranchNotFoundException;
 import com.laroka.backend.branch.repository.BranchRepository;
-import com.laroka.backend.shared.exception.BusinessException;
 import com.laroka.backend.staffuser.entity.StaffUser;
 import com.laroka.backend.staffuser.entity.UserRole;
+import com.laroka.backend.staffuser.exception.StaffUserNotFoundException;
 import com.laroka.backend.staffuser.repository.StaffUserRepository;
+import com.laroka.backend.tenant.entity.Tenant;
 
 @ExtendWith(MockitoExtension.class)
 class StaffUserServiceTest {
+
+	private static final int TENANT_ID = 10;
+	private static final int BRANCH_ID = 1;
+	private static final int USER_ID = 5;
 
 	@Mock private StaffUserRepository staffUserRepository;
 	@Mock private BranchRepository branchRepository;
@@ -33,56 +43,263 @@ class StaffUserServiceTest {
 	@InjectMocks
 	private StaffUserService staffUserService;
 
-	private Branch branch() {
-		return Branch.builder().id(1).name("Playa Unión").build();
+	private Tenant tenant() {
+		return Tenant.builder().id(TENANT_ID).name("La Roka").build();
 	}
 
-	private StaffUser staffUser() {
+	private Branch branch() {
+		return Branch.builder().id(BRANCH_ID).name("Playa Unión").tenant(tenant()).build();
+	}
+
+	private StaffUser existingUser(String name, String email) {
 		return StaffUser.builder()
-			.name("New Staff")
-			.email("newstaff@laroka.com")
-			.passwordHash("plainPassword123")
+			.id(USER_ID)
+			.name(name)
+			.email(email)
+			.passwordHash("$2a$10$hashed")
 			.role(UserRole.STAFF)
 			.branch(branch())
 			.build();
 	}
 
-	@Test
-	void create_validStaffUser_savesAndReturns() {
-		StaffUser staffUser = staffUser();
-		Branch branch = branch();
+	private StaffUser newStaffUser(String name) {
+		return StaffUser.builder()
+			.name(name)
+			.passwordHash("plainPassword123")
+			.role(UserRole.STAFF)
+			.branch(Branch.builder().id(BRANCH_ID).build())
+			.build();
+	}
 
-		when(staffUserRepository.findByEmail("newstaff@laroka.com")).thenReturn(Optional.empty());
-		when(branchRepository.findById(1)).thenReturn(Optional.of(branch));
-		when(passwordEncoder.encode("plainPassword123")).thenReturn("$2a$10$hashedPassword");
-		when(staffUserRepository.save(any(StaffUser.class))).thenReturn(staffUser);
+	// ── US-11-02: create ────────────────────────────────────────────────────────
+
+	@Test
+	void create_generatesEmailFromName() {
+		StaffUser staffUser = newStaffUser("Juan Perez");
+
+		when(staffUserRepository.existsByEmail("juan.perez@laroka.com")).thenReturn(false);
+		when(branchRepository.findById(BRANCH_ID)).thenReturn(Optional.of(branch()));
+		when(passwordEncoder.encode(anyString())).thenReturn("$2a$10$hashed");
+		when(staffUserRepository.save(any(StaffUser.class))).thenAnswer(inv -> inv.getArgument(0));
 
 		StaffUser result = staffUserService.create(staffUser);
 
-		assertThat(result.getName()).isEqualTo("New Staff");
-		assertThat(result.getEmail()).isEqualTo("newstaff@laroka.com");
+		assertThat(result.getEmail()).isEqualTo("juan.perez@laroka.com");
 		verify(staffUserRepository).save(any(StaffUser.class));
 	}
 
 	@Test
-	void create_duplicateEmail_throwsBusinessException() {
-		StaffUser staffUser = staffUser();
+	void create_emailConflict_appendsNumericSuffix() {
+		StaffUser staffUser = newStaffUser("Juan Perez");
 
-		when(staffUserRepository.findByEmail("newstaff@laroka.com")).thenReturn(Optional.of(staffUser));
+		when(staffUserRepository.existsByEmail("juan.perez@laroka.com")).thenReturn(true);
+		when(staffUserRepository.existsByEmail("juan.perez2@laroka.com")).thenReturn(false);
+		when(branchRepository.findById(BRANCH_ID)).thenReturn(Optional.of(branch()));
+		when(passwordEncoder.encode(anyString())).thenReturn("$2a$10$hashed");
+		when(staffUserRepository.save(any(StaffUser.class))).thenAnswer(inv -> inv.getArgument(0));
 
-		assertThatThrownBy(() -> staffUserService.create(staffUser))
-			.isInstanceOf(BusinessException.class)
-			.hasMessage("Email already in use");
+		StaffUser result = staffUserService.create(staffUser);
+
+		assertThat(result.getEmail()).isEqualTo("juan.perez2@laroka.com");
+	}
+
+	@Test
+	void create_multipleSuffixConflicts_incrementsUntilAvailable() {
+		StaffUser staffUser = newStaffUser("Juan Perez");
+
+		when(staffUserRepository.existsByEmail("juan.perez@laroka.com")).thenReturn(true);
+		when(staffUserRepository.existsByEmail("juan.perez2@laroka.com")).thenReturn(true);
+		when(staffUserRepository.existsByEmail("juan.perez3@laroka.com")).thenReturn(false);
+		when(branchRepository.findById(BRANCH_ID)).thenReturn(Optional.of(branch()));
+		when(passwordEncoder.encode(anyString())).thenReturn("$2a$10$hashed");
+		when(staffUserRepository.save(any(StaffUser.class))).thenAnswer(inv -> inv.getArgument(0));
+
+		StaffUser result = staffUserService.create(staffUser);
+
+		assertThat(result.getEmail()).isEqualTo("juan.perez3@laroka.com");
+	}
+
+	@Test
+	void generateEmail_nameWithAccents_normalizes() {
+		when(staffUserRepository.existsByEmail("maria.garcia@laroka.com")).thenReturn(false);
+
+		assertThat(staffUserService.generateEmail("María García")).isEqualTo("maria.garcia@laroka.com");
+	}
+
+	@Test
+	void generateEmail_nameWithNTilde_normalizesToN() {
+		when(staffUserRepository.existsByEmail("juan.ibanez@laroka.com")).thenReturn(false);
+
+		assertThat(staffUserService.generateEmail("Juan Ibáñez")).isEqualTo("juan.ibanez@laroka.com");
+	}
+
+	@Test
+	void generateEmail_nameWithMixedSpecialChars_normalizes() {
+		when(staffUserRepository.existsByEmail("jose.munoz@laroka.com")).thenReturn(false);
+
+		assertThat(staffUserService.generateEmail("José Muñoz")).isEqualTo("jose.munoz@laroka.com");
 	}
 
 	@Test
 	void create_invalidBranch_throwsBranchNotFoundException() {
-		StaffUser staffUser = staffUser();
+		StaffUser staffUser = newStaffUser("New Staff");
 
-		when(staffUserRepository.findByEmail("newstaff@laroka.com")).thenReturn(Optional.empty());
-		when(branchRepository.findById(1)).thenReturn(Optional.empty());
+		when(staffUserRepository.existsByEmail(anyString())).thenReturn(false);
+		when(branchRepository.findById(BRANCH_ID)).thenReturn(Optional.empty());
 
 		assertThatThrownBy(() -> staffUserService.create(staffUser))
 			.isInstanceOf(BranchNotFoundException.class);
+	}
+
+	// ── US-11-03: update ────────────────────────────────────────────────────────
+
+	@Test
+	void update_nameChanged_regeneratesEmail() {
+		StaffUser existing = existingUser("Juan Perez", "juan.perez@laroka.com");
+		StaffUser patch = StaffUser.builder()
+			.name("Juan Garcia")
+			.role(UserRole.MANAGER)
+			.branch(Branch.builder().id(BRANCH_ID).build())
+			.build();
+
+		when(staffUserRepository.findByIdWithBranchAndTenant(USER_ID)).thenReturn(Optional.of(existing));
+		when(branchRepository.existsByIdAndTenantId(BRANCH_ID, TENANT_ID)).thenReturn(true);
+		when(staffUserRepository.existsByEmailAndIdNot("juan.garcia@laroka.com", USER_ID)).thenReturn(false);
+		when(branchRepository.findById(BRANCH_ID)).thenReturn(Optional.of(branch()));
+		when(staffUserRepository.save(any(StaffUser.class))).thenAnswer(inv -> inv.getArgument(0));
+
+		StaffUser result = staffUserService.update(USER_ID, TENANT_ID, patch);
+
+		assertThat(result.getEmail()).isEqualTo("juan.garcia@laroka.com");
+		assertThat(result.getName()).isEqualTo("Juan Garcia");
+		assertThat(result.getRole()).isEqualTo(UserRole.MANAGER);
+	}
+
+	@Test
+	void update_nameUnchanged_doesNotRegenerateEmail() {
+		StaffUser existing = existingUser("Juan Perez", "juan.perez@laroka.com");
+		StaffUser patch = StaffUser.builder()
+			.name("Juan Perez")
+			.role(UserRole.MANAGER)
+			.branch(Branch.builder().id(BRANCH_ID).build())
+			.build();
+
+		when(staffUserRepository.findByIdWithBranchAndTenant(USER_ID)).thenReturn(Optional.of(existing));
+		when(branchRepository.existsByIdAndTenantId(BRANCH_ID, TENANT_ID)).thenReturn(true);
+		when(branchRepository.findById(BRANCH_ID)).thenReturn(Optional.of(branch()));
+		when(staffUserRepository.save(any(StaffUser.class))).thenAnswer(inv -> inv.getArgument(0));
+
+		StaffUser result = staffUserService.update(USER_ID, TENANT_ID, patch);
+
+		assertThat(result.getEmail()).isEqualTo("juan.perez@laroka.com");
+		verify(staffUserRepository, never()).existsByEmailAndIdNot(anyString(), anyInt());
+	}
+
+	@Test
+	void update_branchFromAnotherTenant_throwsForbidden() {
+		StaffUser existing = existingUser("Juan Perez", "juan.perez@laroka.com");
+		int foreignBranchId = 99;
+		StaffUser patch = StaffUser.builder()
+			.name("Juan Perez")
+			.role(UserRole.STAFF)
+			.branch(Branch.builder().id(foreignBranchId).build())
+			.build();
+
+		when(staffUserRepository.findByIdWithBranchAndTenant(USER_ID)).thenReturn(Optional.of(existing));
+		when(branchRepository.existsByIdAndTenantId(foreignBranchId, TENANT_ID)).thenReturn(false);
+
+		assertThatThrownBy(() -> staffUserService.update(USER_ID, TENANT_ID, patch))
+			.isInstanceOf(ResponseStatusException.class)
+			.satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode().value())
+				.isEqualTo(HttpStatus.FORBIDDEN.value()));
+	}
+
+	@Test
+	void update_userNotFound_throwsNotFoundException() {
+		StaffUser patch = StaffUser.builder()
+			.name("Juan Perez")
+			.role(UserRole.STAFF)
+			.branch(Branch.builder().id(BRANCH_ID).build())
+			.build();
+
+		when(staffUserRepository.findByIdWithBranchAndTenant(99)).thenReturn(Optional.empty());
+
+		assertThatThrownBy(() -> staffUserService.update(99, TENANT_ID, patch))
+			.isInstanceOf(StaffUserNotFoundException.class);
+	}
+
+	// ── US-11-05: setStatus ─────────────────────────────────────────────────────
+
+	@Test
+	void setStatus_deactivatesAnotherUser_succeeds() {
+		int adminUserId = 99;
+		StaffUser existing = existingUser("Juan Perez", "juan.perez@laroka.com");
+
+		when(staffUserRepository.findByIdWithBranchAndTenant(USER_ID)).thenReturn(Optional.of(existing));
+		when(staffUserRepository.save(any(StaffUser.class))).thenAnswer(inv -> inv.getArgument(0));
+
+		staffUserService.setStatus(USER_ID, TENANT_ID, adminUserId, false);
+
+		assertThat(existing.isActive()).isFalse();
+		verify(staffUserRepository).save(existing);
+	}
+
+	@Test
+	void setStatus_selfDeactivation_throwsBadRequest() {
+		StaffUser existing = existingUser("Juan Perez", "juan.perez@laroka.com");
+
+		when(staffUserRepository.findByIdWithBranchAndTenant(USER_ID)).thenReturn(Optional.of(existing));
+
+		assertThatThrownBy(() -> staffUserService.setStatus(USER_ID, TENANT_ID, USER_ID, false))
+			.isInstanceOf(ResponseStatusException.class)
+			.satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode().value())
+				.isEqualTo(HttpStatus.BAD_REQUEST.value()));
+	}
+
+	@Test
+	void setStatus_selfActivation_succeeds() {
+		int adminUserId = USER_ID;
+		StaffUser existing = existingUser("Juan Perez", "juan.perez@laroka.com");
+		existing.setActive(false);
+
+		when(staffUserRepository.findByIdWithBranchAndTenant(USER_ID)).thenReturn(Optional.of(existing));
+		when(staffUserRepository.save(any(StaffUser.class))).thenAnswer(inv -> inv.getArgument(0));
+
+		staffUserService.setStatus(USER_ID, TENANT_ID, adminUserId, true);
+
+		assertThat(existing.isActive()).isTrue();
+	}
+
+	@Test
+	void setStatus_userNotFound_throwsNotFoundException() {
+		when(staffUserRepository.findByIdWithBranchAndTenant(99)).thenReturn(Optional.empty());
+
+		assertThatThrownBy(() -> staffUserService.setStatus(99, TENANT_ID, 1, false))
+			.isInstanceOf(StaffUserNotFoundException.class);
+	}
+
+	// ── US-11-04: resetPassword ─────────────────────────────────────────────────
+
+	@Test
+	void resetPassword_hashesAndSavesNewPassword() {
+		StaffUser existing = existingUser("Juan Perez", "juan.perez@laroka.com");
+
+		when(staffUserRepository.findByIdWithBranchAndTenant(USER_ID)).thenReturn(Optional.of(existing));
+		when(passwordEncoder.encode("newPassword123")).thenReturn("$2a$10$newHashed");
+		when(staffUserRepository.save(any(StaffUser.class))).thenAnswer(inv -> inv.getArgument(0));
+
+		staffUserService.resetPassword(USER_ID, TENANT_ID, "newPassword123");
+
+		verify(passwordEncoder).encode("newPassword123");
+		verify(staffUserRepository).save(any(StaffUser.class));
+		assertThat(existing.getPasswordHash()).isEqualTo("$2a$10$newHashed");
+	}
+
+	@Test
+	void resetPassword_userNotFound_throwsNotFoundException() {
+		when(staffUserRepository.findByIdWithBranchAndTenant(99)).thenReturn(Optional.empty());
+
+		assertThatThrownBy(() -> staffUserService.resetPassword(99, TENANT_ID, "newPassword123"))
+			.isInstanceOf(StaffUserNotFoundException.class);
 	}
 }

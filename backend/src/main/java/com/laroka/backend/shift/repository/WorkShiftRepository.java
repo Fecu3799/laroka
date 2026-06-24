@@ -1,5 +1,6 @@
 package com.laroka.backend.shift.repository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -16,6 +17,9 @@ import com.laroka.backend.shift.entity.WorkShift;
 public interface WorkShiftRepository extends JpaRepository<WorkShift, UUID> {
 
     Optional<WorkShift> findByBranchIdAndStatus(Integer branchId, ShiftStatus status);
+
+    @Query("SELECT s FROM WorkShift s JOIN FETCH s.branch WHERE s.status = :status")
+    List<WorkShift> findAllByStatusWithBranch(@Param("status") ShiftStatus status);
 
     @EntityGraph(attributePaths = {"openedBy"})
     @Query("SELECT s FROM WorkShift s WHERE s.branch.id = :branchId AND s.status = :status")

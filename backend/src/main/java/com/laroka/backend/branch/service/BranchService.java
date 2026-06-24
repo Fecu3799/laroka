@@ -7,7 +7,9 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import com.laroka.backend.branch.entity.Branch;
 import com.laroka.backend.branch.entity.BranchQR;
@@ -61,6 +63,15 @@ public class BranchService {
 
 	public void delete(Integer id) {
 		repository.delete(findById(id));
+	}
+
+	public Branch updateConfig(Integer id, Integer tenantId, Integer maxShiftDurationMinutes) {
+		if (!repository.existsByIdAndTenantId(id, tenantId)) {
+			throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Branch does not belong to your tenant");
+		}
+		Branch branch = findById(id);
+		branch.setMaxShiftDurationMinutes(maxShiftDurationMinutes);
+		return repository.save(branch);
 	}
 
 	public BranchQR saveQrConfig(Integer branchId, String mpPosId, String mpQrId) {

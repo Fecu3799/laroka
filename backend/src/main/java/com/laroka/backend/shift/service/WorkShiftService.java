@@ -9,6 +9,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -40,6 +42,7 @@ import com.laroka.backend.staffuser.repository.StaffUserRepository;
 
 import lombok.RequiredArgsConstructor;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class WorkShiftService {
@@ -235,6 +238,20 @@ public class WorkShiftService {
         WorkShiftSummary summary = calculateSummary(shift);
         summary.setCalculatedAt(OffsetDateTime.now());
         return summary;
+    }
+
+    public List<WorkShift> findExpiredOpenShifts() {
+        OffsetDateTime now = OffsetDateTime.now();
+        return workShiftRepository.findAllByStatusWithBranch(ShiftStatus.OPEN).stream()
+            .filter(s -> s.getOpenedAt().plusMinutes(s.getBranch().getMaxShiftDurationMinutes()).isBefore(now))
+            .toList();
+    }
+
+    @Transactional
+    public void autoCloseShift(UUID shiftId) {
+        workShiftRepository.findById(shiftId)
+            .filter(s -> s.getStatus() == ShiftStatus.OPEN)
+            .ifPresent(s -> closeShiftInternal(s, null));
     }
 
     public List<TopProductDTO> getTopProducts(UUID shiftId, Integer branchId) {

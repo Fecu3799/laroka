@@ -43,6 +43,10 @@ public class AuthService {
 			throw new InvalidCredentialsException();
 		}
 
+		if (!user.isActive()) {
+			throw new InvalidCredentialsException("Usuario desactivado");
+		}
+
 		String accessToken = jwtService.generateToken(user);
 		String rawRefreshToken = generateAndPersistRefreshToken(user);
 		return new LoginTokens(accessToken, rawRefreshToken);

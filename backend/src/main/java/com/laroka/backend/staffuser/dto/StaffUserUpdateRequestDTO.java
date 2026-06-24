@@ -13,13 +13,10 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class StaffUserRequestDTO {
+public class StaffUserUpdateRequestDTO {
 
 	@NotBlank(message = "Name is required")
 	private String name;
-
-	@NotBlank(message = "Password is required")
-	private String password;
 
 	@NotNull(message = "Role is required")
 	private UserRole role;

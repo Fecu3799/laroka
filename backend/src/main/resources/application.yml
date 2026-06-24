@@ -6,8 +6,14 @@ spring:
     username: ${DB_USER}
     password: ${DB_PASS}
     hikari:
-      maximum-pool-size: 20
-  jpa:
+      maximum-pool-size: 5
+      minimum-idle: 1
+      idle-timeout: 120000
+      max-lifetime: 180000
+      keepalive-time: 60000
+      connection-timeout: 20000
+      validation-timeout: 3000
+      connection-test-query: SELECT 1
     hibernate:
       ddl-auto: validate
     properties:

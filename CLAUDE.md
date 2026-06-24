@@ -81,6 +81,8 @@ Capas obligatorias por módulo:
 | V20     | work_shift open unique index               |
 | V21     | order shift_id NOT NULL                     |
 | V22     | push_subscription + order push_subscription_id |
+| V23     | staff_user active                          |
+| V24     | branch max_shift_duration_minutes          |
 
 Toda migración nueva debe ser la siguiente versión disponible en esta tabla.
 Actualizar esta tabla al agregar una migración.
