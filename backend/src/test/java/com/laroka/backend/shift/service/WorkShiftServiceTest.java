@@ -551,4 +551,78 @@ class WorkShiftServiceTest {
         assertThatThrownBy(() -> workShiftService.getTopProducts(shiftId, 99))
             .isInstanceOf(BusinessException.class);
     }
+
+    // ── autoCloseShift ───────────────────────────────────────────────────────────
+
+    @Test
+    void autoCloseShift_shiftWithActiveOrdersOnly_closesWithoutDeleting() {
+        // Escenario del bug: turno con pedidos activos (RECEIVED/IN_PREP),
+        // sin ninguno DELIVERED ni CANCELLED → calculateSummary devuelve totalOrders=0.
+        // El auto-cierre NO debe eliminar el turno (viola shift_id NOT NULL en orders).
+        Branch branch = branch();
+        WorkShift shift = openShift(branch, staffUser());
+        UUID shiftId = shift.getId();
+
+        when(workShiftRepository.findById(shiftId)).thenReturn(Optional.of(shift));
+        // Sin pedidos DELIVERED/CANCELLED
+        when(orderRepository.findByShiftIdAndStatusIn(eq(shiftId), anyCollection()))
+            .thenReturn(List.of());
+        when(workShiftRepository.save(any(WorkShift.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        workShiftService.autoCloseShift(shiftId);
+
+        // El turno debe quedar CLOSED, nunca eliminado
+        ArgumentCaptor<WorkShift> captor = ArgumentCaptor.forClass(WorkShift.class);
+        verify(workShiftRepository).save(captor.capture());
+        assertThat(captor.getValue().getStatus()).isEqualTo(ShiftStatus.CLOSED);
+        assertThat(captor.getValue().getClosedAt()).isNotNull();
+        assertThat(captor.getValue().getClosedBy()).isNull();
+        verify(workShiftRepository, never()).delete(any(WorkShift.class));
+        // Sin actividad → no se crea summary, pero sí se deshabilita recepción de pedidos
+        verify(workShiftSummaryRepository, never()).save(any());
+        verify(branchRepository).updateAcceptingOrders(1, false);
+    }
+
+    @Test
+    void autoCloseShift_shiftWithActivity_closesAndSavesSummary() {
+        Branch branch = branch();
+        WorkShift shift = openShift(branch, staffUser());
+        UUID shiftId = shift.getId();
+
+        Order delivered = Order.builder().id(UUID.randomUUID()).status(OrderStatus.DELIVERED)
+            .orderType(OrderType.DELIVERY).totalAmount(new BigDecimal("800.00")).build();
+        Payment payment = Payment.builder().method(PaymentMethod.CASH).order(delivered).build();
+
+        when(workShiftRepository.findById(shiftId)).thenReturn(Optional.of(shift));
+        when(orderRepository.findByShiftIdAndStatusIn(eq(shiftId), anyCollection()))
+            .thenReturn(List.of(delivered));
+        when(paymentRepository.findByOrderIdIn(anyCollection())).thenReturn(List.of(payment));
+        when(workShiftRepository.save(any(WorkShift.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(workShiftSummaryRepository.save(any(WorkShiftSummary.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        workShiftService.autoCloseShift(shiftId);
+
+        verify(workShiftSummaryRepository).save(any(WorkShiftSummary.class));
+        verify(workShiftRepository).save(any(WorkShift.class));
+        verify(workShiftRepository, never()).delete(any(WorkShift.class));
+        verify(branchRepository).updateAcceptingOrders(1, false);
+    }
+
+    @Test
+    void autoCloseShift_alreadyClosed_doesNothing() {
+        Branch branch = branch();
+        WorkShift shift = WorkShift.builder()
+            .id(UUID.randomUUID()).branch(branch)
+            .openedAt(OffsetDateTime.now().minusHours(10))
+            .closedAt(OffsetDateTime.now().minusHours(1))
+            .status(ShiftStatus.CLOSED).build();
+
+        when(workShiftRepository.findById(shift.getId())).thenReturn(Optional.of(shift));
+
+        workShiftService.autoCloseShift(shift.getId());
+
+        verify(workShiftRepository, never()).save(any());
+        verify(workShiftSummaryRepository, never()).save(any());
+        verify(branchRepository, never()).updateAcceptingOrders(anyInt(), anyBoolean());
+    }
 }
