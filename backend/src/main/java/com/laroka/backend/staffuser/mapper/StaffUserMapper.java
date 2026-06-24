@@ -5,6 +5,7 @@ import org.springframework.stereotype.Component;
 import com.laroka.backend.branch.entity.Branch;
 import com.laroka.backend.staffuser.dto.StaffUserRequestDTO;
 import com.laroka.backend.staffuser.dto.StaffUserResponseDTO;
+import com.laroka.backend.staffuser.dto.StaffUserUpdateRequestDTO;
 import com.laroka.backend.staffuser.entity.StaffUser;
 
 @Component
@@ -34,6 +35,17 @@ public class StaffUserMapper {
 		return StaffUser.builder()
 			.name(dto.getName())
 			.passwordHash(dto.getPassword())
+			.role(dto.getRole())
+			.branch(Branch.builder().id(dto.getBranchId()).build())
+			.build();
+	}
+
+	public StaffUser toUpdateEntity(StaffUserUpdateRequestDTO dto) {
+		if (dto == null) {
+			return null;
+		}
+		return StaffUser.builder()
+			.name(dto.getName())
 			.role(dto.getRole())
 			.branch(Branch.builder().id(dto.getBranchId()).build())
 			.build();

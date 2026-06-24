@@ -7,14 +7,18 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.laroka.backend.shared.security.CustomUserDetails;
+import com.laroka.backend.staffuser.dto.StaffUserPasswordResetRequestDTO;
 import com.laroka.backend.staffuser.dto.StaffUserRequestDTO;
 import com.laroka.backend.staffuser.dto.StaffUserResponseDTO;
+import com.laroka.backend.staffuser.dto.StaffUserUpdateRequestDTO;
 import com.laroka.backend.staffuser.mapper.StaffUserMapper;
 import com.laroka.backend.staffuser.service.StaffUserService;
 
@@ -51,5 +55,28 @@ public class StaffUserController {
 		var staffUser = staffUserMapper.toEntity(dto);
 		var saved = staffUserService.create(staffUser);
 		return ResponseEntity.status(HttpStatus.CREATED).body(staffUserMapper.toResponseDTO(saved));
+	}
+
+	@PatchMapping("/{id}")
+	@PreAuthorize("hasRole('ADMIN')")
+	@Operation(summary = "Update staff user", description = "Updates name, role and branch of a staff user (ADMIN only)")
+	public ResponseEntity<StaffUserResponseDTO> update(
+			@PathVariable Integer id,
+			@Valid @RequestBody StaffUserUpdateRequestDTO dto,
+			@AuthenticationPrincipal CustomUserDetails principal) {
+		var patch = staffUserMapper.toUpdateEntity(dto);
+		var updated = staffUserService.update(id, principal.getTenantId(), patch);
+		return ResponseEntity.ok(staffUserMapper.toResponseDTO(updated));
+	}
+
+	@PatchMapping("/{id}/password")
+	@PreAuthorize("hasRole('ADMIN')")
+	@Operation(summary = "Reset staff user password", description = "Replaces the password of a staff user (ADMIN only)")
+	public ResponseEntity<Void> resetPassword(
+			@PathVariable Integer id,
+			@Valid @RequestBody StaffUserPasswordResetRequestDTO dto,
+			@AuthenticationPrincipal CustomUserDetails principal) {
+		staffUserService.resetPassword(id, principal.getTenantId(), dto.getNewPassword());
+		return ResponseEntity.ok().build();
 	}
 }

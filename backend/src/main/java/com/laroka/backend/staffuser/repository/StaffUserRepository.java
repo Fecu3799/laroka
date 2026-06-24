@@ -17,6 +17,8 @@ public interface StaffUserRepository extends JpaRepository<StaffUser, Integer> {
 
 	boolean existsByEmail(String email);
 
+	boolean existsByEmailAndIdNot(String email, Integer id);
+
 	@Query("SELECT u FROM StaffUser u JOIN FETCH u.branch b JOIN FETCH b.tenant WHERE u.email = :email")
 	Optional<StaffUser> findByEmailWithBranchAndTenant(@Param("email") String email);
 
