@@ -21,6 +21,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 
 import com.laroka.backend.branch.dto.AcceptingOrdersResponseDTO;
+import com.laroka.backend.branch.dto.BranchConfigRequestDTO;
 import com.laroka.backend.branch.dto.BranchRequestDTO;
 import com.laroka.backend.branch.dto.BranchResponseDTO;
 import com.laroka.backend.branch.dto.QrConfigRequestDTO;
@@ -94,6 +95,17 @@ public class BranchController {
 		Integer branchId = securityUtils.resolveBranchId(principal, request);
 		boolean accepting = workShiftService.toggleAcceptingOrders(branchId);
 		return ResponseEntity.ok(AcceptingOrdersResponseDTO.builder().acceptingOrders(accepting).build());
+	}
+
+	@PatchMapping("/{id}/config")
+	@PreAuthorize("hasRole('ADMIN')")
+	@Operation(summary = "Update branch config", description = "Updates configurable settings for a branch (ADMIN only)")
+	public ResponseEntity<BranchResponseDTO> updateConfig(
+			@PathVariable Integer id,
+			@Valid @RequestBody BranchConfigRequestDTO dto,
+			@AuthenticationPrincipal CustomUserDetails principal) {
+		Branch updated = service.updateConfig(id, principal.getTenantId(), dto.getMaxShiftDurationMinutes());
+		return ResponseEntity.ok(mapper.toResponseDTO(updated));
 	}
 
 	@PostMapping("/{id}/qr-config")

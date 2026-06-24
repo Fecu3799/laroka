@@ -64,6 +64,10 @@ public class Branch {
 	@Column(name = "accepting_orders", nullable = false)
 	private boolean acceptingOrders;
 
+	@Builder.Default
+	@Column(name = "max_shift_duration_minutes", nullable = false)
+	private Integer maxShiftDurationMinutes = 720;
+
 	@ManyToOne(fetch = FetchType.LAZY)
 	@JoinColumn(name = "tenant_id", nullable = false)
 	private Tenant tenant;

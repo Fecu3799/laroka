@@ -19,6 +19,7 @@ public class BranchResponseDTO {
 	private String address;
 	private Integer estimatedDeliveryMinutes;
 	private String phone;
+	private Integer maxShiftDurationMinutes;
 	private Integer tenantId;
 	private TenantResponseDTO tenant;
 	private LocalDateTime createdAt;

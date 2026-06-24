@@ -27,6 +27,7 @@ public class BranchMapper {
 			.address(branch.getAddress())
 			.estimatedDeliveryMinutes(branch.getEstimatedDeliveryMinutes())
 			.phone(branch.getPhone())
+			.maxShiftDurationMinutes(branch.getMaxShiftDurationMinutes())
 			.tenantId(branch.getTenant().getId())
 			.tenant(tenantMapper.toResponseDTO(branch.getTenant()))
 			.createdAt(branch.getCreatedAt())
