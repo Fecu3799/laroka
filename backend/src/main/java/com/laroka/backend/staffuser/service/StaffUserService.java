@@ -62,6 +62,22 @@ public class StaffUserService {
 		return staffUserRepository.save(existing);
 	}
 
+	public void setStatus(Integer id, Integer tenantId, Integer authenticatedUserId, boolean active) {
+		StaffUser existing = staffUserRepository.findByIdWithBranchAndTenant(id)
+			.orElseThrow(() -> new StaffUserNotFoundException(id));
+
+		if (!existing.getBranch().getTenant().getId().equals(tenantId)) {
+			throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Staff user does not belong to your tenant");
+		}
+
+		if (!active && id.equals(authenticatedUserId)) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El ADMIN no puede desactivarse a sí mismo");
+		}
+
+		existing.setActive(active);
+		staffUserRepository.save(existing);
+	}
+
 	public void resetPassword(Integer id, Integer tenantId, String newPassword) {
 		StaffUser existing = staffUserRepository.findByIdWithBranchAndTenant(id)
 			.orElseThrow(() -> new StaffUserNotFoundException(id));

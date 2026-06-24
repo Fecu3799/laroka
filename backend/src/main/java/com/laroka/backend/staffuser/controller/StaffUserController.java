@@ -18,6 +18,7 @@ import com.laroka.backend.shared.security.CustomUserDetails;
 import com.laroka.backend.staffuser.dto.StaffUserPasswordResetRequestDTO;
 import com.laroka.backend.staffuser.dto.StaffUserRequestDTO;
 import com.laroka.backend.staffuser.dto.StaffUserResponseDTO;
+import com.laroka.backend.staffuser.dto.StaffUserStatusRequestDTO;
 import com.laroka.backend.staffuser.dto.StaffUserUpdateRequestDTO;
 import com.laroka.backend.staffuser.mapper.StaffUserMapper;
 import com.laroka.backend.staffuser.service.StaffUserService;
@@ -67,6 +68,17 @@ public class StaffUserController {
 		var patch = staffUserMapper.toUpdateEntity(dto);
 		var updated = staffUserService.update(id, principal.getTenantId(), patch);
 		return ResponseEntity.ok(staffUserMapper.toResponseDTO(updated));
+	}
+
+	@PatchMapping("/{id}/status")
+	@PreAuthorize("hasRole('ADMIN')")
+	@Operation(summary = "Set staff user status", description = "Activates or deactivates a staff user (ADMIN only)")
+	public ResponseEntity<Void> setStatus(
+			@PathVariable Integer id,
+			@Valid @RequestBody StaffUserStatusRequestDTO dto,
+			@AuthenticationPrincipal CustomUserDetails principal) {
+		staffUserService.setStatus(id, principal.getTenantId(), principal.getUserId(), dto.getActive());
+		return ResponseEntity.ok().build();
 	}
 
 	@PatchMapping("/{id}/password")

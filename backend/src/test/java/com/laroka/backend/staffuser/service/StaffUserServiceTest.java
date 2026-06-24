@@ -228,6 +228,56 @@ class StaffUserServiceTest {
 			.isInstanceOf(StaffUserNotFoundException.class);
 	}
 
+	// ── US-11-05: setStatus ─────────────────────────────────────────────────────
+
+	@Test
+	void setStatus_deactivatesAnotherUser_succeeds() {
+		int adminUserId = 99;
+		StaffUser existing = existingUser("Juan Perez", "juan.perez@laroka.com");
+
+		when(staffUserRepository.findByIdWithBranchAndTenant(USER_ID)).thenReturn(Optional.of(existing));
+		when(staffUserRepository.save(any(StaffUser.class))).thenAnswer(inv -> inv.getArgument(0));
+
+		staffUserService.setStatus(USER_ID, TENANT_ID, adminUserId, false);
+
+		assertThat(existing.isActive()).isFalse();
+		verify(staffUserRepository).save(existing);
+	}
+
+	@Test
+	void setStatus_selfDeactivation_throwsBadRequest() {
+		StaffUser existing = existingUser("Juan Perez", "juan.perez@laroka.com");
+
+		when(staffUserRepository.findByIdWithBranchAndTenant(USER_ID)).thenReturn(Optional.of(existing));
+
+		assertThatThrownBy(() -> staffUserService.setStatus(USER_ID, TENANT_ID, USER_ID, false))
+			.isInstanceOf(ResponseStatusException.class)
+			.satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode().value())
+				.isEqualTo(HttpStatus.BAD_REQUEST.value()));
+	}
+
+	@Test
+	void setStatus_selfActivation_succeeds() {
+		int adminUserId = USER_ID;
+		StaffUser existing = existingUser("Juan Perez", "juan.perez@laroka.com");
+		existing.setActive(false);
+
+		when(staffUserRepository.findByIdWithBranchAndTenant(USER_ID)).thenReturn(Optional.of(existing));
+		when(staffUserRepository.save(any(StaffUser.class))).thenAnswer(inv -> inv.getArgument(0));
+
+		staffUserService.setStatus(USER_ID, TENANT_ID, adminUserId, true);
+
+		assertThat(existing.isActive()).isTrue();
+	}
+
+	@Test
+	void setStatus_userNotFound_throwsNotFoundException() {
+		when(staffUserRepository.findByIdWithBranchAndTenant(99)).thenReturn(Optional.empty());
+
+		assertThatThrownBy(() -> staffUserService.setStatus(99, TENANT_ID, 1, false))
+			.isInstanceOf(StaffUserNotFoundException.class);
+	}
+
 	// ── US-11-04: resetPassword ─────────────────────────────────────────────────
 
 	@Test

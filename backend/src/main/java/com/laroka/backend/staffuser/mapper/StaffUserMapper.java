@@ -22,7 +22,7 @@ public class StaffUserMapper {
 			.role(user.getRole())
 			.branchId(user.getBranch().getId())
 			.branchName(user.getBranch().getName())
-			.active(true)
+			.active(user.isActive())
 			.createdAt(user.getCreatedAt())
 			.updatedAt(user.getUpdatedAt())
 			.build();

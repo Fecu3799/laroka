@@ -47,6 +47,20 @@ class AuthServiceTest {
 			.build();
 	}
 
+	private StaffUser inactiveUser() {
+		Tenant tenant = Tenant.builder().id(1).name("LaRoka").build();
+		Branch branch = Branch.builder().id(1).name("Playa Unión").tenant(tenant).build();
+		return StaffUser.builder()
+			.id(2)
+			.name("Inactive Staff")
+			.email("inactive@laroka.com")
+			.passwordHash("$2a$10$hashedpassword")
+			.role(UserRole.STAFF)
+			.active(false)
+			.branch(branch)
+			.build();
+	}
+
 	@Test
 	void login_validCredentials_returnsBothTokens() {
 		StaffUser user = staffUser();
@@ -79,5 +93,16 @@ class AuthServiceTest {
 		assertThatThrownBy(() -> authService.login("admin@laroka.com", "wrongpassword"))
 			.isInstanceOf(InvalidCredentialsException.class)
 			.hasMessage("Invalid credentials");
+	}
+
+	@Test
+	void login_inactiveUser_throwsInvalidCredentialsException() {
+		StaffUser user = inactiveUser();
+		when(staffUserRepository.findByEmailWithBranchAndTenant("inactive@laroka.com")).thenReturn(Optional.of(user));
+		when(passwordEncoder.matches("password123", user.getPasswordHash())).thenReturn(true);
+
+		assertThatThrownBy(() -> authService.login("inactive@laroka.com", "password123"))
+			.isInstanceOf(InvalidCredentialsException.class)
+			.hasMessage("Usuario desactivado");
 	}
 }

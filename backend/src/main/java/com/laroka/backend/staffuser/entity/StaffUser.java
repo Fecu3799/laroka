@@ -47,6 +47,10 @@ public class StaffUser {
 	@Column(name = "role", nullable = false)
 	private UserRole role;
 
+	@Builder.Default
+	@Column(name = "active", nullable = false)
+	private boolean active = true;
+
 	@ManyToOne(fetch = FetchType.LAZY)
 	@JoinColumn(name = "branch_id", nullable = false)
 	private Branch branch;
