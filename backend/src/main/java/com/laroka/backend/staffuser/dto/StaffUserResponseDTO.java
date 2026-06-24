@@ -20,6 +20,8 @@ public class StaffUserResponseDTO {
 	private String email;
 	private UserRole role;
 	private Integer branchId;
+	private String branchName;
+	private boolean active;
 	private LocalDateTime createdAt;
 	private LocalDateTime updatedAt;
 }

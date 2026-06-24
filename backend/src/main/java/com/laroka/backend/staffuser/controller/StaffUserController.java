@@ -1,13 +1,18 @@
 package com.laroka.backend.staffuser.controller;
 
+import java.util.List;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.laroka.backend.shared.security.CustomUserDetails;
 import com.laroka.backend.staffuser.dto.StaffUserRequestDTO;
 import com.laroka.backend.staffuser.dto.StaffUserResponseDTO;
 import com.laroka.backend.staffuser.mapper.StaffUserMapper;
@@ -27,6 +32,17 @@ public class StaffUserController {
 
 	private final StaffUserService staffUserService;
 	private final StaffUserMapper staffUserMapper;
+
+	@GetMapping
+	@PreAuthorize("hasRole('ADMIN')")
+	@Operation(summary = "List staff users", description = "Returns all staff users for the authenticated ADMIN's tenant")
+	public ResponseEntity<List<StaffUserResponseDTO>> findAll(@AuthenticationPrincipal CustomUserDetails principal) {
+		List<StaffUserResponseDTO> response = staffUserService.findAllByTenantId(principal.getTenantId())
+			.stream()
+			.map(staffUserMapper::toResponseDTO)
+			.toList();
+		return ResponseEntity.ok(response);
+	}
 
 	@PostMapping
 	@PreAuthorize("hasRole('ADMIN')")

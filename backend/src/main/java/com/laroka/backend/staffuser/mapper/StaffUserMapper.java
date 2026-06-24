@@ -20,6 +20,8 @@ public class StaffUserMapper {
 			.email(user.getEmail())
 			.role(user.getRole())
 			.branchId(user.getBranch().getId())
+			.branchName(user.getBranch().getName())
+			.active(true)
 			.createdAt(user.getCreatedAt())
 			.updatedAt(user.getUpdatedAt())
 			.build();
@@ -31,7 +33,6 @@ public class StaffUserMapper {
 		}
 		return StaffUser.builder()
 			.name(dto.getName())
-			.email(dto.getEmail())
 			.passwordHash(dto.getPassword())
 			.role(dto.getRole())
 			.branch(Branch.builder().id(dto.getBranchId()).build())

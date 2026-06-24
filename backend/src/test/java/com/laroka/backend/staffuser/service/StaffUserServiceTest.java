@@ -3,6 +3,7 @@ package com.laroka.backend.staffuser.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -18,7 +19,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import com.laroka.backend.branch.entity.Branch;
 import com.laroka.backend.branch.exception.BranchNotFoundException;
 import com.laroka.backend.branch.repository.BranchRepository;
-import com.laroka.backend.shared.exception.BusinessException;
 import com.laroka.backend.staffuser.entity.StaffUser;
 import com.laroka.backend.staffuser.entity.UserRole;
 import com.laroka.backend.staffuser.repository.StaffUserRepository;
@@ -37,10 +37,9 @@ class StaffUserServiceTest {
 		return Branch.builder().id(1).name("Playa Unión").build();
 	}
 
-	private StaffUser staffUser() {
+	private StaffUser staffUser(String name) {
 		return StaffUser.builder()
-			.name("New Staff")
-			.email("newstaff@laroka.com")
+			.name(name)
 			.passwordHash("plainPassword123")
 			.role(UserRole.STAFF)
 			.branch(branch())
@@ -48,38 +47,83 @@ class StaffUserServiceTest {
 	}
 
 	@Test
-	void create_validStaffUser_savesAndReturns() {
-		StaffUser staffUser = staffUser();
-		Branch branch = branch();
+	void create_generatesEmailFromName() {
+		StaffUser staffUser = staffUser("Juan Perez");
 
-		when(staffUserRepository.findByEmail("newstaff@laroka.com")).thenReturn(Optional.empty());
-		when(branchRepository.findById(1)).thenReturn(Optional.of(branch));
-		when(passwordEncoder.encode("plainPassword123")).thenReturn("$2a$10$hashedPassword");
-		when(staffUserRepository.save(any(StaffUser.class))).thenReturn(staffUser);
+		when(staffUserRepository.existsByEmail("juan.perez@laroka.com")).thenReturn(false);
+		when(branchRepository.findById(1)).thenReturn(Optional.of(branch()));
+		when(passwordEncoder.encode(anyString())).thenReturn("$2a$10$hashed");
+		when(staffUserRepository.save(any(StaffUser.class))).thenAnswer(inv -> inv.getArgument(0));
 
 		StaffUser result = staffUserService.create(staffUser);
 
-		assertThat(result.getName()).isEqualTo("New Staff");
-		assertThat(result.getEmail()).isEqualTo("newstaff@laroka.com");
+		assertThat(result.getEmail()).isEqualTo("juan.perez@laroka.com");
 		verify(staffUserRepository).save(any(StaffUser.class));
 	}
 
 	@Test
-	void create_duplicateEmail_throwsBusinessException() {
-		StaffUser staffUser = staffUser();
+	void create_emailConflict_appendsNumericSuffix() {
+		StaffUser staffUser = staffUser("Juan Perez");
 
-		when(staffUserRepository.findByEmail("newstaff@laroka.com")).thenReturn(Optional.of(staffUser));
+		when(staffUserRepository.existsByEmail("juan.perez@laroka.com")).thenReturn(true);
+		when(staffUserRepository.existsByEmail("juan.perez2@laroka.com")).thenReturn(false);
+		when(branchRepository.findById(1)).thenReturn(Optional.of(branch()));
+		when(passwordEncoder.encode(anyString())).thenReturn("$2a$10$hashed");
+		when(staffUserRepository.save(any(StaffUser.class))).thenAnswer(inv -> inv.getArgument(0));
 
-		assertThatThrownBy(() -> staffUserService.create(staffUser))
-			.isInstanceOf(BusinessException.class)
-			.hasMessage("Email already in use");
+		StaffUser result = staffUserService.create(staffUser);
+
+		assertThat(result.getEmail()).isEqualTo("juan.perez2@laroka.com");
+	}
+
+	@Test
+	void create_multipleSuffixConflicts_incrementsUntilAvailable() {
+		StaffUser staffUser = staffUser("Juan Perez");
+
+		when(staffUserRepository.existsByEmail("juan.perez@laroka.com")).thenReturn(true);
+		when(staffUserRepository.existsByEmail("juan.perez2@laroka.com")).thenReturn(true);
+		when(staffUserRepository.existsByEmail("juan.perez3@laroka.com")).thenReturn(false);
+		when(branchRepository.findById(1)).thenReturn(Optional.of(branch()));
+		when(passwordEncoder.encode(anyString())).thenReturn("$2a$10$hashed");
+		when(staffUserRepository.save(any(StaffUser.class))).thenAnswer(inv -> inv.getArgument(0));
+
+		StaffUser result = staffUserService.create(staffUser);
+
+		assertThat(result.getEmail()).isEqualTo("juan.perez3@laroka.com");
+	}
+
+	@Test
+	void generateEmail_nameWithAccents_normalizes() {
+		when(staffUserRepository.existsByEmail("maria.garcia@laroka.com")).thenReturn(false);
+
+		String email = staffUserService.generateEmail("María García");
+
+		assertThat(email).isEqualTo("maria.garcia@laroka.com");
+	}
+
+	@Test
+	void generateEmail_nameWithNTilde_normalizesToN() {
+		when(staffUserRepository.existsByEmail("juan.ibanez@laroka.com")).thenReturn(false);
+
+		String email = staffUserService.generateEmail("Juan Ibáñez");
+
+		assertThat(email).isEqualTo("juan.ibanez@laroka.com");
+	}
+
+	@Test
+	void generateEmail_nameWithMixedSpecialChars_normalizes() {
+		when(staffUserRepository.existsByEmail("jose.munoz@laroka.com")).thenReturn(false);
+
+		String email = staffUserService.generateEmail("José Muñoz");
+
+		assertThat(email).isEqualTo("jose.munoz@laroka.com");
 	}
 
 	@Test
 	void create_invalidBranch_throwsBranchNotFoundException() {
-		StaffUser staffUser = staffUser();
+		StaffUser staffUser = staffUser("New Staff");
 
-		when(staffUserRepository.findByEmail("newstaff@laroka.com")).thenReturn(Optional.empty());
+		when(staffUserRepository.existsByEmail(anyString())).thenReturn(false);
 		when(branchRepository.findById(1)).thenReturn(Optional.empty());
 
 		assertThatThrownBy(() -> staffUserService.create(staffUser))
