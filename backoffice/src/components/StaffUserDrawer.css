@@ -91,7 +91,41 @@
 
 .sud-input:focus { border-color: var(--accent); }
 
-select.sud-input { cursor: pointer; }
+/* ── Campo con icono (toggle de contraseña) ────────────────────── */
+
+.sud-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.sud-input--with-icon {
+  width: 100%;
+  padding-right: 42px;
+}
+
+.sud-eye {
+  position: absolute;
+  right: 6px;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: 7px;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+
+.sud-eye:hover {
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--border) 14%, transparent);
+}
 
 .sud-hint {
   font-size: 12px;

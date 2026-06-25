@@ -2,12 +2,32 @@ import { useState, useEffect } from 'react'
 import ReactDOM from 'react-dom'
 import useAuth from '../hooks/useAuth'
 import { createStaffUser, updateStaffUser } from '../services/staffService'
+import CustomSelect from './CustomSelect'
 import './StaffUserDrawer.css'
 
 const ROLES = [
   { value: 'STAFF', label: 'Staff' },
   { value: 'MANAGER', label: 'Encargado' },
 ]
+
+function EyeIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8" />
+    </svg>
+  )
+}
+
+function EyeOffIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M10.6 6.1A9.6 9.6 0 0 1 12 6c6.5 0 10 7 10 7a16.2 16.2 0 0 1-2.3 3.2M6.6 6.6A16 16 0 0 0 2 13s3.5 7 10 7a9.5 9.5 0 0 0 4.4-1.1" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M3 3l18 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  )
+}
 
 const EMPTY_FORM = { name: '', role: 'STAFF', branchId: '', password: '' }
 
@@ -18,6 +38,7 @@ export default function StaffUserDrawer({ open, mode, user, branches, onClose, o
   const [form, setForm] = useState(EMPTY_FORM)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
+  const [showPassword, setShowPassword] = useState(false)
   // Resultado de alta exitosa: muestra el email generado por el backend.
   const [created, setCreated] = useState(null)
 
@@ -26,6 +47,7 @@ export default function StaffUserDrawer({ open, mode, user, branches, onClose, o
     if (!open) return
     setError(null)
     setCreated(null)
+    setShowPassword(false)
     if (isEdit && user) {
       setForm({
         name: user.name ?? '',
@@ -136,46 +158,51 @@ export default function StaffUserDrawer({ open, mode, user, branches, onClose, o
             </div>
 
             <div className="sud-field">
-              <label className="sud-label" htmlFor="sud-role">Rol</label>
-              <select
+              <span className="sud-label" id="sud-role-label">Rol</span>
+              <CustomSelect
                 id="sud-role"
-                className="sud-input"
+                ariaLabelledBy="sud-role-label"
                 value={form.role}
-                onChange={e => setField('role', e.target.value)}
-              >
-                {ROLES.map(r => (
-                  <option key={r.value} value={r.value}>{r.label}</option>
-                ))}
-              </select>
+                onChange={val => setField('role', val)}
+                options={ROLES}
+              />
             </div>
 
             <div className="sud-field">
-              <label className="sud-label" htmlFor="sud-branch">Sucursal</label>
-              <select
+              <span className="sud-label" id="sud-branch-label">Sucursal</span>
+              <CustomSelect
                 id="sud-branch"
-                className="sud-input"
+                ariaLabelledBy="sud-branch-label"
                 value={form.branchId}
-                onChange={e => setField('branchId', e.target.value)}
-              >
-                <option value="" disabled>Seleccionar sucursal…</option>
-                {branches.map(b => (
-                  <option key={b.id} value={String(b.id)}>{b.name}</option>
-                ))}
-              </select>
+                onChange={val => setField('branchId', val)}
+                options={branches.map(b => ({ value: String(b.id), label: b.name }))}
+                placeholder="Seleccionar sucursal…"
+              />
             </div>
 
             {!isEdit && (
               <div className="sud-field">
                 <label className="sud-label" htmlFor="sud-password">Contraseña</label>
-                <input
-                  id="sud-password"
-                  className="sud-input"
-                  type="password"
-                  placeholder="Mínimo 8 caracteres"
-                  value={form.password}
-                  onChange={e => setField('password', e.target.value)}
-                  autoComplete="new-password"
-                />
+                <div className="sud-input-wrap">
+                  <input
+                    id="sud-password"
+                    className="sud-input sud-input--with-icon"
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="Mínimo 8 caracteres"
+                    value={form.password}
+                    onChange={e => setField('password', e.target.value)}
+                    autoComplete="new-password"
+                  />
+                  <button
+                    type="button"
+                    className="sud-eye"
+                    onClick={() => setShowPassword(s => !s)}
+                    aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                    aria-pressed={showPassword}
+                  >
+                    {showPassword ? <EyeOffIcon /> : <EyeIcon />}
+                  </button>
+                </div>
                 {form.password.length > 0 && form.password.length < 8 && (
                   <span className="sud-hint">La contraseña debe tener al menos 8 caracteres.</span>
                 )}

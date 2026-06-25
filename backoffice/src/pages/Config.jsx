@@ -5,6 +5,7 @@ import { fetchStaffUsers, setStaffUserStatus } from '../services/staffService'
 import { fetchBranches } from '../services/branchService'
 import StaffUserDrawer from '../components/StaffUserDrawer'
 import ResetPasswordModal from '../components/ResetPasswordModal'
+import BranchConfigSection from '../components/BranchConfigSection'
 import './Config.css'
 
 const ROLE_LABELS = { ADMIN: 'Admin', MANAGER: 'Encargado', STAFF: 'Staff' }
@@ -15,6 +16,14 @@ function DotsIcon() {
       <circle cx="12" cy="5" r="1.6" />
       <circle cx="12" cy="12" r="1.6" />
       <circle cx="12" cy="19" r="1.6" />
+    </svg>
+  )
+}
+
+function ChevronIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="m6 9 6 6 6-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )
 }
@@ -33,6 +42,7 @@ export default function Config() {
   const [confirm, setConfirm] = useState(null)      // { user, nextActive } | null
   const [confirmBusy, setConfirmBusy] = useState(false)
   const [confirmError, setConfirmError] = useState(null)
+  const [showArchived, setShowArchived] = useState(false)
 
   const loadStaff = useCallback(() => {
     if (!token) return
@@ -92,6 +102,78 @@ export default function Config() {
     }
   }
 
+  // Activos en la tabla principal; inactivos ocultos en "Archivados".
+  const activeStaff = staff.filter(u => u.active)
+  const inactiveStaff = staff.filter(u => !u.active)
+
+  function renderStaffTable(list) {
+    return (
+      <div className="config-table-wrapper">
+        <table className="config-table">
+          <thead>
+            <tr>
+              <th>NOMBRE</th>
+              <th>EMAIL</th>
+              <th>ROL</th>
+              <th>SUCURSAL</th>
+              <th>ESTADO</th>
+              <th aria-label="Acciones"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {list.map(u => {
+              const isSelf = String(u.id) === String(userId)
+              return (
+                <tr key={u.id} className="config-row">
+                  <td className="config-name">{u.name}</td>
+                  <td className="config-mono">{u.email}</td>
+                  <td>{ROLE_LABELS[u.role] ?? u.role}</td>
+                  {/* El ADMIN no pertenece a una sucursal específica, aunque el backend
+                      le asigne una por la FK NOT NULL. */}
+                  <td>{u.role === 'ADMIN' ? '—' : (u.branchName ?? '—')}</td>
+                  <td>
+                    <span className={`config-badge${u.active ? ' config-badge--active' : ' config-badge--inactive'}`}>
+                      {u.active ? 'Activo' : 'Inactivo'}
+                    </span>
+                  </td>
+                  <td className="config-actions-cell">
+                    <button
+                      className="config-dots-btn"
+                      onClick={() => setMenuId(menuId === u.id ? null : u.id)}
+                      aria-label={`Acciones para ${u.name}`}
+                      aria-haspopup="true"
+                      aria-expanded={menuId === u.id}
+                    >
+                      <DotsIcon />
+                    </button>
+                    {menuId === u.id && (
+                      <div className="config-menu" role="menu">
+                        <button className="config-menu-item" onClick={() => openEdit(u)}>
+                          Editar
+                        </button>
+                        <button className="config-menu-item" onClick={() => openReset(u)}>
+                          Resetear contraseña
+                        </button>
+                        <button
+                          className={`config-menu-item${u.active ? ' config-menu-item--danger' : ''}`}
+                          onClick={() => openConfirmStatus(u)}
+                          disabled={isSelf && u.active}
+                          title={isSelf && u.active ? 'No podés desactivarte a vos mismo' : undefined}
+                        >
+                          {u.active ? 'Desactivar' : 'Activar'}
+                        </button>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
+
   return (
     <div className="config-page">
       <header className="config-header">
@@ -119,69 +201,33 @@ export default function Config() {
             <p className="config-empty">Aún no hay empleados cargados.</p>
           </div>
         ) : (
-          <div className="config-table-wrapper">
-            <table className="config-table">
-              <thead>
-                <tr>
-                  <th>NOMBRE</th>
-                  <th>EMAIL</th>
-                  <th>ROL</th>
-                  <th>SUCURSAL</th>
-                  <th>ESTADO</th>
-                  <th aria-label="Acciones"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {staff.map(u => {
-                  const isSelf = String(u.id) === String(userId)
-                  return (
-                    <tr key={u.id} className={`config-row${u.active ? '' : ' config-row--inactive'}`}>
-                      <td className="config-name">{u.name}</td>
-                      <td className="config-mono">{u.email}</td>
-                      <td>{ROLE_LABELS[u.role] ?? u.role}</td>
-                      <td>{u.branchName ?? '—'}</td>
-                      <td>
-                        <span className={`config-badge${u.active ? ' config-badge--active' : ' config-badge--inactive'}`}>
-                          {u.active ? 'Activo' : 'Inactivo'}
-                        </span>
-                      </td>
-                      <td className="config-actions-cell">
-                        <button
-                          className="config-dots-btn"
-                          onClick={() => setMenuId(menuId === u.id ? null : u.id)}
-                          aria-label={`Acciones para ${u.name}`}
-                          aria-haspopup="true"
-                          aria-expanded={menuId === u.id}
-                        >
-                          <DotsIcon />
-                        </button>
-                        {menuId === u.id && (
-                          <div className="config-menu" role="menu">
-                            <button className="config-menu-item" onClick={() => openEdit(u)}>
-                              Editar
-                            </button>
-                            <button className="config-menu-item" onClick={() => openReset(u)}>
-                              Resetear contraseña
-                            </button>
-                            <button
-                              className={`config-menu-item${u.active ? ' config-menu-item--danger' : ''}`}
-                              onClick={() => openConfirmStatus(u)}
-                              disabled={isSelf && u.active}
-                              title={isSelf && u.active ? 'No podés desactivarte a vos mismo' : undefined}
-                            >
-                              {u.active ? 'Desactivar' : 'Activar'}
-                            </button>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+          <>
+            {activeStaff.length === 0 ? (
+              <div className="config-state-center">
+                <p className="config-empty">No hay empleados activos.</p>
+              </div>
+            ) : (
+              renderStaffTable(activeStaff)
+            )}
+
+            {inactiveStaff.length > 0 && (
+              <div className="config-archived">
+                <button
+                  className={`config-archived-toggle${showArchived ? ' config-archived-toggle--open' : ''}`}
+                  onClick={() => setShowArchived(s => !s)}
+                  aria-expanded={showArchived}
+                >
+                  <span className="config-archived-chevron"><ChevronIcon /></span>
+                  Archivados ({inactiveStaff.length})
+                </button>
+                {showArchived && renderStaffTable(inactiveStaff)}
+              </div>
+            )}
+          </>
         )}
       </section>
+
+      <BranchConfigSection />
 
       {/* Cierra el menú de acciones al hacer click fuera. */}
       {menuId !== null && (
