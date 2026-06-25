@@ -27,4 +27,8 @@ ENTRYPOINT ["java", \
   "-javaagent:/app/newrelic/newrelic/newrelic.jar", \
   "-Dnewrelic.config.app_name=laroka-backend", \
   "-Dnewrelic.config.log_file_name=STDOUT", \
+  "-Dnewrelic.config.transaction_tracer.enabled=true", \
+  "-Dnewrelic.config.transaction_tracer.record_sql=obfuscated", \
+  "-Dnewrelic.config.datastore_tracer.database_name_reporting.enabled=true", \
+  "-Dnewrelic.config.datastore_tracer.instance_reporting.enabled=true", \
   "-jar", "app.jar"]

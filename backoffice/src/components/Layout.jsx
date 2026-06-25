@@ -51,6 +51,7 @@ const NAV = [
   {
     to: '/settings',
     label: 'CONFIG.',
+    adminOnly: true,
     icon: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
         <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8" />
@@ -63,7 +64,7 @@ const NAV = [
 export default function Layout() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { token, tenantName } = useAuth()
+  const { token, tenantName, role } = useAuth()
   const { activeBranchId, setActiveBranch } = useBranch()
   const [time, setTime] = useState(new Date())
   const [connectionStatus, setConnectionStatus] = useState('disconnected')
@@ -174,7 +175,7 @@ export default function Layout() {
         </div>
 
         <nav className="layout-sidebar-nav" aria-label="Navegación principal">
-          {NAV.map(({ to, label, icon, end }) => (
+          {NAV.filter(({ adminOnly }) => !adminOnly || role === 'ADMIN').map(({ to, label, icon, end }) => (
             <NavLink
               key={to}
               to={to}
