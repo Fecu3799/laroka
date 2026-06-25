@@ -1,0 +1,207 @@
+/* ── Drawer de empleado (US-11-F-01 / US-11-F-02) ──────────────── */
+
+.sud-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 1000;
+  display: flex;
+  justify-content: flex-end;
+  animation: sud-fade 0.18s ease;
+}
+
+@keyframes sud-fade { from { opacity: 0; } to { opacity: 1; } }
+
+.sud-panel {
+  width: min(420px, 92vw);
+  height: 100%;
+  background: var(--color-sidebar-bg);
+  border-left: 1px solid color-mix(in srgb, var(--border) 28%, transparent);
+  display: flex;
+  flex-direction: column;
+  box-shadow: -18px 0 60px rgba(0, 0, 0, 0.55);
+  animation: sud-slide 0.22s ease;
+}
+
+@keyframes sud-slide { from { transform: translateX(100%); } to { transform: translateX(0); } }
+
+.sud-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 18%, transparent);
+}
+
+.sud-title {
+  font-size: 19px;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.sud-close {
+  width: 30px;
+  height: 30px;
+  border: 1px solid color-mix(in srgb, var(--border) 30%, transparent);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.sud-close:hover { color: var(--text-primary); border-color: var(--border); }
+
+/* ── Form ──────────────────────────────────────────────────────── */
+
+.sud-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 24px;
+  overflow-y: auto;
+}
+
+.sud-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.sud-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.sud-input {
+  background: color-mix(in srgb, var(--border) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 28%, transparent);
+  border-radius: 9px;
+  color: var(--text-primary);
+  font-size: 14px;
+  padding: 11px 13px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.sud-input:focus { border-color: var(--accent); }
+
+select.sud-input { cursor: pointer; }
+
+.sud-hint {
+  font-size: 12px;
+  color: var(--color-warning);
+}
+
+.sud-readonly {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 11px 13px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--border) 6%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--border) 28%, transparent);
+}
+
+.sud-readonly-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--text-secondary);
+}
+
+.sud-readonly-value {
+  font-family: ui-monospace, 'SFMono-Regular', 'JetBrains Mono', Menlo, monospace;
+  font-size: 14px;
+  color: var(--text-primary);
+  word-break: break-all;
+}
+
+.sud-error {
+  font-size: 13px;
+  color: var(--color-danger);
+}
+
+.sud-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.sud-cancel,
+.sud-submit {
+  flex: 1;
+  padding: 11px 16px;
+  border-radius: 9px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: filter 0.15s, background 0.15s, opacity 0.15s;
+}
+
+.sud-cancel {
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--border) 38%, transparent);
+  color: var(--text-secondary);
+}
+
+.sud-cancel:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--border) 12%, transparent);
+  color: var(--text-primary);
+}
+
+.sud-submit {
+  background: var(--accent);
+  border: none;
+  color: #0a1810;
+}
+
+.sud-submit:hover:not(:disabled) { filter: brightness(1.08); }
+
+.sud-submit:disabled,
+.sud-cancel:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── Estado de alta exitosa ────────────────────────────────────── */
+
+.sud-success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+  padding: 36px 24px 24px;
+}
+
+.sud-success-icon { color: var(--color-success); }
+
+.sud-success-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.sud-success-sub {
+  font-size: 13px;
+  color: var(--text-secondary);
+  max-width: 300px;
+}
+
+.sud-success .sud-readonly {
+  width: 100%;
+  text-align: left;
+  margin-top: 6px;
+}
+
+.sud-success .sud-submit {
+  width: 100%;
+  flex: none;
+  margin-top: 8px;
+}
