@@ -22,7 +22,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     ports:
-      - "55432:5432"
+      - "5433:5432"
     tmpfs:
       - /var/lib/postgresql/data
     healthcheck:
