@@ -4,27 +4,33 @@
 
 ## Convención de migraciones Flyway
 
-| Versión | Contenido                                    |
-| ------- | -------------------------------------------- |
-| V1      | tenant                                       |
-| V2      | branch                                       |
-| V3      | category                                     |
-| V4      | product + branch_product                     |
-| V5      | staff_user                                   |
-| V6      | order + order_item (incluye campo origin)    |
-| V7      | order_status_history                         |
-| V8      | delivery_address (columna en order)          |
-| V9      | payment                                      |
-| V10     | branch operating hours                       |
-| V11     | branch_qr                                    |
-| V12     | add_cancellation_reason                      |
-| V13     | add_payment_link                             |
-| V14     | create_refresh_tokens                        |
-| V15     | create_work_shift                            |
-| V16     | create_work_shift_summary                    |
-| V17     | add_shift_summary_analytics                  |
-| V18     | add_branch_accepting_orders                  |
-| V19     | add_order_shift_id (NOT NULL after truncate) |
+| Versión | Contenido                                 |
+| ------- | ----------------------------------------- |
+| V1      | tenant                                    |
+| V2      | branch                                    |
+| V3      | category                                  |
+| V4      | product + branch_product                  |
+| V5      | staff_user                                |
+| V6      | order + order_item (incluye campo origin) |
+| V7      | order_status_history                      |
+| V8      | delivery_address (columna en order)       |
+| V9      | payment + branch_qr (datos dev)           |
+| V10     | branch operating hours                    |
+| V11     | branch_qr active + payment_id             |
+| V12     | add_cancellation_reason                   |
+| V13     | add_payment_link                          |
+| V14     | create_refresh_tokens                     |
+| V15     | create_work_shift                         |
+| V16     | create_work_shift_summary                 |
+| V17     | add_shift_summary_analytics               |
+| V18     | add_branch_accepting_orders               |
+| V19     | add_order_shift_id                        |
+| V20     | add_work_shift_open_unique_index          |
+| V21     | set_order_shift_id_not_null               |
+| V22     | create_push_subscription                  |
+| V23     | add_staff_user_active                     |
+| V24     | add_branch_max_shift_duration             |
+| V25     | add_tenant_email_domain (Sprint 12)       |
 
 ---
 
@@ -351,6 +357,19 @@ indicando quién disparó el cambio de estado. Los endpoints del backoffice pasa
 | US-11-F-01 | Como ADMIN, necesito una pestaña CONFIG en el backoffice con la sección de gestión de staff para administrar el equipo desde el panel.    | Nueva pestaña "Config" en la navegación del backoffice, visible solo para ADMIN. Sección "Equipo" con tabla de staff users: columnas name, email, role, sucursal, estado (activo/inactivo). Botón "Nuevo empleado" abre un drawer/modal con form: name (texto), role (select: STAFF, MANAGER), branchId (select con sucursales del tenant). Email no es campo del form — se muestra como read-only en la respuesta tras la creación. Submit llama `POST /backoffice/staff-users`. Manejo de error si el backend retorna 400/409.                                                                                                                                                             | Alta      |
 | US-11-F-02 | Como ADMIN, necesito poder editar y desactivar staff users desde el panel para gestionar el equipo sin acceso directo a la base de datos. | En la tabla de staff users, cada fila tiene un menú de acciones (ícono de tres puntos o similar): "Editar", "Resetear contraseña", "Desactivar"/"Activar". "Editar" abre el mismo drawer con los campos precargados y llama `PATCH /backoffice/staff-users/{id}`. "Resetear contraseña" abre un modal con campo `newPassword` (con confirmación) y llama `PATCH /backoffice/staff-users/{id}/password`. "Desactivar"/"Activar" muestra confirmación y llama `PATCH /backoffice/staff-users/{id}/status`. Usuarios inactivos se muestran visualmente diferenciados (opacity reducida o badge "Inactivo"). El propio ADMIN autenticado no puede desactivarse a sí mismo (botón deshabilitado). | Alta      |
 | US-11-F-03 | Como ADMIN, necesito poder configurar la duración máxima de turno por sucursal desde el panel.                                            | En la pestaña CONFIG, sección "Sucursales" (o dentro del detalle de cada sucursal). Campo "Duración máxima de turno" por sucursal: input numérico en horas (se convierte a minutos antes de enviar al backend), con opción de dejarlo vacío para sin límite. Llama `PATCH /backoffice/branches/{id}/config`. Muestra el valor actual al cargar. Feedback visual de guardado exitoso/error.                                                                                                                                                                                                                                                                                                   | Media     |
+
+---
+
+## Sprint 12 — Hardening: Seguridad, Datos y Fixes Operativos
+
+| ID       | Historia                                                                                                                                         | Criterios de Aceptación                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Prioridad |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
+| US-12-01 | Como sistema, necesito que las migraciones Flyway sean DDL puro sin datos de prueba para que el esquema sea seguro para producción.              | Eliminar todos los `INSERT` de las migraciones V1, V2, V3, V4, V5, V9 (tablas afectadas: tenant, branch, category, product, branch_product, staff_user, branch_qr). Las migraciones quedan con DDL únicamente. Verificar que ninguna migración posterior dependa de IDs generados por esos INSERTs. Una vez mergeado, el desarrollador resetea la DB local con `docker-compose down -v && docker-compose up` y la DB de staging con `DROP SCHEMA public CASCADE; CREATE SCHEMA public;` seguido de redeploy del backend en Render. Los datos se cargan manualmente desde TablePlus en orden: tenant → branch → category → product → branch_product → staff_user → branch_qr. Documentar el orden de carga en el README bajo sección "Carga inicial de datos".                                                                                                 | Alta      |
+| US-12-02 | Como sistema, necesito que el email de staff users use el dominio configurado del tenant en lugar del dominio hardcodeado.                       | Agregar campo `email_domain` (VARCHAR(255), NOT NULL) a la tabla `tenant`. Migración Flyway V25 — sin default, la tabla estará vacía al correr la migración tras el reset de US-12-01. Agregar campo `emailDomain` a la entidad `Tenant` y a `TenantRepository`. `StaffUserService` reemplaza `@laroka.com` por `@{tenant.emailDomain}` en la generación de email. Para obtener el tenant, usar el `tenantId` del staff user que se está creando o editando. Al regenerar email por cambio de nombre (`PATCH /backoffice/staff-users/{id}`), usa el dominio del tenant del usuario editado. `emailDomain` no es editable desde el panel — es configuración de plataforma, se setea manualmente al crear el tenant desde TablePlus. Tests unitarios cubren: email generado usa el dominio del tenant correctamente, deduplicación numérica respeta el dominio. | Alta      |
+| US-12-03 | Como sistema, necesito que un usuario desactivado no pueda operar aunque tenga un JWT vigente.                                                   | `JwtAuthenticationFilter` consulta el campo `active` de `StaffUser` inmediatamente después de validar el token JWT. Si `active = false`, retorna 401 con mensaje "Usuario desactivado". La consulta usa `StaffUserRepository.findById(userId)` con el `userId` extraído del claim del JWT. Configurar un cache Caffeine `staffUserActive` (TTL 60 segundos, max 500 entradas) anotando el método de repositorio con `@Cacheable("staffUserActive")`. Al desactivar un usuario (`PATCH /backoffice/staff-users/{id}/status`), invalidar la entrada del cache con `@CacheEvict("staffUserActive", key = "#id")`. El campo `active` ya existe (V23) — no requiere migración. Test unitario cubre: request con JWT válido de usuario inactivo retorna 401.                                                                                                        | Alta      |
+| US-12-04 | Como sistema, necesito que el auto-cierre de turno notifique al operador en tiempo real para que no se encuentre con el turno cerrado sin aviso. | `NotificationService` agrega método `sendShiftAutoClosedEvent(Long branchId)` que emite un evento SSE de tipo `SHIFT_AUTO_CLOSED`. `ShiftAutoCloseJob` llama a este método tras cerrar cada turno automáticamente. `CurrentShiftResponseDTO` agrega campo booleano `autoClose` derivado de `closedBy == null`. El backoffice escucha el evento SSE `SHIFT_AUTO_CLOSED` y muestra un modal bloqueante con mensaje "El turno se cerró automáticamente por superar la duración máxima configurada" y botón "Entendido". Al confirmar el modal, el frontend refresca el estado del turno llamando al endpoint de turno actual. Test unitario cubre: `autoCloseShift()` invoca `sendShiftAutoClosedEvent()` con el `branchId` correcto.                                                                                                                            | Alta      |
+| US-12-05 | Como operador, necesito que el contador de nuevos pedidos solo se incremente cuando no estoy viendo la lista de pedidos.                         | En `Layout.jsx`, agregar la condición `location.pathname !== '/orders'` al bloque de incremento del contador, tanto para `NEW_ORDER` como para `CANCELLATION_REQUESTED`. Si el operador está en `/orders`, el evento SSE no incrementa el badge — el pedido se considera visto inmediatamente. El reset del contador al montar `Orders.jsx` se mantiene para cubrir navegación desde otra tab. El render condicional del badge (`location.pathname !== '/orders'`) se mantiene como está. Test manual: con el operador en `/orders`, los pedidos entrantes no incrementan el badge; al estar en otra tab y recibir un pedido, el badge se incrementa correctamente.                                                                                                                                                                                           | Alta      |
+| US-12-06 | Como ADMIN, necesito que el campo de duración máxima de turno no pueda dejarse vacío desde el panel.                                             | En el frontend del backoffice, sección Sucursales de la pestaña CONFIG: el input de duración máxima de turno es obligatorio. Validación frontend impide el submit si el campo está vacío o tiene valor 0. Mensaje de error inline: "La duración máxima es obligatoria". Valor mínimo aceptable: 1 hora. La conversión de horas a minutos antes de enviar al backend se mantiene sin cambios.                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | Media     |
 
 ---
 
