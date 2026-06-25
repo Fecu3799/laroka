@@ -31,4 +31,5 @@ ENTRYPOINT ["java", \
   "-Dnewrelic.config.transaction_tracer.record_sql=obfuscated", \
   "-Dnewrelic.config.datastore_tracer.database_name_reporting.enabled=true", \
   "-Dnewrelic.config.datastore_tracer.instance_reporting.enabled=true", \
+  "-Dnewrelic.config.class_transformer.com.newrelic.instrumentation.jdbc-hikaricp.enabled=true", \
   "-jar", "app.jar"]
