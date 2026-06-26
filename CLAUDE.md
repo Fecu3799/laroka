@@ -84,6 +84,7 @@ Capas obligatorias por módulo:
 | V23     | staff_user active                          |
 | V24     | branch max_shift_duration_minutes          |
 | V25     | tenant email_domain                        |
+| V26     | tenant_profile                             |
 
 Toda migración nueva debe ser la siguiente versión disponible en esta tabla.
 Actualizar esta tabla al agregar una migración.

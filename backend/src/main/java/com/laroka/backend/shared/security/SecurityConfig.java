@@ -69,6 +69,7 @@ public class SecurityConfig {
 			.authorizeHttpRequests(auth -> auth
 				.dispatcherTypeMatchers(DispatcherType.ASYNC).permitAll()
 				.requestMatchers(HttpMethod.GET, "/branches/**").permitAll()
+				.requestMatchers(HttpMethod.GET, "/tenants/*/profile").permitAll()
 				.requestMatchers(HttpMethod.POST, "/orders").permitAll()
 				.requestMatchers(HttpMethod.GET, "/orders/*/status").permitAll()
 				.requestMatchers(HttpMethod.GET, "/orders/*/items").permitAll()
