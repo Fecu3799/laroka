@@ -30,6 +30,9 @@ public class Tenant {
 	@Column(name = "name", nullable = false, unique = true)
 	private String name;
 
+	@Column(name = "email_domain", nullable = false)
+	private String emailDomain;
+
 	@Column(name = "created_at", nullable = false, updatable = false)
 	private LocalDateTime createdAt;
 

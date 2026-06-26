@@ -11,9 +11,3 @@ CREATE TABLE category (
 );
 
 CREATE INDEX idx_category_tenant_id ON category(tenant_id);
-
--- Categorías seed
-INSERT INTO category (name, tenant_id) VALUES
-    ('Pizzas', 1),
-    ('Empanadas', 1),
-    ('Bebidas', 1);

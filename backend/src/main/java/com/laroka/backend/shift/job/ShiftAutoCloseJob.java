@@ -5,6 +5,7 @@ import java.util.List;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import com.laroka.backend.notification.service.NotificationService;
 import com.laroka.backend.shift.entity.WorkShift;
 import com.laroka.backend.shift.service.WorkShiftService;
 
@@ -17,6 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 public class ShiftAutoCloseJob {
 
     private final WorkShiftService workShiftService;
+    private final NotificationService notificationService;
 
     @Scheduled(fixedDelay = 900_000)
     public void run() {
@@ -30,6 +32,7 @@ public class ShiftAutoCloseJob {
             try {
                 workShiftService.autoCloseShift(shift.getId());
                 closed++;
+                notificationService.sendShiftAutoClosedEvent(shift.getBranch().getId());
             } catch (Exception e) {
                 log.error("ShiftAutoCloseJob: error al cerrar turno {} (sucursal {})",
                         shift.getId(), shift.getBranch().getId(), e);

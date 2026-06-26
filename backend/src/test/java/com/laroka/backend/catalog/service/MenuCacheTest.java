@@ -4,6 +4,7 @@ import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 import org.junit.jupiter.api.Assumptions;
@@ -12,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.cache.CacheManager;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
@@ -30,6 +32,21 @@ class MenuCacheTest {
 
 	@Autowired
 	CacheManager cacheManager;
+
+	@Autowired
+	JdbcTemplate jdbcTemplate;
+
+	@BeforeEach
+	void insertTestData() {
+		jdbcTemplate.execute(
+			"TRUNCATE TABLE branch_product, product, category, staff_user, branch, tenant RESTART IDENTITY CASCADE");
+		jdbcTemplate.update("INSERT INTO tenant (name, email_domain) VALUES (?, ?)", "Test Tenant", "test.com");
+		jdbcTemplate.update("INSERT INTO branch (name, address, tenant_id) VALUES (?, ?, ?)", "Test Branch", "Test Address", 1);
+		jdbcTemplate.update("INSERT INTO category (name, tenant_id) VALUES (?, ?)", "Test Category", 1);
+		jdbcTemplate.update("INSERT INTO product (name, price, category_id, tenant_id) VALUES (?, ?, ?, ?)",
+			"Test Pizza", new BigDecimal("10.00"), 1, 1);
+		jdbcTemplate.update("INSERT INTO branch_product (branch_id, product_id) VALUES (?, ?)", 1, 1);
+	}
 
 	@BeforeEach
 	void setUp() {

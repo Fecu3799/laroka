@@ -7,6 +7,3 @@ CREATE TABLE tenant (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-
--- Insertar tenant inicial
-INSERT INTO tenant (name) VALUES ('LaRoka');

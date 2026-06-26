@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
+import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,6 +30,7 @@ import com.laroka.backend.staffuser.dto.StaffUserResponseDTO;
 import com.laroka.backend.staffuser.entity.StaffUser;
 import com.laroka.backend.staffuser.entity.UserRole;
 import com.laroka.backend.staffuser.mapper.StaffUserMapper;
+import com.laroka.backend.staffuser.repository.StaffUserRepository;
 import com.laroka.backend.staffuser.service.StaffUserService;
 
 import io.jsonwebtoken.Jwts;
@@ -60,6 +62,9 @@ class SecurityIntegrationTest {
 	private RefreshTokenRepository refreshTokenRepository;
 
 	@MockitoBean
+	private StaffUserRepository staffUserRepository;
+
+	@MockitoBean
 	private StaffUserService staffUserService;
 
 	@MockitoBean
@@ -87,6 +92,20 @@ class SecurityIntegrationTest {
 			.expiration(new Date(System.currentTimeMillis() - 3_600_000))
 			.signWith(Keys.hmacShaKeyFor(TEST_SECRET.getBytes(StandardCharsets.UTF_8)))
 			.compact();
+	}
+
+	// --- usuario desactivado con JWT válido → 401 ---
+
+	@Test
+	void inactiveUser_validToken_returns401Desactivado() throws Exception {
+		when(staffUserRepository.findActiveById(1)).thenReturn(Optional.of(false));
+
+		mockMvc.perform(post("/backoffice/staff-users")
+				.header("Authorization", "Bearer " + tokenWithRole("ADMIN"))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{}"))
+			.andExpect(status().isUnauthorized())
+			.andExpect(jsonPath("$.message").value("Usuario desactivado"));
 	}
 
 	// --- backoffice endpoint sin token → 401 ---

@@ -105,4 +105,22 @@ public class NotificationService {
         }
         emitters.removeAll(dead);
     }
+
+    public void sendShiftAutoClosedEvent(Integer branchId) {
+        List<EmitterEntry> dead = new ArrayList<>();
+        for (EmitterEntry entry : emitters) {
+            if (entry.branchId().equals(branchId)) {
+                try {
+                    Map<String, Object> data = new LinkedHashMap<>();
+                    data.put("type", "SHIFT_AUTO_CLOSED");
+                    data.put("branchId", branchId);
+                    entry.emitter().send(SseEmitter.event().name("shift-auto-closed").data(data));
+                } catch (Exception e) {
+                    log.warn("SSE send failed, removing dead emitter | branchId={}", branchId);
+                    dead.add(entry);
+                }
+            }
+        }
+        emitters.removeAll(dead);
+    }
 }

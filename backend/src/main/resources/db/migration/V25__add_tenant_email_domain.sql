@@ -1,0 +1,1 @@
+ALTER TABLE tenant ADD COLUMN email_domain VARCHAR(255) NOT NULL;

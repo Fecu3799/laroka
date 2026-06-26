@@ -74,7 +74,26 @@ class OrderFlowsIntegrationTest {
 
     @BeforeAll
     void setupShift() {
-        jdbcTemplate.execute("TRUNCATE TABLE work_shift CASCADE");
+        // Truncate from root so all FK-dependent tables (orders, work_shift, payment, etc.) are cleared.
+        // RESTART IDENTITY resets auto-increment sequences so the first inserts get the IDs the test expects.
+        jdbcTemplate.execute(
+            "TRUNCATE TABLE branch_product, product, category, staff_user, branch, tenant RESTART IDENTITY CASCADE");
+
+        jdbcTemplate.update("INSERT INTO tenant (name, email_domain) VALUES (?, ?)", "Test Tenant", "laroka.com");
+        jdbcTemplate.update("INSERT INTO branch (name, address, tenant_id) VALUES (?, ?, ?)", "Test Branch", "Test Address", 1);
+        // Two staff users so that the second one (auto-id=2) matches STAFF_USER_ID=2
+        jdbcTemplate.update(
+            "INSERT INTO staff_user (name, email, password_hash, role, branch_id) VALUES (?, ?, ?, ?, ?)",
+            "Dummy", "dummy@test.com", "noop", "STAFF", 1);
+        jdbcTemplate.update(
+            "INSERT INTO staff_user (name, email, password_hash, role, branch_id) VALUES (?, ?, ?, ?, ?)",
+            "Staff", "staff@test.com", "noop", "STAFF", 1);
+        jdbcTemplate.update("INSERT INTO category (name, tenant_id) VALUES (?, ?)", "Test Category", 1);
+        jdbcTemplate.update(
+            "INSERT INTO product (name, price, category_id, tenant_id) VALUES (?, ?, ?, ?)",
+            "Test Pizza", new java.math.BigDecimal("10.00"), 1, 1);
+        jdbcTemplate.update("INSERT INTO branch_product (branch_id, product_id) VALUES (?, ?)", BRANCH_ID, 1);
+
         jdbcTemplate.update(
             "INSERT INTO work_shift (id, branch_id, opened_by, opened_at, status) VALUES (?, ?, ?, CURRENT_TIMESTAMP, 'OPEN')",
             UUID.randomUUID(), BRANCH_ID, STAFF_USER_ID);

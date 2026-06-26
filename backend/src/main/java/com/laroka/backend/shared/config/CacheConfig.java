@@ -26,8 +26,13 @@ public class CacheConfig {
 			Caffeine.newBuilder()
 				.expireAfterWrite(menuTtlSeconds, TimeUnit.SECONDS)
 				.build());
+		CaffeineCache staffUserActiveCache = new CaffeineCache("staffUserActive",
+			Caffeine.newBuilder()
+				.maximumSize(500)
+				.expireAfterWrite(60, TimeUnit.SECONDS)
+				.build());
 		SimpleCacheManager manager = new SimpleCacheManager();
-		manager.setCaches(List.of(menuCache));
+		manager.setCaches(List.of(menuCache, staffUserActiveCache));
 		return manager;
 	}
 }

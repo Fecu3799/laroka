@@ -125,10 +125,13 @@ export default function Layout() {
                     window.dispatchEvent(new CustomEvent('laroka:order-updated', {
                       detail: { orderId, type: json.type, order: json.order ?? null, origin: json.origin ?? null, actionOrigin: json.actionOrigin ?? null },
                     }))
-                    if (orderId !== openOrderIdRef.current) {
+                    if (orderId !== openOrderIdRef.current && window.location.pathname !== '/orders') {
                       if (json.type === 'NEW_ORDER' && json.origin !== 'BACKOFFICE') setNewOrderCount(prev => prev + 1)
                       else if (json.type === 'CANCELLATION_REQUESTED') setCancelCount(prev => prev + 1)
                     }
+                  }
+                  if (json.type === 'SHIFT_AUTO_CLOSED') {
+                    window.dispatchEvent(new CustomEvent('laroka:shift-auto-closed'))
                   }
                 } catch { /* noop */ }
               }

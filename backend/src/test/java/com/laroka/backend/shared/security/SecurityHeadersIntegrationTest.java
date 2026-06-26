@@ -16,6 +16,7 @@ import com.laroka.backend.auth.repository.RefreshTokenRepository;
 import com.laroka.backend.auth.service.AuthService;
 import com.laroka.backend.staffuser.controller.StaffUserController;
 import com.laroka.backend.staffuser.mapper.StaffUserMapper;
+import com.laroka.backend.staffuser.repository.StaffUserRepository;
 import com.laroka.backend.staffuser.service.StaffUserService;
 
 /**
@@ -52,6 +53,9 @@ class SecurityHeadersIntegrationTest {
 
 	@MockitoBean
 	private StaffUserMapper staffUserMapper;
+
+	@MockitoBean
+	private StaffUserRepository staffUserRepository;
 
 	/**
 	 * Afirma que la respuesta contiene todos los headers de seguridad con su

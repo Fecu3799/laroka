@@ -17,6 +17,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.laroka.backend.branch.entity.Branch;
+import com.laroka.backend.notification.service.NotificationService;
 import com.laroka.backend.shift.entity.ShiftStatus;
 import com.laroka.backend.shift.entity.WorkShift;
 import com.laroka.backend.shift.service.WorkShiftService;
@@ -26,6 +27,9 @@ class ShiftAutoCloseJobTest {
 
     @Mock
     private WorkShiftService workShiftService;
+
+    @Mock
+    private NotificationService notificationService;
 
     @InjectMocks
     private ShiftAutoCloseJob job;
@@ -73,5 +77,16 @@ class ShiftAutoCloseJobTest {
 
         verify(workShiftService).autoCloseShift(id1);
         verify(workShiftService).autoCloseShift(id2);
+    }
+
+    @Test
+    void run_expiredShift_notifiesBranchAfterClose() {
+        UUID id = UUID.randomUUID();
+        WorkShift shift = expiredShift(id);
+        when(workShiftService.findExpiredOpenShifts()).thenReturn(List.of(shift));
+
+        job.run();
+
+        verify(notificationService).sendShiftAutoClosedEvent(shift.getBranch().getId());
     }
 }
