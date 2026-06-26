@@ -16,6 +16,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 import com.laroka.backend.branch.entity.Branch;
 import com.laroka.backend.branch.entity.BranchSchedule;
@@ -170,6 +172,78 @@ class BranchServiceTest {
 
 		assertThatThrownBy(() -> service.delete(99))
 			.isInstanceOf(BranchNotFoundException.class);
+	}
+
+	// --- US-13-07: schedule por sucursal (ADMIN) ---
+
+	private BranchSchedule dayInput(WeekDay day, boolean active, LocalTime o1, LocalTime c1, LocalTime o2, LocalTime c2) {
+		return BranchSchedule.builder()
+			.dayOfWeek(day).active(active)
+			.openTime(o1).closeTime(c1).openTime2(o2).closeTime2(c2)
+			.build();
+	}
+
+	@Test
+	void findScheduleByBranch_otherTenant_throws403() {
+		when(branchRepository.existsByIdAndTenantId(1, 99)).thenReturn(false);
+
+		assertThatThrownBy(() -> service.findScheduleByBranch(1, 99))
+			.isInstanceOf(ResponseStatusException.class)
+			.satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
+	}
+
+	@Test
+	void upsertSchedule_otherTenant_throws403() {
+		when(branchRepository.existsByIdAndTenantId(1, 99)).thenReturn(false);
+
+		assertThatThrownBy(() -> service.upsertSchedule(1, 99, List.of()))
+			.isInstanceOf(ResponseStatusException.class)
+			.satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
+	}
+
+	@Test
+	void upsertSchedule_activeWithoutHours_throws400() {
+		when(branchRepository.existsByIdAndTenantId(1, 1)).thenReturn(true);
+		when(branchRepository.findById(1)).thenReturn(Optional.of(branch(tenant())));
+
+		BranchSchedule day = dayInput(WeekDay.MON, true, null, null, null, null);
+
+		assertThatThrownBy(() -> service.upsertSchedule(1, 1, List.of(day)))
+			.isInstanceOf(ResponseStatusException.class)
+			.satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
+	}
+
+	@Test
+	void upsertSchedule_partialSecondFrame_throws400() {
+		when(branchRepository.existsByIdAndTenantId(1, 1)).thenReturn(true);
+		when(branchRepository.findById(1)).thenReturn(Optional.of(branch(tenant())));
+
+		// closeTime2 ausente con openTime2 presente.
+		BranchSchedule day = dayInput(WeekDay.MON, true,
+			LocalTime.of(10, 0), LocalTime.of(15, 0), LocalTime.of(19, 0), null);
+
+		assertThatThrownBy(() -> service.upsertSchedule(1, 1, List.of(day)))
+			.isInstanceOf(ResponseStatusException.class)
+			.satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
+	}
+
+	@Test
+	void upsertSchedule_valid_createsMissingDayAndReturnsAll() {
+		Branch branch = branch(tenant());
+		when(branchRepository.existsByIdAndTenantId(1, 1)).thenReturn(true);
+		when(branchRepository.findById(1)).thenReturn(Optional.of(branch));
+		when(branchScheduleRepository.findByBranchIdAndDayOfWeek(1, WeekDay.MON)).thenReturn(Optional.empty());
+		when(branchScheduleRepository.save(any(BranchSchedule.class))).thenAnswer(inv -> inv.getArgument(0));
+		BranchSchedule persisted = dayInput(WeekDay.MON, true, LocalTime.of(10, 0), LocalTime.of(15, 0), null, null);
+		persisted.setBranch(branch);
+		when(branchScheduleRepository.findByBranchId(1)).thenReturn(List.of(persisted));
+
+		BranchSchedule input = dayInput(WeekDay.MON, true, LocalTime.of(10, 0), LocalTime.of(15, 0), null, null);
+		List<BranchSchedule> result = service.upsertSchedule(1, 1, List.of(input));
+
+		assertThat(result).hasSize(1);
+		assertThat(result.get(0).getDayOfWeek()).isEqualTo(WeekDay.MON);
+		verify(branchScheduleRepository).save(any(BranchSchedule.class));
 	}
 
 	// --- isOpenAt (US-13-06: branch_schedule + overrides) ---

@@ -24,11 +24,15 @@ import com.laroka.backend.branch.dto.AcceptingOrdersResponseDTO;
 import com.laroka.backend.branch.dto.BranchConfigRequestDTO;
 import com.laroka.backend.branch.dto.BranchRequestDTO;
 import com.laroka.backend.branch.dto.BranchResponseDTO;
+import com.laroka.backend.branch.dto.BranchScheduleDayRequestDTO;
+import com.laroka.backend.branch.dto.BranchScheduleDayResponseDTO;
 import com.laroka.backend.branch.dto.QrConfigRequestDTO;
 import com.laroka.backend.branch.dto.QrConfigResponseDTO;
 import com.laroka.backend.branch.entity.Branch;
 import com.laroka.backend.branch.entity.BranchQR;
+import com.laroka.backend.branch.entity.BranchSchedule;
 import com.laroka.backend.branch.mapper.BranchMapper;
+import com.laroka.backend.branch.mapper.BranchScheduleMapper;
 import com.laroka.backend.branch.service.BranchService;
 import com.laroka.backend.shared.security.CustomUserDetails;
 import com.laroka.backend.shared.security.SecurityUtils;
@@ -46,6 +50,7 @@ public class BranchController {
 
 	private final BranchService service;
 	private final BranchMapper mapper;
+	private final BranchScheduleMapper scheduleMapper;
 	private final WorkShiftService workShiftService;
 	private final SecurityUtils securityUtils;
 
@@ -106,6 +111,32 @@ public class BranchController {
 			@AuthenticationPrincipal CustomUserDetails principal) {
 		Branch updated = service.updateConfig(id, principal.getTenantId(), dto.getMaxShiftDurationMinutes());
 		return ResponseEntity.ok(mapper.toResponseDTO(updated));
+	}
+
+	@GetMapping("/{id}/schedule")
+	@PreAuthorize("hasRole('ADMIN')")
+	@Operation(summary = "Get branch weekly schedule",
+			description = "Returns exactly 7 entries (MON..SUN). Days without a record are returned with active=false "
+					+ "and null hours. ADMIN only; the branch must belong to the ADMIN's tenant.")
+	public ResponseEntity<List<BranchScheduleDayResponseDTO>> getSchedule(
+			@PathVariable Integer id,
+			@AuthenticationPrincipal CustomUserDetails principal) {
+		List<BranchSchedule> schedule = service.findScheduleByBranch(id, principal.getTenantId());
+		return ResponseEntity.ok(scheduleMapper.toWeekResponse(schedule));
+	}
+
+	@PutMapping("/{id}/schedule")
+	@PreAuthorize("hasRole('ADMIN')")
+	@Operation(summary = "Upsert branch weekly schedule",
+			description = "Receives the list of days and upserts the branch schedule. ADMIN only; the branch must "
+					+ "belong to the ADMIN's tenant. Returns 400 on incomplete time frames.")
+	public ResponseEntity<List<BranchScheduleDayResponseDTO>> upsertSchedule(
+			@PathVariable Integer id,
+			@RequestBody List<BranchScheduleDayRequestDTO> days,
+			@AuthenticationPrincipal CustomUserDetails principal) {
+		List<BranchSchedule> data = days.stream().map(scheduleMapper::toEntity).toList();
+		List<BranchSchedule> saved = service.upsertSchedule(id, principal.getTenantId(), data);
+		return ResponseEntity.ok(scheduleMapper.toWeekResponse(saved));
 	}
 
 	@PostMapping("/{id}/qr-config")

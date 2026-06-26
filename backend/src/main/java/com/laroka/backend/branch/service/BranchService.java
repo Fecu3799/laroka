@@ -89,6 +89,60 @@ public class BranchService {
 		return branchQrRepository.save(qr);
 	}
 
+	// --- US-13-07: gestión de horarios por sucursal (ADMIN) ---
+
+	public List<BranchSchedule> findScheduleByBranch(Integer branchId, Integer tenantId) {
+		validateBranchOwnership(branchId, tenantId);
+		return branchScheduleRepository.findByBranchId(branchId);
+	}
+
+	public List<BranchSchedule> upsertSchedule(Integer branchId, Integer tenantId, List<BranchSchedule> days) {
+		validateBranchOwnership(branchId, tenantId);
+		Branch branch = findById(branchId);
+
+		for (BranchSchedule day : days) {
+			validateScheduleDay(day);
+			BranchSchedule entity = branchScheduleRepository
+				.findByBranchIdAndDayOfWeek(branchId, day.getDayOfWeek())
+				.orElseGet(() -> {
+					BranchSchedule created = new BranchSchedule();
+					created.setBranch(branch);
+					created.setDayOfWeek(day.getDayOfWeek());
+					return created;
+				});
+			entity.setActive(day.isActive());
+			entity.setOpenTime(day.getOpenTime());
+			entity.setCloseTime(day.getCloseTime());
+			entity.setOpenTime2(day.getOpenTime2());
+			entity.setCloseTime2(day.getCloseTime2());
+			branchScheduleRepository.save(entity);
+		}
+
+		return branchScheduleRepository.findByBranchId(branchId);
+	}
+
+	private void validateBranchOwnership(Integer branchId, Integer tenantId) {
+		if (!repository.existsByIdAndTenantId(branchId, tenantId)) {
+			throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Branch does not belong to your tenant");
+		}
+	}
+
+	private static void validateScheduleDay(BranchSchedule day) {
+		if (day.getDayOfWeek() == null) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "dayOfWeek is required");
+		}
+		if (day.isActive() && (day.getOpenTime() == null || day.getCloseTime() == null)) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+				"openTime and closeTime are required when active is true");
+		}
+		boolean hasOpen2 = day.getOpenTime2() != null;
+		boolean hasClose2 = day.getCloseTime2() != null;
+		if (hasOpen2 != hasClose2) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+				"openTime2 and closeTime2 must both be present or both absent");
+		}
+	}
+
 	public boolean isOpen(Integer branchId) {
 		return isOpenAt(branchId, LocalDate.now(), LocalTime.now());
 	}
