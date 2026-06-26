@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.laroka.backend.branch.dto.BranchPublicDTO;
@@ -33,9 +34,9 @@ public class BranchClientController {
 	private final MenuMapper menuMapper;
 
 	@GetMapping
-	@Operation(summary = "Get all active branches", description = "Returns a list of all active branches with basic information")
-	public ResponseEntity<List<BranchPublicDTO>> findAll() {
-		return ResponseEntity.ok(branchService.findAll().stream().map(branchMapper::toPublicDTO).toList());
+	@Operation(summary = "Get branches by tenant", description = "Returns the branches that belong to the given tenant. The tenantId query param is required; omitting it returns 400.")
+	public ResponseEntity<List<BranchPublicDTO>> findAll(@RequestParam Integer tenantId) {
+		return ResponseEntity.ok(branchService.findByTenant(tenantId).stream().map(branchMapper::toPublicDTO).toList());
 	}
 
 	@GetMapping("/{id}")
