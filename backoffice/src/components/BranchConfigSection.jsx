@@ -126,12 +126,14 @@ export default function BranchConfigSection() {
                   </button>
 
                   <span className="config-branch-feedback">
-                    {row.status === 'saved' && (
-                      <span className="config-feedback-ok">✓ Guardado</span>
-                    )}
-                    {row.status === 'error' && (
-                      <span className="config-feedback-err">{row.error}</span>
-                    )}
+                    {invalid && dirty
+                      ? <span className="config-feedback-err">La duración máxima es obligatoria</span>
+                      : row.status === 'saved'
+                        ? <span className="config-feedback-ok">✓ Guardado</span>
+                        : row.status === 'error'
+                          ? <span className="config-feedback-err">{row.error}</span>
+                          : null
+                    }
                   </span>
                 </div>
               </div>
