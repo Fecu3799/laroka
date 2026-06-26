@@ -18,6 +18,25 @@ En producción: flujo completo de pedido cliente → pago (MercadoPago / efectiv
 
 ---
 
+## Breaking Changes
+
+### Sprint 13 — `GET /branches` ahora requiere `tenantId` (US-13-01)
+
+El endpoint público `GET /branches` pasó a **requerir** el query param
+`tenantId` (entero). Antes devolvía todas las sucursales sin filtro; ahora
+devuelve únicamente las del tenant indicado.
+
+- **Antes:** `GET /branches`
+- **Ahora:** `GET /branches?tenantId=1`
+- Omitir `tenantId` retorna **400 Bad Request**.
+
+**Impacto en la PWA del cliente:** las pantallas que listan sucursales
+(`BranchSelection`, `SplashScreen`) deben incluir el `tenantId` en la llamada.
+La integración del lado del frontend se aborda en US-13-F-01 mediante la
+variable de entorno `VITE_TENANT_ID`.
+
+---
+
 ## Stack Tecnológico
 
 | Componente          | Tecnología                                    |
