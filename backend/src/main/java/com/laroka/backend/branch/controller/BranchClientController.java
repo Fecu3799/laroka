@@ -46,7 +46,7 @@ public class BranchClientController {
 	}
 
 	@GetMapping("/{id}/status")
-	@Operation(summary = "Get branch open/closed status", description = "Returns whether the branch is currently open based on its schedule (opening_time, closing_time, open_days).")
+	@Operation(summary = "Get branch open/closed status", description = "Returns whether the branch is currently open based on its weekly schedule (branch_schedule) and any date-specific overrides (branch_schedule_override).")
 	public ResponseEntity<BranchStatusDTO> getBranchStatus(@PathVariable Integer id) {
 		return ResponseEntity.ok(BranchStatusDTO.builder().open(branchService.isOpen(id)).build());
 	}

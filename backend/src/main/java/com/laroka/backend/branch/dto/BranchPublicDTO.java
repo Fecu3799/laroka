@@ -1,9 +1,6 @@
 package com.laroka.backend.branch.dto;
 
 import java.math.BigDecimal;
-import java.time.LocalTime;
-
-import com.fasterxml.jackson.annotation.JsonFormat;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -22,13 +19,5 @@ public class BranchPublicDTO {
 	private BigDecimal serviceFee;
 	private Integer estimatedDeliveryMinutes;
 	private String phone;
-
-	@JsonFormat(pattern = "HH:mm")
-	private LocalTime openingTime;
-
-	@JsonFormat(pattern = "HH:mm")
-	private LocalTime closingTime;
-
-	private String openDays;
 	private boolean acceptingOrders;
 }

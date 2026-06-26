@@ -1,11 +1,9 @@
 package com.laroka.backend.branch.service;
 
-import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
+import java.util.Optional;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -13,9 +11,14 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.laroka.backend.branch.entity.Branch;
 import com.laroka.backend.branch.entity.BranchQR;
+import com.laroka.backend.branch.entity.BranchSchedule;
+import com.laroka.backend.branch.entity.BranchScheduleOverride;
+import com.laroka.backend.branch.entity.WeekDay;
 import com.laroka.backend.branch.exception.BranchNotFoundException;
 import com.laroka.backend.branch.repository.BranchQRRepository;
 import com.laroka.backend.branch.repository.BranchRepository;
+import com.laroka.backend.branch.repository.BranchScheduleOverrideRepository;
+import com.laroka.backend.branch.repository.BranchScheduleRepository;
 import com.laroka.backend.tenant.entity.Tenant;
 import com.laroka.backend.tenant.exception.TenantNotFoundException;
 import com.laroka.backend.tenant.repository.TenantRepository;
@@ -29,6 +32,8 @@ public class BranchService {
 	private final BranchRepository repository;
 	private final TenantRepository tenantRepository;
 	private final BranchQRRepository branchQrRepository;
+	private final BranchScheduleRepository branchScheduleRepository;
+	private final BranchScheduleOverrideRepository branchScheduleOverrideRepository;
 
 	public Branch findById(Integer id) {
 		return repository.findById(id)
@@ -85,27 +90,59 @@ public class BranchService {
 	}
 
 	public boolean isOpen(Integer branchId) {
-		return isOpenAt(findById(branchId), LocalDate.now(), LocalTime.now());
+		return isOpenAt(branchId, LocalDate.now(), LocalTime.now());
 	}
 
-	static boolean isOpenAt(Branch branch, LocalDate date, LocalTime now) {
-		String dayCode = DAY_CODES.get(date.getDayOfWeek());
-		List<String> openDays = Arrays.asList(branch.getOpenDays().split(","));
-		if (!openDays.contains(dayCode)) {
+	/**
+	 * US-13-06: determina si la sucursal está operativa en una fecha/hora.
+	 * (1) Si existe un override para la fecha: si está inactivo, cerrado; si está
+	 *     activo, se evalúan sus franjas. (2) Si no hay override, se usa el
+	 *     branch_schedule del día de la semana: si no existe o está inactivo,
+	 *     cerrado; si está activo, se evalúan sus franjas. Sin franjas definidas
+	 *     y activo = abierto todo el día.
+	 */
+	boolean isOpenAt(Integer branchId, LocalDate date, LocalTime time) {
+		Optional<BranchScheduleOverride> override =
+			branchScheduleOverrideRepository.findByBranchIdAndDate(branchId, date);
+		if (override.isPresent()) {
+			BranchScheduleOverride o = override.get();
+			if (!o.isActive()) {
+				return false;
+			}
+			return withinFrames(time, o.getOpenTime(), o.getCloseTime(), o.getOpenTime2(), o.getCloseTime2());
+		}
+
+		WeekDay day = WeekDay.from(date.getDayOfWeek());
+		Optional<BranchSchedule> schedule =
+			branchScheduleRepository.findByBranchIdAndDayOfWeek(branchId, day);
+		if (schedule.isEmpty()) {
 			return false;
 		}
-		return !now.isBefore(branch.getOpeningTime()) && !now.isAfter(branch.getClosingTime());
+		BranchSchedule s = schedule.get();
+		if (!s.isActive()) {
+			return false;
+		}
+		return withinFrames(time, s.getOpenTime(), s.getCloseTime(), s.getOpenTime2(), s.getCloseTime2());
 	}
 
-	private static final Map<DayOfWeek, String> DAY_CODES = Map.of(
-		DayOfWeek.MONDAY,    "LUN",
-		DayOfWeek.TUESDAY,   "MAR",
-		DayOfWeek.WEDNESDAY, "MIE",
-		DayOfWeek.THURSDAY,  "JUE",
-		DayOfWeek.FRIDAY,    "VIE",
-		DayOfWeek.SATURDAY,  "SAB",
-		DayOfWeek.SUNDAY,    "DOM"
-	);
+	/**
+	 * Verdadero si {@code time} cae en la franja 1 o la franja 2. Si ninguna franja
+	 * está definida (todos los límites null), el local se considera abierto todo el día.
+	 */
+	private static boolean withinFrames(LocalTime time, LocalTime open1, LocalTime close1,
+			LocalTime open2, LocalTime close2) {
+		boolean frame1Defined = open1 != null && close1 != null;
+		boolean frame2Defined = open2 != null && close2 != null;
+		if (!frame1Defined && !frame2Defined) {
+			return true;
+		}
+		return (frame1Defined && withinFrame(time, open1, close1))
+			|| (frame2Defined && withinFrame(time, open2, close2));
+	}
+
+	private static boolean withinFrame(LocalTime time, LocalTime open, LocalTime close) {
+		return !time.isBefore(open) && !time.isAfter(close);
+	}
 
 	private Tenant validateTenantExists(Integer tenantId) {
 		return tenantRepository.findById(tenantId)

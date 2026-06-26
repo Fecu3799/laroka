@@ -47,9 +47,6 @@ public class BranchMapper {
 			.serviceFee(branch.getServiceFee())
 			.estimatedDeliveryMinutes(branch.getEstimatedDeliveryMinutes())
 			.phone(branch.getPhone())
-			.openingTime(branch.getOpeningTime())
-			.closingTime(branch.getClosingTime())
-			.openDays(branch.getOpenDays())
 			.acceptingOrders(branch.isAcceptingOrders())
 			.build();
 	}
