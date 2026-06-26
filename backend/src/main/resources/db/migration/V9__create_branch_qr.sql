@@ -11,9 +11,3 @@ CREATE TABLE branch_qr (
 );
 
 CREATE INDEX idx_branch_qr_branch_id ON branch_qr(branch_id);
-
--- Seed con valores placeholder para dev
-INSERT INTO branch_qr (branch_id, mp_pos_id, mp_qr_id, active) VALUES
-    (1, 'POS_PLAYA_UNION_DEV', 'QR_PLAYA_UNION_DEV', true),
-    (2, 'POS_RAWSON_DEV',      'QR_RAWSON_DEV',      true),
-    (3, 'POS_MADRYN_DEV',      'QR_MADRYN_DEV',      true);

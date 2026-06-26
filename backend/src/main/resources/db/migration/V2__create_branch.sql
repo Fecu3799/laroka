@@ -16,9 +16,3 @@ CREATE TABLE branch (
 );
 
 CREATE INDEX idx_branch_tenant_id ON branch(tenant_id);
-
--- Insertar sucursales iniciales
-INSERT INTO branch (name, address, tenant_id, delivery_fee, service_fee, estimated_delivery_minutes, phone) VALUES
-    ('Playa Unión', 'Centenario 423', 1, 500.00, 200.00, 15, '+542804123456'),
-    ('Rawson', '15 de Septiembre 1-98', 1, 800.00, 250.00, 15, '+542804125435'),
-    ('Puerto Madryn', 'Blvd. Brown 78', 1, 1000.00, 300.00, 15, '+542804142354');

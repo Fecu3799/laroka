@@ -19,18 +19,6 @@ CREATE TABLE product (
 CREATE INDEX idx_product_tenant_id ON product(tenant_id);
 CREATE INDEX idx_product_category_id ON product(category_id);
 
--- Productos seed
-INSERT INTO product (name, description, price, category_id, tenant_id) VALUES
-    ('Muzzarella',  'Salsa de tomate y muzzarella',                            2800.00, 1, 1),
-    ('Napolitana',  'Salsa de tomate, muzzarella, tomate y ajo',               3200.00, 1, 1),
-    ('Fugazzeta',   'Muzzarella, cebolla y aceitunas',                          3400.00, 1, 1),
-    ('Especial',    'Jamón, morrón, aceitunas y muzzarella',                    3800.00, 1, 1),
-    ('Carne',       'Carne vacuna, huevo y aceitunas',                           650.00, 2, 1),
-    ('Pollo',       'Pollo desmenuzado, morrón y cebolla',                       650.00, 2, 1),
-    ('Verdura',     'Espinaca, ricota y huevo',                                  600.00, 2, 1),
-    ('Coca-Cola 1.5L',    'Gaseosa',                                            1200.00, 3, 1),
-    ('Agua mineral 500ml','Sin gas',                                              500.00, 3, 1);
-
 -- Tabla de disponibilidad por sucursal
 CREATE TABLE branch_product (
     branch_id  INTEGER NOT NULL,
@@ -43,11 +31,3 @@ CREATE TABLE branch_product (
 );
 
 CREATE INDEX idx_branch_product_product_id ON branch_product(product_id);
-
--- Seed: todos los productos activos disponibles en las 3 sucursales
-INSERT INTO branch_product (branch_id, product_id)
-SELECT b.id, p.id
-FROM branch b
-CROSS JOIN product p
-WHERE b.tenant_id = 1
-  AND p.tenant_id = 1;
