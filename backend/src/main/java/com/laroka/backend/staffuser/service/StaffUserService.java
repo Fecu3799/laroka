@@ -26,11 +26,11 @@ public class StaffUserService {
 	private final PasswordEncoder passwordEncoder;
 
 	public StaffUser create(StaffUser staffUser) {
-		staffUser.setEmail(generateEmail(staffUser.getName()));
-
 		Branch branch = branchRepository.findById(staffUser.getBranch().getId())
 			.orElseThrow(() -> new BranchNotFoundException(staffUser.getBranch().getId()));
 
+		String domain = branch.getTenant().getEmailDomain();
+		staffUser.setEmail(generateEmail(staffUser.getName(), domain));
 		staffUser.setBranch(branch);
 		staffUser.setPasswordHash(passwordEncoder.encode(staffUser.getPasswordHash()));
 
@@ -51,7 +51,8 @@ public class StaffUserService {
 		}
 
 		if (!existing.getName().equals(patch.getName())) {
-			existing.setEmail(generateEmailExcluding(patch.getName(), id));
+			String domain = existing.getBranch().getTenant().getEmailDomain();
+			existing.setEmail(generateEmailExcluding(patch.getName(), id, domain));
 			existing.setName(patch.getName());
 		}
 
@@ -94,15 +95,15 @@ public class StaffUserService {
 		return staffUserRepository.findAllByTenantId(tenantId);
 	}
 
-	String generateEmail(String name) {
+	String generateEmail(String name, String domain) {
 		String normalized = normalizeName(name);
-		String baseEmail = normalized + "@laroka.com";
+		String baseEmail = normalized + "@" + domain;
 		if (!staffUserRepository.existsByEmail(baseEmail)) {
 			return baseEmail;
 		}
 		int suffix = 2;
 		while (true) {
-			String candidate = normalized + suffix + "@laroka.com";
+			String candidate = normalized + suffix + "@" + domain;
 			if (!staffUserRepository.existsByEmail(candidate)) {
 				return candidate;
 			}
@@ -110,15 +111,15 @@ public class StaffUserService {
 		}
 	}
 
-	String generateEmailExcluding(String name, Integer excludeId) {
+	String generateEmailExcluding(String name, Integer excludeId, String domain) {
 		String normalized = normalizeName(name);
-		String baseEmail = normalized + "@laroka.com";
+		String baseEmail = normalized + "@" + domain;
 		if (!staffUserRepository.existsByEmailAndIdNot(baseEmail, excludeId)) {
 			return baseEmail;
 		}
 		int suffix = 2;
 		while (true) {
-			String candidate = normalized + suffix + "@laroka.com";
+			String candidate = normalized + suffix + "@" + domain;
 			if (!staffUserRepository.existsByEmailAndIdNot(candidate, excludeId)) {
 				return candidate;
 			}

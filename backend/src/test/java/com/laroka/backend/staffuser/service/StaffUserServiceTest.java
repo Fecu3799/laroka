@@ -44,7 +44,7 @@ class StaffUserServiceTest {
 	private StaffUserService staffUserService;
 
 	private Tenant tenant() {
-		return Tenant.builder().id(TENANT_ID).name("La Roka").build();
+		return Tenant.builder().id(TENANT_ID).name("La Roka").emailDomain("laroka.com").build();
 	}
 
 	private Branch branch() {
@@ -123,32 +123,64 @@ class StaffUserServiceTest {
 	void generateEmail_nameWithAccents_normalizes() {
 		when(staffUserRepository.existsByEmail("maria.garcia@laroka.com")).thenReturn(false);
 
-		assertThat(staffUserService.generateEmail("María García")).isEqualTo("maria.garcia@laroka.com");
+		assertThat(staffUserService.generateEmail("María García", "laroka.com")).isEqualTo("maria.garcia@laroka.com");
 	}
 
 	@Test
 	void generateEmail_nameWithNTilde_normalizesToN() {
 		when(staffUserRepository.existsByEmail("juan.ibanez@laroka.com")).thenReturn(false);
 
-		assertThat(staffUserService.generateEmail("Juan Ibáñez")).isEqualTo("juan.ibanez@laroka.com");
+		assertThat(staffUserService.generateEmail("Juan Ibáñez", "laroka.com")).isEqualTo("juan.ibanez@laroka.com");
 	}
 
 	@Test
 	void generateEmail_nameWithMixedSpecialChars_normalizes() {
 		when(staffUserRepository.existsByEmail("jose.munoz@laroka.com")).thenReturn(false);
 
-		assertThat(staffUserService.generateEmail("José Muñoz")).isEqualTo("jose.munoz@laroka.com");
+		assertThat(staffUserService.generateEmail("José Muñoz", "laroka.com")).isEqualTo("jose.munoz@laroka.com");
 	}
 
 	@Test
 	void create_invalidBranch_throwsBranchNotFoundException() {
 		StaffUser staffUser = newStaffUser("New Staff");
 
-		when(staffUserRepository.existsByEmail(anyString())).thenReturn(false);
 		when(branchRepository.findById(BRANCH_ID)).thenReturn(Optional.empty());
 
 		assertThatThrownBy(() -> staffUserService.create(staffUser))
 			.isInstanceOf(BranchNotFoundException.class);
+	}
+
+	@Test
+	void create_usesEmailDomainFromTenant() {
+		Tenant customTenant = Tenant.builder().id(TENANT_ID).name("Otra Pizza").emailDomain("otrapizza.com").build();
+		Branch customBranch = Branch.builder().id(BRANCH_ID).name("Local").tenant(customTenant).build();
+		StaffUser staffUser = newStaffUser("Juan Perez");
+
+		when(branchRepository.findById(BRANCH_ID)).thenReturn(Optional.of(customBranch));
+		when(staffUserRepository.existsByEmail("juan.perez@otrapizza.com")).thenReturn(false);
+		when(passwordEncoder.encode(anyString())).thenReturn("$2a$10$hashed");
+		when(staffUserRepository.save(any(StaffUser.class))).thenAnswer(inv -> inv.getArgument(0));
+
+		StaffUser result = staffUserService.create(staffUser);
+
+		assertThat(result.getEmail()).isEqualTo("juan.perez@otrapizza.com");
+	}
+
+	@Test
+	void create_emailConflict_deduplicationRespectsTenantDomain() {
+		Tenant customTenant = Tenant.builder().id(TENANT_ID).name("Otra Pizza").emailDomain("otrapizza.com").build();
+		Branch customBranch = Branch.builder().id(BRANCH_ID).name("Local").tenant(customTenant).build();
+		StaffUser staffUser = newStaffUser("Juan Perez");
+
+		when(branchRepository.findById(BRANCH_ID)).thenReturn(Optional.of(customBranch));
+		when(staffUserRepository.existsByEmail("juan.perez@otrapizza.com")).thenReturn(true);
+		when(staffUserRepository.existsByEmail("juan.perez2@otrapizza.com")).thenReturn(false);
+		when(passwordEncoder.encode(anyString())).thenReturn("$2a$10$hashed");
+		when(staffUserRepository.save(any(StaffUser.class))).thenAnswer(inv -> inv.getArgument(0));
+
+		StaffUser result = staffUserService.create(staffUser);
+
+		assertThat(result.getEmail()).isEqualTo("juan.perez2@otrapizza.com");
 	}
 
 	// ── US-11-03: update ────────────────────────────────────────────────────────

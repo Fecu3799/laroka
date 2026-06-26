@@ -83,6 +83,7 @@ Capas obligatorias por módulo:
 | V22     | push_subscription + order push_subscription_id |
 | V23     | staff_user active                          |
 | V24     | branch max_shift_duration_minutes          |
+| V25     | tenant email_domain                        |
 
 Toda migración nueva debe ser la siguiente versión disponible en esta tabla.
 Actualizar esta tabla al agregar una migración.
