@@ -70,7 +70,7 @@ Capas obligatorias por módulo:
 | V9      | payment                                    |
 | V10     | branch operating hours                     |
 | V11     | branch_qr                                  |
-| V12     | delivery_fee + service_fee (branch/order)  |
+| V12     | cancellation_reason en order_status_history |
 | V13     | push_subscription                          |
 | V14     | refresh_token                              |
 | V15     | work_shift                                 |
