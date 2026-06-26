@@ -95,6 +95,7 @@ public class WorkShiftController {
                 .shiftId(ws.getId())
                 .openedAt(ws.getOpenedAt())
                 .openedBy(ws.getOpenedBy().getName())
+                .autoClose(ws.getClosedBy() == null)
                 .build())
             .orElse(CurrentShiftResponseDTO.builder().active(false).build());
 

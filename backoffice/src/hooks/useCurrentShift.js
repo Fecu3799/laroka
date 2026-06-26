@@ -21,6 +21,7 @@ export default function useCurrentShift() {
   const [closeSummary, setCloseSummary] = useState(null)
   const [acceptingOrders, setAcceptingOrders] = useState(false)
   const [suggestOrders, setSuggestOrders] = useState(false)
+  const [shiftAutoClosed, setShiftAutoClosed] = useState(false)
 
   const refresh = useCallback(async () => {
     if (!token || activeBranchId == null) { setLoading(false); setReady(true); return }
@@ -46,6 +47,17 @@ export default function useCurrentShift() {
   }, [token, activeBranchId])
 
   useEffect(() => { refresh() }, [refresh])
+
+  useEffect(() => {
+    function handle() { setShiftAutoClosed(true) }
+    window.addEventListener('laroka:shift-auto-closed', handle)
+    return () => window.removeEventListener('laroka:shift-auto-closed', handle)
+  }, [])
+
+  const confirmShiftAutoClosed = useCallback(async () => {
+    setShiftAutoClosed(false)
+    await refresh()
+  }, [refresh])
 
   const toggleOrders = useCallback(async () => {
     if (!token || activeBranchId == null) return
@@ -119,5 +131,6 @@ export default function useCurrentShift() {
     openShift, closeShift, closeSummary, dismissSummary,
     acceptingOrders, toggleOrders,
     suggestOrders, confirmSuggestOrders, dismissSuggestOrders,
+    shiftAutoClosed, confirmShiftAutoClosed,
   }
 }

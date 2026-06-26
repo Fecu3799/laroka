@@ -19,6 +19,7 @@ export default function SubHeader() {
   const {
     shift, loading, warning, confirmWarning, openShift,
     acceptingOrders, toggleOrders, suggestOrders, confirmSuggestOrders, dismissSuggestOrders,
+    shiftAutoClosed, confirmShiftAutoClosed,
   } = useShift()
 
   // ── Feed state ───────────────────────────────────────────────
@@ -201,6 +202,23 @@ export default function SubHeader() {
           </div>
         </div>
       </div>
+
+      {/* Auto-cierre: turno cerrado automáticamente por duración máxima */}
+      {shiftAutoClosed && (
+        <div className="sub-header-overlay" role="dialog" aria-modal="true" aria-labelledby="autoclose-title">
+          <div className="sub-header-modal">
+            <p className="sub-header-modal-title" id="autoclose-title">Turno cerrado automáticamente</p>
+            <div className="sub-header-modal-warning">
+              El turno se cerró automáticamente por superar la duración máxima configurada.
+            </div>
+            <div className="sub-header-modal-actions">
+              <button className="sub-header-modal-btn sub-header-modal-btn--secondary" onClick={confirmShiftAutoClosed}>
+                Entendido
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Warning: turno anterior cerrado automáticamente */}
       {warning && (

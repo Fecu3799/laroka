@@ -130,6 +130,9 @@ export default function Layout() {
                       else if (json.type === 'CANCELLATION_REQUESTED') setCancelCount(prev => prev + 1)
                     }
                   }
+                  if (json.type === 'SHIFT_AUTO_CLOSED') {
+                    window.dispatchEvent(new CustomEvent('laroka:shift-auto-closed'))
+                  }
                 } catch { /* noop */ }
               }
             }

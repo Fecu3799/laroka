@@ -18,4 +18,5 @@ public class CurrentShiftResponseDTO {
     private UUID shiftId;
     private OffsetDateTime openedAt;
     private String openedBy;
+    private boolean autoClose;
 }
