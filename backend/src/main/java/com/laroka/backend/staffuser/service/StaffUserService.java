@@ -3,6 +3,7 @@ package com.laroka.backend.staffuser.service;
 import java.text.Normalizer;
 import java.util.List;
 
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -63,6 +64,7 @@ public class StaffUserService {
 		return staffUserRepository.save(existing);
 	}
 
+	@CacheEvict(value = "staffUserActive", key = "#id")
 	public void setStatus(Integer id, Integer tenantId, Integer authenticatedUserId, boolean active) {
 		StaffUser existing = staffUserRepository.findByIdWithBranchAndTenant(id)
 			.orElseThrow(() -> new StaffUserNotFoundException(id));

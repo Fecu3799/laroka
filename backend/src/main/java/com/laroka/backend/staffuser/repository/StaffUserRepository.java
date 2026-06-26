@@ -3,6 +3,7 @@ package com.laroka.backend.staffuser.repository;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -12,6 +13,10 @@ import com.laroka.backend.staffuser.entity.StaffUser;
 
 @Repository
 public interface StaffUserRepository extends JpaRepository<StaffUser, Integer> {
+
+	@Cacheable(value = "staffUserActive", key = "#id")
+	@Query("SELECT u.active FROM StaffUser u WHERE u.id = :id")
+	Optional<Boolean> findActiveById(@Param("id") Integer id);
 
 	Optional<StaffUser> findByEmail(String email);
 
