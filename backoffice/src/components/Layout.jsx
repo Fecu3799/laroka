@@ -13,6 +13,14 @@ import './Layout.css'
 
 const API_URL = import.meta.env.VITE_API_URL ?? ''
 
+// Visibilidad de cada ítem del nav según el rol. adminOnly = solo ADMIN;
+// roles = lista explícita de roles permitidos; sin restricción = visible para todos.
+function navVisible(item, role) {
+  if (item.adminOnly) return role === 'ADMIN'
+  if (item.roles) return item.roles.includes(role)
+  return true
+}
+
 const NAV = [
   {
     to: '/orders',
@@ -45,6 +53,17 @@ const NAV = [
         <path d="M3 3v5h5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
         <path d="M3 8C4.6 4.4 8.5 2 13 2a10 10 0 1 1-9.9 11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
         <path d="M13 7v5l3 2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    to: '/menu',
+    label: 'MENÚ',
+    roles: ['ADMIN', 'MANAGER'],
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M4 7h16M4 12h16M4 17h10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+        <circle cx="18" cy="17" r="1.4" fill="currentColor" />
       </svg>
     ),
   },
@@ -178,7 +197,7 @@ export default function Layout() {
         </div>
 
         <nav className="layout-sidebar-nav" aria-label="Navegación principal">
-          {NAV.filter(({ adminOnly }) => !adminOnly || role === 'ADMIN').map(({ to, label, icon, end }) => (
+          {NAV.filter(item => navVisible(item, role)).map(({ to, label, icon, end }) => (
             <NavLink
               key={to}
               to={to}

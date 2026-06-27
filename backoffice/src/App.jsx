@@ -9,6 +9,7 @@ import OrderDetail from './pages/OrderDetail'
 import Summary from './pages/Summary'
 import History from './pages/History'
 import Config from './pages/Config'
+import Menu from './pages/Menu'
 import './App.css'
 
 function App() {
@@ -37,6 +38,7 @@ function App() {
             <Route path="/shifts/history" element={<History />} />
             <Route path="/orders" element={<Orders />} />
             <Route path="/orders/:id" element={<OrderDetail />} />
+            <Route path="/menu" element={<Menu />} />
             <Route path="/settings" element={<Config />} />
           </Route>
         </Routes>
