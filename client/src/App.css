@@ -318,6 +318,23 @@
   letter-spacing: 0.3px;
 }
 
+.menu-branch-name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.menu-about-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  color: color-mix(in srgb, var(--accent) 90%, transparent);
+}
+
 /* Branch selector button */
 .menu-branch-selector-wrapper {
   position: relative;
@@ -1787,6 +1804,101 @@
 }
 
 .branch-switch-confirm:active { filter: brightness(0.88); }
+
+/* Welcome / About modal (US-13-F-02) */
+.welcome-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.82);
+  z-index: 400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  overflow-y: auto;
+}
+
+.welcome-modal {
+  background: var(--bg-card-product);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 32px 24px;
+  width: 100%;
+  max-width: 440px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 16px;
+  margin: auto;
+}
+
+.welcome-logo {
+  width: 96px;
+  height: 96px;
+  object-fit: contain;
+  border-radius: 16px;
+}
+
+.welcome-name {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700;
+  font-size: 30px;
+  color: var(--text-primary);
+  margin: 0;
+  line-height: 1.1;
+}
+
+.welcome-description {
+  font-family: 'Inria Sans', sans-serif;
+  font-size: 15px;
+  color: var(--text-primary);
+  opacity: 0.8;
+  margin: 0;
+  line-height: 1.55;
+  white-space: pre-line;
+}
+
+.welcome-social {
+  display: flex;
+  gap: 14px;
+  margin-top: 2px;
+}
+
+.welcome-social-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.welcome-social-link:active {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.welcome-cta {
+  width: 100%;
+  margin-top: 8px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: 0.05em;
+  color: var(--bg-primary);
+  background: var(--accent);
+  border: none;
+  border-radius: 12px;
+  padding: 14px;
+  cursor: pointer;
+  transition: filter 0.15s;
+}
+
+.welcome-cta:active { filter: brightness(0.88); }
 
 /* Active order dot indicator */
 .branch-active-dot {

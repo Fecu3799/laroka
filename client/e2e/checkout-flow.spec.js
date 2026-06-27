@@ -83,6 +83,9 @@ test.describe('US-06-F-04 · checkout en efectivo con seguimiento', () => {
     await page.addInitScript(() => {
       localStorage.clear()
       sessionStorage.clear()
+      // Usuario recurrente: evita el modal de bienvenida (US-13-F-02) que se
+      // muestra sobre el menú la primera vez.
+      localStorage.setItem('laroka_intro_seen', 'true')
     })
 
     // Mocks más específicos primero (orden importa)
@@ -202,6 +205,8 @@ test.describe('US-06-F · cancelación de pedido desde el banner', () => {
     await page.addInitScript(({ orderId, storedBranch }) => {
       localStorage.clear()
       sessionStorage.clear()
+      // Usuario recurrente: evita el modal de bienvenida (US-13-F-02).
+      localStorage.setItem('laroka_intro_seen', 'true')
       localStorage.setItem('laroka_preferred_branch', storedBranch)
       localStorage.setItem('laroka_active_orders', JSON.stringify([
         { orderId, branchId: 1 },
