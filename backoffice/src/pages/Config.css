@@ -5,10 +5,56 @@
   flex-direction: column;
   gap: 24px;
   padding: 24px 28px;
-  max-width: 1040px;
   width: 100%;
   height: 100%;
   overflow-y: auto;
+}
+
+/* ── Layout en dos columnas ─────────────────────────────────────── */
+
+.config-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  row-gap: 24px;
+  align-items: start;
+}
+
+.config-col {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+}
+
+/* Gutter simétrico (~48px) con el divisor vertical centrado entre columnas. */
+.config-col--main {
+  padding-right: 24px;
+  border-right: 1px solid color-mix(in srgb, var(--border) 22%, transparent);
+}
+
+.config-col--side {
+  padding-left: 24px;
+}
+
+/* La sección de Perfil ocupa todo el ancho de la columna derecha. */
+.config-col--side .config-profile-form {
+  max-width: none;
+}
+
+/* Mobile / tablet: columnas apiladas (Perfil debajo de Sucursales). */
+@media (max-width: 1024px) {
+  .config-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .config-col--main {
+    padding-right: 0;
+    border-right: none;
+  }
+
+  .config-col--side {
+    padding-left: 0;
+  }
 }
 
 .config-header {
