@@ -36,3 +36,21 @@ export async function updateBranchConfig(branchId, maxShiftDurationMinutes, toke
   })
   return res.json()
 }
+
+// Horario semanal de una sucursal (ADMIN). Siempre 7 días (MON..SUN).
+export async function fetchBranchSchedule(branchId, token) {
+  const res = await apiFetch(`${API_URL}/backoffice/branches/${branchId}/schedule`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  return res.json()
+}
+
+// Upsert del horario semanal. days: lista de 7 días con horas en formato HH:mm.
+export async function saveBranchSchedule(branchId, days, token) {
+  const res = await apiFetch(`${API_URL}/backoffice/branches/${branchId}/schedule`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(days),
+  })
+  return res.json()
+}

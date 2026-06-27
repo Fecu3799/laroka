@@ -451,6 +451,138 @@
   margin-top: 4px;
 }
 
+/* ── Horarios por sucursal ──────────────────────────────────────── */
+
+.config-branch-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.config-branch-item:not(:last-child) {
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 12%, transparent);
+}
+
+.config-schedule-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  align-self: flex-start;
+  margin: 0 18px 14px;
+  padding: 7px 12px;
+  border-radius: 9px;
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--border) 28%, transparent);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+
+.config-schedule-toggle:hover {
+  background: color-mix(in srgb, var(--border) 12%, transparent);
+  color: var(--text-primary);
+}
+
+.config-schedule-chevron {
+  display: inline-flex;
+  transition: transform 0.15s ease;
+}
+
+.config-schedule-toggle--open .config-schedule-chevron {
+  transform: rotate(180deg);
+}
+
+.config-schedule {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 0 18px 18px;
+}
+
+.config-schedule-days {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.config-schedule-day {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--border) 6%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 18%, transparent);
+}
+
+.config-schedule-day--off {
+  opacity: 0.55;
+}
+
+.config-schedule-day-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.config-schedule-day-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.config-schedule-slots {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+}
+
+.config-schedule-slot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.config-schedule-time {
+  background: color-mix(in srgb, var(--border) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 28%, transparent);
+  border-radius: 9px;
+  color: var(--text-primary);
+  font-size: 14px;
+  padding: 8px 11px;
+  transition: border-color 0.15s;
+}
+
+.config-schedule-time:focus { border-color: var(--accent); outline: none; }
+
+.config-schedule-time:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.config-schedule-sep {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.config-schedule-second-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.config-schedule-second-toggle input:disabled {
+  cursor: not-allowed;
+}
+
 /* ── Modal de confirmación de estado ───────────────────────────── */
 
 .config-overlay {
