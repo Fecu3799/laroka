@@ -27,6 +27,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.laroka.backend.catalog.dto.ProductResponseDTO;
 import com.laroka.backend.catalog.entity.Product;
+import com.laroka.backend.catalog.mapper.BranchProductConfigMapper;
 import com.laroka.backend.catalog.mapper.ProductMapper;
 import com.laroka.backend.catalog.service.ProductService;
 import com.laroka.backend.shared.security.JwtAuthenticationFilter;
@@ -64,6 +65,9 @@ class ProductControllerAuthorizationTest {
 
 	@MockitoBean
 	private ProductMapper mapper;
+
+	@MockitoBean
+	private BranchProductConfigMapper branchProductConfigMapper;
 
 	@MockitoBean
 	private SecurityUtils securityUtils;

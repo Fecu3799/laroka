@@ -299,6 +299,32 @@ class ProductServiceTest {
 			.hasMessageContaining("Branch ID");
 	}
 
+	// --- getBranchProductConfig ---
+
+	@Test
+	void getBranchProductConfig_existingProduct_returnsBranchProducts() {
+		Tenant p = tenant();
+		Branch b = branch(p);
+		Product product = product(category(p), p);
+		BranchProduct bp = branchProduct(b, product, new BigDecimal("3100.00"));
+		when(productRepository.findById(1)).thenReturn(Optional.of(product));
+		when(branchProductRepository.findConfigByProductId(1)).thenReturn(List.of(bp));
+
+		List<BranchProduct> result = service.getBranchProductConfig(1);
+
+		assertThat(result).hasSize(1);
+		assertThat(result.get(0).getPriceOverride()).isEqualByComparingTo("3100.00");
+		verify(branchProductRepository).findConfigByProductId(1);
+	}
+
+	@Test
+	void getBranchProductConfig_productNotFound_throwsProductNotFoundException() {
+		when(productRepository.findById(99)).thenReturn(Optional.empty());
+
+		assertThatThrownBy(() -> service.getBranchProductConfig(99))
+			.isInstanceOf(ProductNotFoundException.class);
+	}
+
 	// --- updateBranchConfig ---
 
 	@Test

@@ -5,6 +5,8 @@ import java.util.Optional;
 
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import com.laroka.backend.catalog.entity.BranchProduct;
@@ -23,4 +25,12 @@ public interface BranchProductRepository extends JpaRepository<BranchProduct, Br
     Optional<BranchProduct> findByBranchIdAndProductId(Integer branchId, Integer productId);
 
     List<BranchProduct> findByProductId(Integer productId);
+
+    // Carga branch + product en la misma query: la config por sucursal se mapea fuera de
+    // la sesión (open-in-view=false), así que branch (para branchName) y product (para el
+    // precio base) deben venir inicializados para evitar LazyInitializationException.
+    @Query("SELECT bp FROM BranchProduct bp "
+        + "JOIN FETCH bp.branch JOIN FETCH bp.product "
+        + "WHERE bp.product.id = :productId")
+    List<BranchProduct> findConfigByProductId(@Param("productId") Integer productId);
 }

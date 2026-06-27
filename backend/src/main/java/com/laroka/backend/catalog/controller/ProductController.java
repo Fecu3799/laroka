@@ -17,11 +17,13 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.laroka.backend.catalog.dto.AvailabilityUpdateDTO;
+import com.laroka.backend.catalog.dto.BranchProductConfigDTO;
 import com.laroka.backend.catalog.dto.BranchProductConfigRequestDTO;
 import com.laroka.backend.catalog.dto.ProductPriceUpdateRequestDTO;
 import com.laroka.backend.catalog.dto.ProductRequestDTO;
 import com.laroka.backend.catalog.dto.ProductResponseDTO;
 import com.laroka.backend.catalog.entity.Product;
+import com.laroka.backend.catalog.mapper.BranchProductConfigMapper;
 import com.laroka.backend.catalog.mapper.ProductMapper;
 import com.laroka.backend.catalog.service.ProductService;
 import com.laroka.backend.shared.security.CustomUserDetails;
@@ -43,6 +45,7 @@ public class ProductController {
 
 	private final ProductService service;
 	private final ProductMapper mapper;
+	private final BranchProductConfigMapper branchProductConfigMapper;
 	private final SecurityUtils securityUtils;
 
 	@GetMapping("/{id}")
@@ -102,6 +105,15 @@ public class ProductController {
 			HttpServletRequest request) {
 		Integer userBranchId = securityUtils.resolveBranchId(principal, request);
 		return ResponseEntity.ok(mapper.toResponseDTO(service.updateAvailability(id, dto.getAvailable(), userBranchId)));
+	}
+
+	@GetMapping("/{id}/branch-config")
+	@PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+	@Operation(summary = "Get product config per branch",
+			description = "Returns one entry per branch of the tenant with availability, price override "
+					+ "(nullable) and the effective price (override if present, base price otherwise).")
+	public ResponseEntity<List<BranchProductConfigDTO>> getBranchConfig(@PathVariable Integer id) {
+		return ResponseEntity.ok(branchProductConfigMapper.toConfigList(service.getBranchProductConfig(id)));
 	}
 
 	@PatchMapping("/{id}/branch-config")

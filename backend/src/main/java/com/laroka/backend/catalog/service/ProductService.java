@@ -97,6 +97,14 @@ public class ProductService {
 		return branchProduct.getProduct();
 	}
 
+	// US-14-03: configuración por sucursal de un producto. Una entrada por cada sucursal
+	// del tenant (cada sucursal tiene su BranchProduct, garantizado por US-14-04), con
+	// branch y product cargados para resolver branchName y precio efectivo en el mapper.
+	public List<BranchProduct> getBranchProductConfig(Integer productId) {
+		findById(productId);
+		return branchProductRepository.findConfigByProductId(productId);
+	}
+
 	@CacheEvict(value = "menu", key = "#branchId")
 	public Product updateBranchConfig(Integer productId, Integer branchId, BigDecimal priceOverride,
 			Boolean available) {
