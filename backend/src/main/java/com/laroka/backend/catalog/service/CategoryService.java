@@ -1,12 +1,16 @@
 package com.laroka.backend.catalog.service;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 
 import com.laroka.backend.catalog.entity.Category;
 import com.laroka.backend.catalog.exception.CategoryNotFoundException;
 import com.laroka.backend.catalog.repository.CategoryRepository;
+import com.laroka.backend.catalog.repository.ProductRepository;
+import com.laroka.backend.catalog.repository.ProductRepository.CategoryProductCount;
 import com.laroka.backend.tenant.entity.Tenant;
 import com.laroka.backend.tenant.exception.TenantNotFoundException;
 import com.laroka.backend.tenant.repository.TenantRepository;
@@ -18,6 +22,7 @@ import lombok.RequiredArgsConstructor;
 public class CategoryService {
 
 	private final CategoryRepository repository;
+	private final ProductRepository productRepository;
 	private final TenantRepository tenantRepository;
 
 	public Category findById(Integer id) {
@@ -27,11 +32,18 @@ public class CategoryService {
 
 	public List<Category> findByTenant(Integer tenantId) {
 		validateTenantExists(tenantId);
-		return repository.findByTenantId(tenantId);
+		return repository.findByTenantIdOrderByNameAsc(tenantId);
 	}
 
 	public List<Category> findAll() {
-		return repository.findAll();
+		return repository.findAllByOrderByNameAsc();
+	}
+
+	// US-14-05: cantidad de productos por categoría, keyed por categoryId. Las categorías
+	// sin productos no aparecen en el mapa (el mapper resuelve a 0).
+	public Map<Integer, Long> countProductsByCategory() {
+		return productRepository.countGroupedByCategory().stream()
+			.collect(Collectors.toMap(CategoryProductCount::getCategoryId, CategoryProductCount::getCount));
 	}
 
 	public Category create(Category category) {

@@ -50,7 +50,7 @@ public class CategoryController {
 		List<Category> categories = tenantId != null
 			? service.findByTenant(tenantId)
 			: service.findAll();
-		return ResponseEntity.ok(categories.stream().map(mapper::toResponseDTO).toList());
+		return ResponseEntity.ok(mapper.toResponseDTOList(categories, service.countProductsByCategory()));
 	}
 
 	@PostMapping

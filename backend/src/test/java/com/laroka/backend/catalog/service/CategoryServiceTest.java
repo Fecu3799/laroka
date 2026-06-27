@@ -3,10 +3,12 @@ package com.laroka.backend.catalog.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
@@ -18,6 +20,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.laroka.backend.catalog.entity.Category;
 import com.laroka.backend.catalog.exception.CategoryNotFoundException;
 import com.laroka.backend.catalog.repository.CategoryRepository;
+import com.laroka.backend.catalog.repository.ProductRepository;
+import com.laroka.backend.catalog.repository.ProductRepository.CategoryProductCount;
 import com.laroka.backend.tenant.entity.Tenant;
 import com.laroka.backend.tenant.exception.TenantNotFoundException;
 import com.laroka.backend.tenant.repository.TenantRepository;
@@ -27,6 +31,9 @@ class CategoryServiceTest {
 
 	@Mock
 	private CategoryRepository categoryRepository;
+
+	@Mock
+	private ProductRepository productRepository;
 
 	@Mock
 	private TenantRepository tenantRepository;
@@ -62,9 +69,9 @@ class CategoryServiceTest {
 	}
 
 	@Test
-	void findAll_returnsAllCategories() {
+	void findAll_returnsAllCategoriesOrderedByName() {
 		Tenant p = tenant();
-		when(categoryRepository.findAll()).thenReturn(List.of(category(p), category(p)));
+		when(categoryRepository.findAllByOrderByNameAsc()).thenReturn(List.of(category(p), category(p)));
 
 		List<Category> result = service.findAll();
 
@@ -75,11 +82,23 @@ class CategoryServiceTest {
 	void findByTenant_validTenant_returnsCategories() {
 		Tenant p = tenant();
 		when(tenantRepository.findById(1)).thenReturn(Optional.of(p));
-		when(categoryRepository.findByTenantId(1)).thenReturn(List.of(category(p)));
+		when(categoryRepository.findByTenantIdOrderByNameAsc(1)).thenReturn(List.of(category(p)));
 
 		List<Category> result = service.findByTenant(1);
 
 		assertThat(result).hasSize(1);
+	}
+
+	@Test
+	void countProductsByCategory_buildsMapKeyedByCategoryId() {
+		CategoryProductCount row = mock(CategoryProductCount.class);
+		when(row.getCategoryId()).thenReturn(1);
+		when(row.getCount()).thenReturn(3L);
+		when(productRepository.countGroupedByCategory()).thenReturn(List.of(row));
+
+		Map<Integer, Long> result = service.countProductsByCategory();
+
+		assertThat(result).containsExactlyInAnyOrderEntriesOf(Map.of(1, 3L));
 	}
 
 	@Test
