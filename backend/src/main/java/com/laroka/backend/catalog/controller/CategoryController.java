@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -36,12 +37,14 @@ public class CategoryController {
 	private final CategoryMapper mapper;
 
 	@GetMapping("/{id}")
+	@PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
 	@Operation(summary = "Get category by ID", description = "Returns a specific category")
 	public ResponseEntity<CategoryResponseDTO> findById(@PathVariable Integer id) {
 		return ResponseEntity.ok(mapper.toResponseDTO(service.findById(id)));
 	}
 
 	@GetMapping
+	@PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
 	@Operation(summary = "List categories", description = "Returns all categories, optionally filtered by tenant")
 	public ResponseEntity<List<CategoryResponseDTO>> findAll(@RequestParam(required = false) Integer tenantId) {
 		List<Category> categories = tenantId != null
@@ -51,6 +54,7 @@ public class CategoryController {
 	}
 
 	@PostMapping
+	@PreAuthorize("hasRole('ADMIN')")
 	@Operation(summary = "Create category", description = "Creates a new category")
 	public ResponseEntity<CategoryResponseDTO> create(@Valid @RequestBody CategoryRequestDTO dto) {
 		Category saved = service.create(mapper.toEntity(dto));
@@ -58,12 +62,14 @@ public class CategoryController {
 	}
 
 	@PutMapping("/{id}")
+	@PreAuthorize("hasRole('ADMIN')")
 	@Operation(summary = "Update category", description = "Updates an existing category")
 	public ResponseEntity<CategoryResponseDTO> update(@PathVariable Integer id, @Valid @RequestBody CategoryRequestDTO dto) {
 		return ResponseEntity.ok(mapper.toResponseDTO(service.update(id, mapper.toEntity(dto))));
 	}
 
 	@DeleteMapping("/{id}")
+	@PreAuthorize("hasRole('ADMIN')")
 	@Operation(summary = "Delete category", description = "Deletes a category")
 	public ResponseEntity<Void> delete(@PathVariable Integer id) {
 		service.delete(id);

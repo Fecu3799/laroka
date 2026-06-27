@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -43,12 +44,14 @@ public class ProductController {
 	private final SecurityUtils securityUtils;
 
 	@GetMapping("/{id}")
+	@PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
 	@Operation(summary = "Get product by ID", description = "Returns a specific product")
 	public ResponseEntity<ProductResponseDTO> findById(@PathVariable Integer id) {
 		return ResponseEntity.ok(mapper.toResponseDTO(service.findById(id)));
 	}
 
 	@GetMapping
+	@PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
 	@Operation(summary = "List products", description = "Returns all products, optionally filtered by category or tenant")
 	public ResponseEntity<List<ProductResponseDTO>> findAll(
 			@RequestParam(required = false) Integer categoryId,
@@ -65,6 +68,7 @@ public class ProductController {
 	}
 
 	@PostMapping
+	@PreAuthorize("hasRole('ADMIN')")
 	@Operation(summary = "Create product", description = "Creates a new product")
 	public ResponseEntity<ProductResponseDTO> create(@Valid @RequestBody ProductRequestDTO dto) {
 		Product saved = service.create(mapper.toEntity(dto));
@@ -72,12 +76,14 @@ public class ProductController {
 	}
 
 	@PutMapping("/{id}")
+	@PreAuthorize("hasRole('ADMIN')")
 	@Operation(summary = "Update product", description = "Updates an existing product")
 	public ResponseEntity<ProductResponseDTO> update(@PathVariable Integer id, @Valid @RequestBody ProductRequestDTO dto) {
 		return ResponseEntity.ok(mapper.toResponseDTO(service.update(id, mapper.toEntity(dto))));
 	}
 
 	@DeleteMapping("/{id}")
+	@PreAuthorize("hasRole('ADMIN')")
 	@Operation(summary = "Delete product", description = "Deletes a product")
 	public ResponseEntity<Void> delete(@PathVariable Integer id) {
 		service.delete(id);
@@ -85,6 +91,7 @@ public class ProductController {
 	}
 
 	@PatchMapping("/{id}/availability")
+	@PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
 	@Operation(summary = "Update product availability", description = "Updates the availability status of a product")
 	public ResponseEntity<ProductResponseDTO> updateAvailability(
 			@PathVariable Integer id,
