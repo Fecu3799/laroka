@@ -7,6 +7,7 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
+import com.laroka.backend.branch.entity.Branch;
 import com.laroka.backend.branch.exception.BranchNotFoundException;
 import com.laroka.backend.branch.repository.BranchRepository;
 import com.laroka.backend.catalog.entity.BranchProduct;
@@ -65,7 +66,26 @@ public class ProductService {
 		Tenant tenant = validateTenantExists(product.getTenant().getId());
 		product.setCategory(category);
 		product.setTenant(tenant);
-		return repository.save(product);
+		Product saved = repository.save(product);
+		// US-14-04: alta automática de un BranchProduct por cada sucursal del tenant,
+		// disponible y sin override. Idempotente: no duplica si ya existe la combinación.
+		createBranchProductsForTenant(saved);
+		return saved;
+	}
+
+	private void createBranchProductsForTenant(Product product) {
+		List<Branch> branches = branchRepository.findByTenantId(product.getTenant().getId());
+		for (Branch branch : branches) {
+			if (branchProductRepository.existsByBranchIdAndProductId(branch.getId(), product.getId())) {
+				continue;
+			}
+			branchProductRepository.save(BranchProduct.builder()
+				.branch(branch)
+				.product(product)
+				.available(true)
+				.priceOverride(null)
+				.build());
+		}
 	}
 
 	public Product update(Integer id, Product updates) {

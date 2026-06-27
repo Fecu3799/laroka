@@ -2,8 +2,11 @@ package com.laroka.backend.catalog.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -13,6 +16,7 @@ import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -189,6 +193,51 @@ class ProductServiceTest {
 
 		assertThat(result.getName()).isEqualTo("Muzzarella");
 		verify(productRepository).save(product);
+	}
+
+	@Test
+	void create_generatesBranchProductForEachTenantBranch() {
+		Tenant p = tenant();
+		Category c = category(p);
+		Product product = product(c, p);
+		Branch b1 = Branch.builder().id(1).name("Playa Unión").tenant(p).build();
+		Branch b2 = Branch.builder().id(2).name("Puerto Madryn").tenant(p).build();
+		when(categoryRepository.findById(1)).thenReturn(Optional.of(c));
+		when(tenantRepository.findById(1)).thenReturn(Optional.of(p));
+		when(productRepository.save(any(Product.class))).thenReturn(product);
+		when(branchRepository.findByTenantId(1)).thenReturn(List.of(b1, b2));
+		when(branchProductRepository.existsByBranchIdAndProductId(anyInt(), anyInt())).thenReturn(false);
+
+		service.create(product);
+
+		ArgumentCaptor<BranchProduct> captor = ArgumentCaptor.forClass(BranchProduct.class);
+		verify(branchProductRepository, times(2)).save(captor.capture());
+		assertThat(captor.getAllValues())
+			.extracting(bp -> bp.getBranch().getId(), BranchProduct::getAvailable, BranchProduct::getPriceOverride)
+			.containsExactlyInAnyOrder(
+				tuple(1, true, null),
+				tuple(2, true, null));
+	}
+
+	@Test
+	void create_existingBranchProduct_notDuplicated() {
+		Tenant p = tenant();
+		Category c = category(p);
+		Product product = product(c, p);
+		Branch b1 = Branch.builder().id(1).name("Playa Unión").tenant(p).build();
+		Branch b2 = Branch.builder().id(2).name("Puerto Madryn").tenant(p).build();
+		when(categoryRepository.findById(1)).thenReturn(Optional.of(c));
+		when(tenantRepository.findById(1)).thenReturn(Optional.of(p));
+		when(productRepository.save(any(Product.class))).thenReturn(product);
+		when(branchRepository.findByTenantId(1)).thenReturn(List.of(b1, b2));
+		when(branchProductRepository.existsByBranchIdAndProductId(1, 1)).thenReturn(true);
+		when(branchProductRepository.existsByBranchIdAndProductId(2, 1)).thenReturn(false);
+
+		service.create(product);
+
+		ArgumentCaptor<BranchProduct> captor = ArgumentCaptor.forClass(BranchProduct.class);
+		verify(branchProductRepository, times(1)).save(captor.capture());
+		assertThat(captor.getValue().getBranch().getId()).isEqualTo(2);
 	}
 
 	@Test
