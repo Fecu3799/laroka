@@ -30,6 +30,24 @@ function WhatsappIcon() {
   )
 }
 
+function PinIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M12 21s-6-5.2-6-10a6 6 0 0 1 12 0c0 4.8-6 10-6 10z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+      <circle cx="12" cy="11" r="2.2" stroke="currentColor" strokeWidth="1.8" />
+    </svg>
+  )
+}
+
+function ClockIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M12 7.5V12l3 2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
 function whatsappHref(value) {
   if (!value) return null
   if (/^https?:\/\//i.test(value)) return value
@@ -37,10 +55,69 @@ function whatsappHref(value) {
   return digits ? `https://wa.me/${digits}` : null
 }
 
+// JS getDay(): 0=Domingo .. 6=Sábado → clave WeekDay del backend.
+const DAY_KEYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
+const DAY_LABELS = {
+  MON: 'Lunes', TUE: 'Martes', WED: 'Miércoles', THU: 'Jueves',
+  FRI: 'Viernes', SAT: 'Sábado', SUN: 'Domingo',
+}
+
+// 'HH:mm' (o 'HH:mm:ss') → minutos desde medianoche; null si no hay valor.
+function toMinutes(t) {
+  if (!t) return null
+  const [h, m] = t.split(':')
+  const hh = Number(h), mm = Number(m)
+  if (Number.isNaN(hh) || Number.isNaN(mm)) return null
+  return hh * 60 + mm
+}
+
+function hhmm(t) {
+  return t ? t.slice(0, 5) : ''
+}
+
+// Estado de atención del día actual (timezone local del navegador).
+// Devuelve { open, text } o null si no hay schedule.
+function getScheduleStatus(schedule) {
+  if (!Array.isArray(schedule) || schedule.length === 0) return null
+
+  const now = new Date()
+  const todayKey = DAY_KEYS[now.getDay()]
+  const nowMin = now.getHours() * 60 + now.getMinutes()
+  const byDay = {}
+  schedule.forEach(d => { byDay[d.dayOfWeek] = d })
+
+  const today = byDay[todayKey]
+  if (today && today.active) {
+    const hasSlots = today.openTime || today.closeTime || today.openTime2 || today.closeTime2
+    if (!hasSlots) return { open: true, text: 'Abierto' }
+    // Franja 1 por defecto; si ya pasó el cierre de la franja 1 y existe la 2, usá la 2.
+    const close1 = toMinutes(today.closeTime)
+    let closeStr = today.closeTime
+    if (close1 != null && nowMin >= close1 && today.closeTime2) closeStr = today.closeTime2
+    return closeStr
+      ? { open: true, text: `Abierto · Cierra a las ${hhmm(closeStr)}` }
+      : { open: true, text: 'Abierto' }
+  }
+
+  // Cerrado hoy: buscar el próximo día con active=true.
+  for (let i = 1; i <= 7; i++) {
+    const key = DAY_KEYS[(now.getDay() + i) % 7]
+    const d = byDay[key]
+    if (d && d.active) {
+      return d.openTime
+        ? { open: false, text: `Cerrado hoy · Abre el ${DAY_LABELS[key]} a las ${hhmm(d.openTime)}` }
+        : { open: false, text: `Cerrado hoy · Abre el ${DAY_LABELS[key]}` }
+    }
+  }
+  return { open: false, text: 'Cerrado' }
+}
+
 // Modal de presentación del negocio (US-13-F-02). Se muestra sobre el menú.
-export function WelcomeModal({ profile, onClose }) {
+export function WelcomeModal({ profile, branch, onClose }) {
   const waHref = whatsappHref(profile.whatsapp)
   const hasSocial = profile.instagramUrl || profile.facebookUrl || waHref
+  const status = getScheduleStatus(branch?.schedule)
+  const hasBranchInfo = branch?.address || status
 
   return (
     <div
@@ -60,6 +137,23 @@ export function WelcomeModal({ profile, onClose }) {
 
         {profile.description && (
           <p className="welcome-description">{profile.description}</p>
+        )}
+
+        {hasBranchInfo && (
+          <div className="welcome-branch">
+            {branch?.address && (
+              <p className="welcome-branch-row">
+                <PinIcon />
+                <span>{branch.address}</span>
+              </p>
+            )}
+            {status && (
+              <p className={`welcome-branch-row welcome-branch-hours welcome-branch-hours--${status.open ? 'open' : 'closed'}`}>
+                <ClockIcon />
+                <span>{status.text}</span>
+              </p>
+            )}
+          </div>
         )}
 
         {hasSocial && (

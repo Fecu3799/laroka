@@ -1,6 +1,7 @@
 package com.laroka.backend.branch.dto;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -20,4 +21,5 @@ public class BranchPublicDTO {
 	private Integer estimatedDeliveryMinutes;
 	private String phone;
 	private boolean acceptingOrders;
+	private List<BranchScheduleDayResponseDTO> schedule;
 }

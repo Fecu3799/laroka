@@ -145,6 +145,7 @@ export function MenuScreen({ branchId, branchName, onChangeBranch, paymentFailur
   const [showSwitchWarning, setShowSwitchWarning] = useState(false)
   const [tenantProfile, setTenantProfile] = useState(null)
   const [showWelcome, setShowWelcome] = useState(false)
+  const [branch, setBranch] = useState(null)
 
   const retryRef = useRef(null)
   const swipeContainerRef = useRef(null)
@@ -216,6 +217,17 @@ export function MenuScreen({ branchId, branchName, onChangeBranch, paymentFailur
   const handleOpenWelcome = useCallback(() => {
     setShowWelcome(true)
   }, [])
+
+  // Datos públicos de la sucursal (incluye address y schedule, US-13-F-05).
+  // Alimenta la sección de dirección/horario del modal de presentación.
+  useEffect(() => {
+    let cancelled = false
+    fetch(`${API_BASE}/branches/${branchId}`)
+      .then(res => (res.ok ? res.json() : null))
+      .then(data => { if (!cancelled) setBranch(data) })
+      .catch(() => { /* best-effort: no bloquea el menú */ })
+    return () => { cancelled = true }
+  }, [branchId])
 
   useEffect(() => {
     let cancelled = false
@@ -538,7 +550,7 @@ export function MenuScreen({ branchId, branchName, onChangeBranch, paymentFailur
       )}
 
       {showWelcome && tenantProfile && (
-        <WelcomeModal profile={tenantProfile} onClose={handleCloseWelcome} />
+        <WelcomeModal profile={tenantProfile} branch={branch} onClose={handleCloseWelcome} />
       )}
     </div>
   )

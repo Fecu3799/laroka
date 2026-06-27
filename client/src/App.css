@@ -1859,6 +1859,46 @@
   white-space: pre-line;
 }
 
+.welcome-branch {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--border) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 30%, transparent);
+}
+
+.welcome-branch-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 0;
+  font-family: 'Inria Sans', sans-serif;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--text-primary);
+}
+
+.welcome-branch-row svg {
+  flex-shrink: 0;
+  opacity: 0.8;
+}
+
+.welcome-branch-hours {
+  font-weight: 700;
+}
+
+.welcome-branch-hours--open {
+  color: var(--green-cta);
+}
+
+.welcome-branch-hours--closed {
+  color: var(--text-secondary);
+}
+
 .welcome-social {
   display: flex;
   gap: 14px;
