@@ -17,6 +17,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.laroka.backend.catalog.dto.AvailabilityUpdateDTO;
+import com.laroka.backend.catalog.dto.BranchProductConfigRequestDTO;
+import com.laroka.backend.catalog.dto.ProductPriceUpdateRequestDTO;
 import com.laroka.backend.catalog.dto.ProductRequestDTO;
 import com.laroka.backend.catalog.dto.ProductResponseDTO;
 import com.laroka.backend.catalog.entity.Product;
@@ -100,5 +102,29 @@ public class ProductController {
 			HttpServletRequest request) {
 		Integer userBranchId = securityUtils.resolveBranchId(principal, request);
 		return ResponseEntity.ok(mapper.toResponseDTO(service.updateAvailability(id, dto.getAvailable(), userBranchId)));
+	}
+
+	@PatchMapping("/{id}/branch-config")
+	@PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+	@Operation(summary = "Update product config for a branch",
+			description = "Updates the price override and/or availability of a product for a specific branch. "
+					+ "A null priceOverride clears the override and the product reverts to its base price.")
+	public ResponseEntity<ProductResponseDTO> updateBranchConfig(
+			@PathVariable Integer id,
+			@Valid @RequestBody BranchProductConfigRequestDTO dto) {
+		Product updated = service.updateBranchConfig(id, dto.getBranchId(), dto.getPriceOverride(), dto.getAvailable());
+		return ResponseEntity.ok(mapper.toResponseDTO(updated));
+	}
+
+	@PutMapping("/{id}/price")
+	@PreAuthorize("hasRole('ADMIN')")
+	@Operation(summary = "Update product base price",
+			description = "Updates the base price of a product. If applyToAllBranches is true, also clears the "
+					+ "price override of every branch product, leveling the price across all branches.")
+	public ResponseEntity<ProductResponseDTO> updatePrice(
+			@PathVariable Integer id,
+			@Valid @RequestBody ProductPriceUpdateRequestDTO dto) {
+		Product updated = service.updatePrice(id, dto.getPrice(), dto.getApplyToAllBranches());
+		return ResponseEntity.ok(mapper.toResponseDTO(updated));
 	}
 }

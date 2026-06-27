@@ -1,5 +1,6 @@
 package com.laroka.backend.catalog.service;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 import org.springframework.cache.annotation.CacheEvict;
@@ -94,6 +95,39 @@ public class ProductService {
 		branchProduct.setAvailable(available);
 		branchProductRepository.save(branchProduct);
 		return branchProduct.getProduct();
+	}
+
+	@CacheEvict(value = "menu", key = "#branchId")
+	public Product updateBranchConfig(Integer productId, Integer branchId, BigDecimal priceOverride,
+			Boolean available) {
+		if (branchId == null) {
+			throw new BusinessException("Branch ID is required to update branch product config");
+		}
+		BranchProduct branchProduct = branchProductRepository.findByBranchIdAndProductId(branchId, productId)
+			.orElseThrow(() -> new BranchProductNotFoundException(branchId, productId));
+		// priceOverride null limpia el override: el producto vuelve al precio base (RN US-14-02).
+		branchProduct.setPriceOverride(priceOverride);
+		if (available != null) {
+			branchProduct.setAvailable(available);
+		}
+		branchProductRepository.save(branchProduct);
+		return branchProduct.getProduct();
+	}
+
+	// applyToAllBranches afecta potencialmente todas las sucursales (override limpiado) y,
+	// aun en false, el nuevo precio base afecta a las sucursales sin override. Por eso se
+	// evicta el menú completo en ambos casos.
+	@CacheEvict(value = "menu", allEntries = true)
+	public Product updatePrice(Integer productId, BigDecimal price, boolean applyToAllBranches) {
+		Product product = findById(productId);
+		product.setPrice(price);
+		Product saved = repository.save(product);
+		if (applyToAllBranches) {
+			List<BranchProduct> branchProducts = branchProductRepository.findByProductId(productId);
+			branchProducts.forEach(bp -> bp.setPriceOverride(null));
+			branchProductRepository.saveAll(branchProducts);
+		}
+		return saved;
 	}
 
 	private Category validateCategoryExists(Integer categoryId) {

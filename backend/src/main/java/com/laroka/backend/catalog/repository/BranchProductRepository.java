@@ -21,4 +21,6 @@ public interface BranchProductRepository extends JpaRepository<BranchProduct, Br
     List<BranchProduct> findByBranchIdAndAvailableTrue(Integer branchId);
 
     Optional<BranchProduct> findByBranchIdAndProductId(Integer branchId, Integer productId);
+
+    List<BranchProduct> findByProductId(Integer productId);
 }
