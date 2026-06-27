@@ -6,6 +6,7 @@ import { fetchBranches } from '../services/branchService'
 import StaffUserDrawer from '../components/StaffUserDrawer'
 import ResetPasswordModal from '../components/ResetPasswordModal'
 import BranchConfigSection from '../components/BranchConfigSection'
+import TenantProfileSection from '../components/TenantProfileSection'
 import './Config.css'
 
 const ROLE_LABELS = { ADMIN: 'Admin', MANAGER: 'Encargado', STAFF: 'Staff' }
@@ -228,6 +229,8 @@ export default function Config() {
       </section>
 
       <BranchConfigSection />
+
+      <TenantProfileSection />
 
       {/* Cierra el menú de acciones al hacer click fuera. */}
       {menuId !== null && (
