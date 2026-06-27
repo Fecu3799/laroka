@@ -6,6 +6,7 @@ import com.laroka.backend.branch.dto.BranchPublicDTO;
 import com.laroka.backend.branch.dto.BranchRequestDTO;
 import com.laroka.backend.branch.dto.BranchResponseDTO;
 import com.laroka.backend.branch.entity.Branch;
+import com.laroka.backend.branch.repository.BranchScheduleRepository;
 import com.laroka.backend.tenant.entity.Tenant;
 import com.laroka.backend.tenant.mapper.TenantMapper;
 
@@ -16,6 +17,8 @@ import lombok.RequiredArgsConstructor;
 public class BranchMapper {
 
 	private final TenantMapper tenantMapper;
+	private final BranchScheduleRepository branchScheduleRepository;
+	private final BranchScheduleMapper branchScheduleMapper;
 
 	public BranchResponseDTO toResponseDTO(Branch branch) {
 		if (branch == null) {
@@ -48,6 +51,8 @@ public class BranchMapper {
 			.estimatedDeliveryMinutes(branch.getEstimatedDeliveryMinutes())
 			.phone(branch.getPhone())
 			.acceptingOrders(branch.isAcceptingOrders())
+			.schedule(branchScheduleMapper.toWeekResponse(
+				branchScheduleRepository.findByBranchId(branch.getId())))
 			.build();
 	}
 

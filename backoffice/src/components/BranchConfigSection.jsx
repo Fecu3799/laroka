@@ -1,6 +1,15 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import useAuth from '../hooks/useAuth'
 import { fetchBackofficeBranches, updateBranchConfig } from '../services/branchService'
+import BranchScheduleEditor from './BranchScheduleEditor'
+
+function ChevronIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="m6 9 6 6 6-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
 
 // minutos → horas como string editable ('' si no hay valor cargado).
 function minutesToHours(minutes) {
@@ -15,6 +24,7 @@ export default function BranchConfigSection() {
   const [rows, setRows] = useState([])      // { id, name, hours, original, status, error }
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
+  const [expanded, setExpanded] = useState({})  // { [branchId]: bool } — horarios desplegados
   const timersRef = useRef({})
 
   const load = useCallback(() => {
@@ -94,48 +104,62 @@ export default function BranchConfigSection() {
             const invalid = !(parseFloat(row.hours) >= 1)
             const dirty = row.hours !== row.original
             const saving = row.status === 'saving'
+            const isOpen = !!expanded[row.id]
             return (
-              <div key={row.id} className="config-branch-row">
-                <div className="config-branch-info">
-                  <span className="config-branch-name">{row.name}</span>
-                  <span className="config-branch-label">Duración máxima de turno</span>
-                </div>
-
-                <div className="config-branch-control">
-                  <div className="config-hours-field">
-                    <input
-                      className="config-hours-input"
-                      type="number"
-                      min="1"
-                      step="0.5"
-                      inputMode="decimal"
-                      value={row.hours}
-                      placeholder="—"
-                      onChange={e => handleChange(row.id, e.target.value)}
-                      aria-label={`Duración máxima de turno para ${row.name} en horas`}
-                    />
-                    <span className="config-hours-unit">horas</span>
+              <div key={row.id} className="config-branch-item">
+                <div className="config-branch-row">
+                  <div className="config-branch-info">
+                    <span className="config-branch-name">{row.name}</span>
+                    <span className="config-branch-label">Duración máxima de turno</span>
                   </div>
 
-                  <button
-                    className="config-branch-save"
-                    onClick={() => handleSave(row)}
-                    disabled={invalid || saving || !dirty}
-                  >
-                    {saving ? 'Guardando…' : 'Guardar'}
-                  </button>
+                  <div className="config-branch-control">
+                    <div className="config-hours-field">
+                      <input
+                        className="config-hours-input"
+                        type="number"
+                        min="1"
+                        step="0.5"
+                        inputMode="decimal"
+                        value={row.hours}
+                        placeholder="—"
+                        onChange={e => handleChange(row.id, e.target.value)}
+                        aria-label={`Duración máxima de turno para ${row.name} en horas`}
+                      />
+                      <span className="config-hours-unit">horas</span>
+                    </div>
 
-                  <span className="config-branch-feedback">
-                    {invalid && dirty
-                      ? <span className="config-feedback-err">La duración máxima es obligatoria</span>
-                      : row.status === 'saved'
-                        ? <span className="config-feedback-ok">✓ Guardado</span>
-                        : row.status === 'error'
-                          ? <span className="config-feedback-err">{row.error}</span>
-                          : null
-                    }
-                  </span>
+                    <button
+                      className="config-branch-save"
+                      onClick={() => handleSave(row)}
+                      disabled={invalid || saving || !dirty}
+                    >
+                      {saving ? 'Guardando…' : 'Guardar'}
+                    </button>
+
+                    <span className="config-branch-feedback">
+                      {invalid && dirty
+                        ? <span className="config-feedback-err">La duración máxima es obligatoria</span>
+                        : row.status === 'saved'
+                          ? <span className="config-feedback-ok">✓ Guardado</span>
+                          : row.status === 'error'
+                            ? <span className="config-feedback-err">{row.error}</span>
+                            : null
+                      }
+                    </span>
+                  </div>
                 </div>
+
+                <button
+                  className={`config-schedule-toggle${isOpen ? ' config-schedule-toggle--open' : ''}`}
+                  onClick={() => setExpanded(p => ({ ...p, [row.id]: !p[row.id] }))}
+                  aria-expanded={isOpen}
+                >
+                  <span className="config-schedule-chevron"><ChevronIcon /></span>
+                  Horarios
+                </button>
+
+                {isOpen && <BranchScheduleEditor branchId={row.id} />}
               </div>
             )
           })}

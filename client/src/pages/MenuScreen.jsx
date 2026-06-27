@@ -5,9 +5,12 @@ import { BottomNav } from '../components/BottomNav'
 import { ProductDetailScreen } from './ProductDetailScreen'
 import { CartScreen } from './CartScreen'
 import { OrderTrackingBanner } from '../features/order/OrderTrackingBanner'
+import { WelcomeModal } from '../components/WelcomeModal'
 import { useCart } from '../hooks/useCart'
+import { getTenantProfile } from '../services/tenantService'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+const INTRO_SEEN_KEY = 'laroka_intro_seen'
 
 function formatPrice(price) {
   return `$${Number(price).toLocaleString('es-AR')}`
@@ -18,6 +21,16 @@ function SearchIcon() {
     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true" className="menu-search-icon">
       <circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth="2.2"/>
       <path d="M21 21l-4.35-4.35" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"/>
+    </svg>
+  )
+}
+
+function InfoIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" />
+      <path d="M12 11v5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <circle cx="12" cy="7.6" r="1.2" fill="currentColor" />
     </svg>
   )
 }
@@ -130,6 +143,9 @@ export function MenuScreen({ branchId, branchName, onChangeBranch, paymentFailur
     pendingPaymentRecovery ? { orderId: pendingPaymentRecovery.orderId } : null
   )
   const [showSwitchWarning, setShowSwitchWarning] = useState(false)
+  const [tenantProfile, setTenantProfile] = useState(null)
+  const [showWelcome, setShowWelcome] = useState(false)
+  const [branch, setBranch] = useState(null)
 
   const retryRef = useRef(null)
   const swipeContainerRef = useRef(null)
@@ -174,6 +190,44 @@ export function MenuScreen({ branchId, branchName, onChangeBranch, paymentFailur
   const handleAddToCart = useCallback((product, qty) => {
     addItem(product, qty)
   }, [addItem])
+
+  // Perfil del negocio (US-13-F-02): se carga al montar la pantalla del menú.
+  // Si no hay perfil (404), no se muestra el modal ni el ícono del header.
+  // El modal de bienvenida aparece sobre el menú la primera vez (mientras no
+  // exista la key laroka_intro_seen en localStorage).
+  useEffect(() => {
+    let cancelled = false
+    getTenantProfile()
+      .then(profile => {
+        if (cancelled || !profile) return
+        setTenantProfile(profile)
+        if (localStorage.getItem(INTRO_SEEN_KEY) == null) {
+          setShowWelcome(true)
+        }
+      })
+      .catch(() => { /* error de red: no bloquea el menú */ })
+    return () => { cancelled = true }
+  }, [])
+
+  const handleCloseWelcome = useCallback(() => {
+    localStorage.setItem(INTRO_SEEN_KEY, 'true')
+    setShowWelcome(false)
+  }, [])
+
+  const handleOpenWelcome = useCallback(() => {
+    setShowWelcome(true)
+  }, [])
+
+  // Datos públicos de la sucursal (incluye address y schedule, US-13-F-05).
+  // Alimenta la sección de dirección/horario del modal de presentación.
+  useEffect(() => {
+    let cancelled = false
+    fetch(`${API_BASE}/branches/${branchId}`)
+      .then(res => (res.ok ? res.json() : null))
+      .then(data => { if (!cancelled) setBranch(data) })
+      .catch(() => { /* best-effort: no bloquea el menú */ })
+    return () => { cancelled = true }
+  }, [branchId])
 
   useEffect(() => {
     let cancelled = false
@@ -322,7 +376,19 @@ export function MenuScreen({ branchId, branchName, onChangeBranch, paymentFailur
             >
               Cambiar sucursal
             </button>
-            <span className="menu-branch-name">{branchName || '—'}</span>
+            <div className="menu-branch-name-row">
+              <span className="menu-branch-name">{branchName || '—'}</span>
+              {tenantProfile && (
+                <button
+                  className="menu-about-btn"
+                  type="button"
+                  onClick={handleOpenWelcome}
+                  aria-label="Sobre nosotros"
+                >
+                  <InfoIcon />
+                </button>
+              )}
+            </div>
           </div>
         </header>
       </div>
@@ -481,6 +547,10 @@ export function MenuScreen({ branchId, branchName, onChangeBranch, paymentFailur
           onConfirm={handleConfirmBranchSwitch}
           onCancel={handleCancelBranchSwitch}
         />
+      )}
+
+      {showWelcome && tenantProfile && (
+        <WelcomeModal profile={tenantProfile} branch={branch} onClose={handleCloseWelcome} />
       )}
     </div>
   )

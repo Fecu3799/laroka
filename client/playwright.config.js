@@ -18,5 +18,8 @@ export default defineConfig({
     url: 'http://localhost:5173',
     reuseExistingServer: !process.env.CI,
     timeout: 30_000,
+    // VITE_TENANT_ID es obligatoria (US-13-F-01): sin ella la app muestra la
+    // pantalla de error de configuración y no llama al backend.
+    env: { VITE_TENANT_ID: '1' },
   },
 })

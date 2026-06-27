@@ -6,6 +6,7 @@ import { fetchBranches } from '../services/branchService'
 import StaffUserDrawer from '../components/StaffUserDrawer'
 import ResetPasswordModal from '../components/ResetPasswordModal'
 import BranchConfigSection from '../components/BranchConfigSection'
+import TenantProfileSection from '../components/TenantProfileSection'
 import './Config.css'
 
 const ROLE_LABELS = { ADMIN: 'Admin', MANAGER: 'Encargado', STAFF: 'Staff' }
@@ -181,16 +182,18 @@ export default function Config() {
         <p className="config-subtitle">Administración del equipo y la operación</p>
       </header>
 
-      <section className="config-section">
-        <div className="config-section-head">
-          <div>
-            <h2 className="config-section-title">Equipo</h2>
-            <p className="config-section-sub">Usuarios con acceso al backoffice</p>
-          </div>
-          <button className="config-new-btn" onClick={openCreate}>+ Nuevo empleado</button>
-        </div>
+      <div className="config-layout">
+        <div className="config-col config-col--main">
+          <section className="config-section">
+            <div className="config-section-head">
+              <div>
+                <h2 className="config-section-title">Equipo</h2>
+                <p className="config-section-sub">Usuarios con acceso al backoffice</p>
+              </div>
+              <button className="config-new-btn" onClick={openCreate}>+ Nuevo empleado</button>
+            </div>
 
-        {loading ? (
+            {loading ? (
           <div className="config-state-center"><div className="config-spinner" /></div>
         ) : error ? (
           <div className="config-state-center">
@@ -225,9 +228,15 @@ export default function Config() {
             )}
           </>
         )}
-      </section>
+          </section>
 
-      <BranchConfigSection />
+          <BranchConfigSection />
+        </div>
+
+        <div className="config-col config-col--side">
+          <TenantProfileSection />
+        </div>
+      </div>
 
       {/* Cierra el menú de acciones al hacer click fuera. */}
       {menuId !== null && (

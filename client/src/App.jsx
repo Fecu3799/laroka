@@ -1,12 +1,14 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { SplashScreen } from './pages/SplashScreen'
 import { BranchSelection } from './pages/BranchSelection'
+import { ConfigError } from './pages/ConfigError'
 import { MenuScreen } from './pages/MenuScreen'
 import { PaymentResultScreen } from './pages/PaymentResultScreen'
 import { PendingModal } from './features/payment/PaymentModals'
 import { Toast } from './components/Toast'
 import { usePreferredBranch } from './hooks/usePreferredBranch'
 import { useTheme } from './hooks/useTheme'
+import { isTenantConfigured } from './config'
 import './App.css'
 
 const SCREEN_EXIT_DURATION = 320
@@ -95,6 +97,12 @@ function App() {
   const handlePaymentFailureConsumed = useCallback(() => {
     setPaymentFailureRecovery(null)
   }, [])
+
+  // Sin VITE_TENANT_ID no se puede resolver el tenant: mostramos el error de
+  // configuración y no montamos ninguna pantalla que llame al backend.
+  if (!isTenantConfigured) {
+    return <ConfigError />
+  }
 
   if (screen === 'paymentResult') {
     return (

@@ -76,7 +76,11 @@ public class BranchService {
 		}
 		Branch branch = findById(id);
 		branch.setMaxShiftDurationMinutes(maxShiftDurationMinutes);
-		return repository.save(branch);
+		repository.save(branch);
+		// save() (merge) puede devolver el branch con el tenant como proxy lazy sin
+		// inicializar; releemos con findById (que trae el tenant vía @EntityGraph)
+		// para que BranchMapper.toResponseDTO no falle con LazyInitializationException.
+		return findById(id);
 	}
 
 	public BranchQR saveQrConfig(Integer branchId, String mpPosId, String mpQrId) {
