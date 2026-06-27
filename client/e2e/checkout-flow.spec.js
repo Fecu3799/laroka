@@ -99,7 +99,7 @@ test.describe('US-06-F-04 · checkout en efectivo con seguimiento', () => {
     await page.route(`**/branches/${BRANCH_ID}`, route =>
       route.fulfill({ json: { ...DEMO_BRANCHES[0], acceptingOrders: true } })
     )
-    await page.route('**/branches', route =>
+    await page.route(/\/branches(\?.*)?$/, route =>
       route.fulfill({ json: DEMO_BRANCHES })
     )
     await page.route('**/orders', route => {
@@ -208,7 +208,7 @@ test.describe('US-06-F · cancelación de pedido desde el banner', () => {
       ]))
     }, { orderId: CANCEL_ORDER_ID, storedBranch: STORED_BRANCH })
 
-    await page.route('**/branches', route =>
+    await page.route(/\/branches(\?.*)?$/, route =>
       route.fulfill({ json: DEMO_BRANCHES })
     )
     await page.route(`**/branches/${BRANCH_ID}/menu`, route =>

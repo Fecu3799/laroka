@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import logoText from '../assets/logo-carga-1.png'
 import logoPizza from '../assets/logo-carga-2.png'
 import styles from './SplashScreen.module.css'
+import { TENANT_ID } from '../config'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080'
 const MIN_DISPLAY_MS = 1200
@@ -28,7 +29,7 @@ export function SplashScreen({ onComplete }) {
       }, FADE_DURATION_MS)
     }
 
-    fetch(`${API_BASE}/branches`)
+    fetch(`${API_BASE}/branches?tenantId=${encodeURIComponent(TENANT_ID)}`)
       .catch(() => {})
       .then(() => {
         if (cancelled) return

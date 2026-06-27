@@ -4,6 +4,7 @@ import heroPizzaImg from '../assets/hero-pizza.webp'
 import playaImg from '../assets/cities/playa.webp'
 import madrynImg from '../assets/cities/madryn.webp'
 import rawsonImg from '../assets/cities/rawson.webp'
+import { TENANT_ID } from '../config'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080'
 
@@ -133,7 +134,7 @@ export function BranchSelection({ onSelect }) {
       setLoading(true)
       setError(null)
       try {
-        const res = await fetch(`${API_BASE}/branches`)
+        const res = await fetch(`${API_BASE}/branches?tenantId=${encodeURIComponent(TENANT_ID)}`)
         if (!res.ok) throw new Error(`Error ${res.status}`)
         const data = await res.json()
         if (!cancelled) setBranches(data)
