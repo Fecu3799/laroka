@@ -114,7 +114,7 @@ public class SecurityConfig {
 		CorsConfiguration config = new CorsConfiguration();
 		List<String> origins = Arrays.asList(corsAllowedOrigins.split(","));
 		config.setAllowedOrigins(origins);
-		config.setAllowedMethods(List.of("GET", "POST", "PATCH", "DELETE"));
+		config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
 		config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Idempotency-Key", "X-Branch-Id"));
 		config.setAllowCredentials(true);
 
