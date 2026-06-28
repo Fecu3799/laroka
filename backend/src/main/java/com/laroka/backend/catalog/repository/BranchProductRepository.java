@@ -5,6 +5,7 @@ import java.util.Optional;
 
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -35,4 +36,10 @@ public interface BranchProductRepository extends JpaRepository<BranchProduct, Br
         + "JOIN FETCH bp.branch JOIN FETCH bp.product "
         + "WHERE bp.product.id = :productId")
     List<BranchProduct> findConfigByProductId(@Param("productId") Integer productId);
+
+    // Borrado en bloque de todas las entradas de un producto. Se ejecuta dentro de la
+    // transacción del service al eliminar el producto (paso previo al delete del producto).
+    @Modifying
+    @Query("DELETE FROM BranchProduct bp WHERE bp.product.id = :productId")
+    void deleteByProductId(@Param("productId") Integer productId);
 }

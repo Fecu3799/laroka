@@ -61,6 +61,7 @@ export default function Menu() {
   const [productsError, setProductsError] = useState(false)
   const [collapsed, setCollapsed] = useState(() => new Set()) // categoryIds colapsadas
   const [productMenuId, setProductMenuId] = useState(null)
+  const [productMenuUp, setProductMenuUp] = useState(false)   // abre hacia arriba si no hay espacio abajo
   const [productDrawer, setProductDrawer] = useState(null)         // { mode, product } | null
   const [productConfirm, setProductConfirm] = useState(null)       // product | null
   const [productConfirmBusy, setProductConfirmBusy] = useState(false)
@@ -135,6 +136,20 @@ export default function Menu() {
       else next.add(categoryId)
       return next
     })
+  }
+
+  // Abre/cierra el menú de acciones de un producto, decidiendo la dirección
+  // según el espacio disponible debajo del trigger respecto al viewport.
+  function toggleProductMenu(e, productId) {
+    if (productMenuId === productId) {
+      setProductMenuId(null)
+      return
+    }
+    const rect = e.currentTarget.getBoundingClientRect()
+    const MENU_HEIGHT = 110 // alto aproximado del dropdown (2 items + padding)
+    const spaceBelow = window.innerHeight - rect.bottom
+    setProductMenuUp(spaceBelow < MENU_HEIGHT)
+    setProductMenuId(productId)
   }
 
   function openProductCreate() {
@@ -309,7 +324,7 @@ export default function Menu() {
                                 <div className="config-actions-cell">
                                   <button
                                     className="config-dots-btn"
-                                    onClick={() => setProductMenuId(productMenuId === p.id ? null : p.id)}
+                                    onClick={(e) => toggleProductMenu(e, p.id)}
                                     aria-label={`Acciones para ${p.name}`}
                                     aria-haspopup="true"
                                     aria-expanded={productMenuId === p.id}
@@ -317,7 +332,7 @@ export default function Menu() {
                                     <DotsIcon />
                                   </button>
                                   {productMenuId === p.id && (
-                                    <div className="config-menu" role="menu">
+                                    <div className={`config-menu${productMenuUp ? ' config-menu--up' : ''}`} role="menu">
                                       <button className="config-menu-item" onClick={() => openProductEdit(p)}>
                                         Editar
                                       </button>

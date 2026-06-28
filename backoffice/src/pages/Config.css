@@ -299,6 +299,12 @@
   gap: 2px;
 }
 
+/* Apertura hacia arriba: cuando no hay espacio suficiente debajo del trigger. */
+.config-menu--up {
+  top: auto;
+  bottom: calc(100% - 4px);
+}
+
 .config-menu-item {
   text-align: left;
   padding: 9px 11px;

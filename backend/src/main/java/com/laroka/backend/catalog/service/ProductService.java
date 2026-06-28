@@ -6,6 +6,7 @@ import java.util.List;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.laroka.backend.branch.entity.Branch;
 import com.laroka.backend.branch.exception.BranchNotFoundException;
@@ -101,8 +102,15 @@ public class ProductService {
 		return repository.save(product);
 	}
 
+	// Eliminar un producto borra primero todas sus entradas branch_product (FK) y luego
+	// el producto, todo en la misma transacción. Invalida el caché del menú de todas las
+	// sucursales porque el producto deja de existir en cualquiera de ellas.
+	@Transactional
+	@CacheEvict(value = "menu", allEntries = true)
 	public void delete(Integer id) {
-		repository.delete(findById(id));
+		Product product = findById(id);
+		branchProductRepository.deleteByProductId(id);
+		repository.delete(product);
 	}
 
 	@CacheEvict(value = "menu", key = "#branchId")
