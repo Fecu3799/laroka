@@ -51,3 +51,40 @@ export async function deleteCategory(id, token) {
     headers: catalogHeaders(token),
   })
 }
+
+// Productos del tenant (US-14-F-02). ADMIN y MANAGER pueden listar.
+export async function fetchProducts(token, tenantId) {
+  const url = tenantId != null
+    ? `${API_URL}/backoffice/products?tenantId=${tenantId}`
+    : `${API_URL}/backoffice/products`
+  const res = await apiFetch(url, { headers: catalogHeaders(token) })
+  return res.json()
+}
+
+// data: { name, description, price, imageUrl, categoryId, tenantId }. Exclusivo ADMIN.
+export async function createProduct(data, token) {
+  const res = await apiFetch(`${API_URL}/backoffice/products`, {
+    method: 'POST',
+    headers: catalogHeaders(token, { 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data),
+  })
+  return res.json()
+}
+
+// data: { name, description, price, imageUrl, categoryId, tenantId }. Exclusivo ADMIN.
+export async function updateProduct(id, data, token) {
+  const res = await apiFetch(`${API_URL}/backoffice/products/${id}`, {
+    method: 'PUT',
+    headers: catalogHeaders(token, { 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data),
+  })
+  return res.json()
+}
+
+// Exclusivo ADMIN.
+export async function deleteProduct(id, token) {
+  await apiFetch(`${API_URL}/backoffice/products/${id}`, {
+    method: 'DELETE',
+    headers: catalogHeaders(token),
+  })
+}

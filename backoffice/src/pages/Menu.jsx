@@ -1,9 +1,17 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Navigate } from 'react-router-dom'
 import useAuth from '../hooks/useAuth'
-import { fetchCategories, deleteCategory } from '../services/catalogService'
+import {
+  fetchCategories,
+  deleteCategory,
+  fetchProducts,
+  deleteProduct,
+} from '../services/catalogService'
+import { formatCurrency } from '../utils/shiftsUtils'
 import CategoryDrawer from '../components/CategoryDrawer'
+import ProductDrawer from '../components/ProductDrawer'
 import './Config.css'
+import './Menu.css'
 
 function DotsIcon() {
   return (
@@ -11,6 +19,24 @@ function DotsIcon() {
       <circle cx="12" cy="5" r="1.6" />
       <circle cx="12" cy="12" r="1.6" />
       <circle cx="12" cy="19" r="1.6" />
+    </svg>
+  )
+}
+
+function ChevronIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="m6 9 6 6 6-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function ImagePlaceholderIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" strokeWidth="1.6" />
+      <circle cx="8.5" cy="9.5" r="1.6" stroke="currentColor" strokeWidth="1.4" />
+      <path d="m4 17 4.5-4.5a2 2 0 0 1 2.8 0L20 19" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )
 }
@@ -29,6 +55,17 @@ export default function Menu() {
   const [confirmBusy, setConfirmBusy] = useState(false)
   const [confirmError, setConfirmError] = useState(null)
 
+  // ── Productos (US-14-F-02) ──────────────────────────────────────
+  const [products, setProducts] = useState([])
+  const [productsLoading, setProductsLoading] = useState(true)
+  const [productsError, setProductsError] = useState(false)
+  const [collapsed, setCollapsed] = useState(() => new Set()) // categoryIds colapsadas
+  const [productMenuId, setProductMenuId] = useState(null)
+  const [productDrawer, setProductDrawer] = useState(null)         // { mode, product } | null
+  const [productConfirm, setProductConfirm] = useState(null)       // product | null
+  const [productConfirmBusy, setProductConfirmBusy] = useState(false)
+  const [productConfirmError, setProductConfirmError] = useState(null)
+
   const loadCategories = useCallback(() => {
     if (!token) return
     setLoading(true)
@@ -39,9 +76,23 @@ export default function Menu() {
       .finally(() => setLoading(false))
   }, [token, tenantId])
 
+  const loadProducts = useCallback(() => {
+    if (!token) return
+    setProductsLoading(true)
+    setProductsError(false)
+    fetchProducts(token, tenantId)
+      .then(setProducts)
+      .catch(() => setProductsError(true))
+      .finally(() => setProductsLoading(false))
+  }, [token, tenantId])
+
   useEffect(() => {
     loadCategories()
   }, [loadCategories])
+
+  useEffect(() => {
+    loadProducts()
+  }, [loadProducts])
 
   // ADMIN y MANAGER únicamente — STAFF no ve la pestaña. Guard sincrónico.
   if (role && role !== 'ADMIN' && role !== 'MANAGER') return <Navigate to="/orders" replace />
@@ -76,6 +127,53 @@ export default function Menu() {
       setConfirmBusy(false)
     }
   }
+
+  function toggleCollapse(categoryId) {
+    setCollapsed(prev => {
+      const next = new Set(prev)
+      if (next.has(categoryId)) next.delete(categoryId)
+      else next.add(categoryId)
+      return next
+    })
+  }
+
+  function openProductCreate() {
+    setProductMenuId(null)
+    setProductDrawer({ mode: 'create', product: null })
+  }
+
+  function openProductEdit(product) {
+    setProductMenuId(null)
+    setProductDrawer({ mode: 'edit', product })
+  }
+
+  function openProductDelete(product) {
+    setProductMenuId(null)
+    setProductConfirmError(null)
+    setProductConfirm(product)
+  }
+
+  async function handleProductDelete() {
+    if (!productConfirm) return
+    setProductConfirmBusy(true)
+    setProductConfirmError(null)
+    try {
+      await deleteProduct(productConfirm.id, token)
+      setProductConfirm(null)
+      loadProducts()
+      // El borrado afecta el productCount de la categoría.
+      loadCategories()
+    } catch (err) {
+      setProductConfirmError(err?.message ?? 'No se pudo eliminar el producto.')
+    } finally {
+      setProductConfirmBusy(false)
+    }
+  }
+
+  // Productos agrupados por categoría, respetando el orden por nombre de las categorías.
+  const productGroups = categories
+    .map(category => ({ category, items: products.filter(p => p.categoryId === category.id) }))
+    .filter(group => group.items.length > 0)
 
   return (
     <div className="config-page">
@@ -152,12 +250,104 @@ export default function Menu() {
               </div>
             )}
           </section>
+
+          <section className="config-section">
+            <div className="config-section-head">
+              <div>
+                <h2 className="config-section-title">Productos</h2>
+                <p className="config-section-sub">Productos del menú agrupados por categoría</p>
+              </div>
+              {isAdmin && (
+                <button className="config-new-btn" onClick={openProductCreate}>+ Nuevo producto</button>
+              )}
+            </div>
+
+            {productsLoading ? (
+              <div className="config-state-center"><div className="config-spinner" /></div>
+            ) : productsError ? (
+              <div className="config-state-center">
+                <p className="config-state-error">No se pudieron cargar los productos.</p>
+              </div>
+            ) : productGroups.length === 0 ? (
+              <div className="config-state-center">
+                <p className="config-empty">Aún no hay productos cargados.</p>
+              </div>
+            ) : (
+              <div className="menu-products">
+                {productGroups.map(({ category, items }) => {
+                  const isCollapsed = collapsed.has(category.id)
+                  return (
+                    <div className="menu-group" key={category.id}>
+                      <button
+                        className="menu-group-head"
+                        onClick={() => toggleCollapse(category.id)}
+                        aria-expanded={!isCollapsed}
+                      >
+                        <span className={`menu-group-chevron${isCollapsed ? ' menu-group-chevron--collapsed' : ''}`}>
+                          <ChevronIcon />
+                        </span>
+                        <span className="menu-group-title">{category.name}</span>
+                        <span className="menu-group-count">({items.length})</span>
+                      </button>
+
+                      {!isCollapsed && (
+                        <div className="menu-product-list">
+                          {items.map(p => (
+                            <div className="menu-product-row" key={p.id}>
+                              {p.imageUrl ? (
+                                <img className="menu-product-img" src={p.imageUrl} alt={p.name} />
+                              ) : (
+                                <span className="menu-product-img-placeholder" aria-hidden="true">
+                                  <ImagePlaceholderIcon />
+                                </span>
+                              )}
+                              <div className="menu-product-info">
+                                <span className="menu-product-name">{p.name}</span>
+                                <span className="menu-product-price">{formatCurrency(p.price)}</span>
+                              </div>
+                              {isAdmin && (
+                                <div className="config-actions-cell">
+                                  <button
+                                    className="config-dots-btn"
+                                    onClick={() => setProductMenuId(productMenuId === p.id ? null : p.id)}
+                                    aria-label={`Acciones para ${p.name}`}
+                                    aria-haspopup="true"
+                                    aria-expanded={productMenuId === p.id}
+                                  >
+                                    <DotsIcon />
+                                  </button>
+                                  {productMenuId === p.id && (
+                                    <div className="config-menu" role="menu">
+                                      <button className="config-menu-item" onClick={() => openProductEdit(p)}>
+                                        Editar
+                                      </button>
+                                      <button className="config-menu-item config-menu-item--danger" onClick={() => openProductDelete(p)}>
+                                        Eliminar
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </section>
         </div>
       </div>
 
       {/* Cierra el menú de acciones al hacer click fuera. */}
       {menuId !== null && (
         <div className="config-menu-backdrop" onClick={() => setMenuId(null)} aria-hidden="true" />
+      )}
+
+      {productMenuId !== null && (
+        <div className="config-menu-backdrop" onClick={() => setProductMenuId(null)} aria-hidden="true" />
       )}
 
       {drawer && (
@@ -195,6 +385,45 @@ export default function Menu() {
                 disabled={confirmBusy}
               >
                 {confirmBusy ? 'Eliminando…' : 'Eliminar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {productDrawer && (
+        <ProductDrawer
+          open
+          mode={productDrawer.mode}
+          product={productDrawer.product}
+          categories={categories}
+          onClose={() => setProductDrawer(null)}
+          onSaved={() => { loadProducts(); loadCategories() }}
+        />
+      )}
+
+      {productConfirm && (
+        <div className="config-overlay" role="dialog" aria-modal="true" aria-labelledby="menu-product-confirm-title">
+          <div className="config-modal">
+            <p className="config-modal-title" id="menu-product-confirm-title">¿Eliminar producto?</p>
+            <p className="config-modal-body">
+              El producto «{productConfirm.name}» será eliminado.
+            </p>
+            {productConfirmError && <p className="config-modal-error">{productConfirmError}</p>}
+            <div className="config-modal-actions">
+              <button
+                className="config-modal-btn config-modal-btn--secondary"
+                onClick={() => setProductConfirm(null)}
+                disabled={productConfirmBusy}
+              >
+                Cancelar
+              </button>
+              <button
+                className="config-modal-btn config-modal-btn--danger"
+                onClick={handleProductDelete}
+                disabled={productConfirmBusy}
+              >
+                {productConfirmBusy ? 'Eliminando…' : 'Eliminar'}
               </button>
             </div>
           </div>
