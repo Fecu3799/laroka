@@ -202,14 +202,11 @@ public class OrderService {
         recordHistory(saved, previous, next, null, reason);
         log.info("Order cancel flow | orderId={} from={} to={}", saved.getId(), previous, next);
 
-        if (next == OrderStatus.CANCELLATION_REQUESTED) {
-            notificationService.sendCancellationRequestEvent(saved.getBranch().getId(), saved.getId());
-        }
-        if (next == OrderStatus.CANCELLED) {
-            BackofficeOrderRow row = findOrderRowById(saved.getId());
-            notificationService.sendOrderUpdatedEvent(saved.getBranch().getId(),
-                    orderMapper.toBackofficeResponseDTO(row.order(), row.payment()), "CLIENT");
-        }
+        // La emisión del evento SSE se hace en OrderController, después de que esta
+        // transacción commitea (mismo patrón que BackofficeOrderController). Hacer el
+        // emitter.send() dentro de la transacción retenía la conexión JDBC mientras se
+        // escribía a un socket potencialmente lento/muerto, agotando el pool de Hikari;
+        // además evita notificar al cliente un cambio que luego haga rollback.
     }
 
     @Transactional
@@ -512,8 +509,10 @@ public class OrderService {
             idempotencyStore.put(idempotencyKey, result);
         }
 
-        notificationService.sendNewOrderEvent(result.getBranch().getId(), result.getId(), result.getCreatedAt(), result.getOrigin());
-
+        // El evento SSE NEW_ORDER se emite en OrderController, después del commit de
+        // esta transacción (mismo patrón que BackofficeOrderController). Mantenerlo aquí
+        // hacía el emitter.send() bloqueante dentro de la transacción, reteniendo la
+        // conexión JDBC; y emitía el evento aun cuando la transacción terminara en rollback.
         return new OrderCreationResult(result, false);
     }
 

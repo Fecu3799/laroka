@@ -115,3 +115,10 @@
   font-weight: 700;
   color: var(--accent);
 }
+
+/* Toggle de disponibilidad inline por sucursal (US-14-F-04, solo MANAGER). */
+.menu-product-toggle {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}

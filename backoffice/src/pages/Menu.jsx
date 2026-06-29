@@ -6,10 +6,13 @@ import {
   deleteCategory,
   fetchProducts,
   deleteProduct,
+  fetchBranchMenu,
+  updateProductAvailability,
 } from '../services/catalogService'
 import { formatCurrency } from '../utils/shiftsUtils'
 import CategoryDrawer from '../components/CategoryDrawer'
 import ProductDrawer from '../components/ProductDrawer'
+import ToggleSwitch from '../components/ToggleSwitch'
 import './Config.css'
 import './Menu.css'
 
@@ -42,8 +45,9 @@ function ImagePlaceholderIcon() {
 }
 
 export default function Menu() {
-  const { token, role, tenantId } = useAuth()
+  const { token, role, tenantId, branchId } = useAuth()
   const isAdmin = role === 'ADMIN'
+  const isManager = role === 'MANAGER'
 
   const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(true)
@@ -54,6 +58,7 @@ export default function Menu() {
   const [confirm, setConfirm] = useState(null)      // category | null
   const [confirmBusy, setConfirmBusy] = useState(false)
   const [confirmError, setConfirmError] = useState(null)
+  const [confirmStep, setConfirmStep] = useState(1) // 2 pasos si la categoría tiene productos
 
   // ── Productos (US-14-F-02) ──────────────────────────────────────
   const [products, setProducts] = useState([])
@@ -66,6 +71,12 @@ export default function Menu() {
   const [productConfirm, setProductConfirm] = useState(null)       // product | null
   const [productConfirmBusy, setProductConfirmBusy] = useState(false)
   const [productConfirmError, setProductConfirmError] = useState(null)
+
+  // ── Disponibilidad inline por sucursal (US-14-F-04, solo MANAGER) ───
+  // El menú de sucursal devuelve solo los productos disponibles: ese set
+  // permite derivar la disponibilidad de cada producto para la sucursal del token.
+  const [availableMenuIds, setAvailableMenuIds] = useState(null)   // Set | null
+  const [availability, setAvailability] = useState({})            // { [productId]: boolean }
 
   const loadCategories = useCallback(() => {
     if (!token) return
@@ -87,6 +98,17 @@ export default function Menu() {
       .finally(() => setProductsLoading(false))
   }, [token, tenantId])
 
+  // Disponibilidad por sucursal: solo MANAGER. branchId se resuelve del token.
+  const loadAvailability = useCallback(() => {
+    if (role !== 'MANAGER' || !token || branchId == null) return
+    fetchBranchMenu(branchId, token)
+      .then(menu => {
+        const ids = new Set(menu.flatMap(c => (c.products ?? []).map(p => p.id)))
+        setAvailableMenuIds(ids)
+      })
+      .catch(() => setAvailableMenuIds(new Set()))
+  }, [role, token, branchId])
+
   useEffect(() => {
     loadCategories()
   }, [loadCategories])
@@ -94,6 +116,18 @@ export default function Menu() {
   useEffect(() => {
     loadProducts()
   }, [loadProducts])
+
+  useEffect(() => {
+    loadAvailability()
+  }, [loadAvailability])
+
+  // Deriva el mapa de disponibilidad cuando hay productos y el menú de sucursal cargado.
+  useEffect(() => {
+    if (!isManager || availableMenuIds == null) return
+    const map = {}
+    for (const p of products) map[p.id] = availableMenuIds.has(p.id)
+    setAvailability(map)
+  }, [isManager, products, availableMenuIds])
 
   // ADMIN y MANAGER únicamente — STAFF no ve la pestaña. Guard sincrónico.
   if (role && role !== 'ADMIN' && role !== 'MANAGER') return <Navigate to="/orders" replace />
@@ -111,7 +145,19 @@ export default function Menu() {
   function openDelete(category) {
     setMenuId(null)
     setConfirmError(null)
+    setConfirmStep(1)
     setConfirm(category)
+  }
+
+  // Primer paso: si la categoría tiene productos, pasa al segundo paso con la advertencia;
+  // si no, elimina directamente.
+  function handleConfirmFirstStep() {
+    if (confirm?.productCount > 0) {
+      setConfirmError(null)
+      setConfirmStep(2)
+    } else {
+      handleDelete()
+    }
   }
 
   async function handleDelete() {
@@ -150,6 +196,18 @@ export default function Menu() {
     const spaceBelow = window.innerHeight - rect.bottom
     setProductMenuUp(spaceBelow < MENU_HEIGHT)
     setProductMenuId(productId)
+  }
+
+  // Optimistic update: cambia el toggle de inmediato y revierte si el backend falla.
+  async function toggleAvailability(product) {
+    const current = !!availability[product.id]
+    const next = !current
+    setAvailability(prev => ({ ...prev, [product.id]: next }))
+    try {
+      await updateProductAvailability(product.id, next, token)
+    } catch {
+      setAvailability(prev => ({ ...prev, [product.id]: current }))
+    }
   }
 
   function openProductCreate() {
@@ -320,6 +378,14 @@ export default function Menu() {
                                 <span className="menu-product-name">{p.name}</span>
                                 <span className="menu-product-price">{formatCurrency(p.price)}</span>
                               </div>
+                              {isManager && (
+                                <div className="menu-product-toggle">
+                                  <ToggleSwitch
+                                    checked={!!availability[p.id]}
+                                    onChange={() => toggleAvailability(p)}
+                                  />
+                                </div>
+                              )}
                               {isAdmin && (
                                 <div className="config-actions-cell">
                                   <button
@@ -378,30 +444,58 @@ export default function Menu() {
       {confirm && (
         <div className="config-overlay" role="dialog" aria-modal="true" aria-labelledby="menu-confirm-title">
           <div className="config-modal">
-            <p className="config-modal-title" id="menu-confirm-title">¿Eliminar categoría?</p>
-            <p className="config-modal-body">
-              La categoría «{confirm.name}» será eliminada.
-              {confirm.productCount > 0 && (
-                <> Esta categoría tiene {confirm.productCount} {confirm.productCount === 1 ? 'producto asociado' : 'productos asociados'}.</>
-              )}
-            </p>
-            {confirmError && <p className="config-modal-error">{confirmError}</p>}
-            <div className="config-modal-actions">
-              <button
-                className="config-modal-btn config-modal-btn--secondary"
-                onClick={() => setConfirm(null)}
-                disabled={confirmBusy}
-              >
-                Cancelar
-              </button>
-              <button
-                className="config-modal-btn config-modal-btn--danger"
-                onClick={handleDelete}
-                disabled={confirmBusy}
-              >
-                {confirmBusy ? 'Eliminando…' : 'Eliminar'}
-              </button>
-            </div>
+            {confirmStep === 1 ? (
+              <>
+                <p className="config-modal-title" id="menu-confirm-title">¿Eliminar categoría?</p>
+                <p className="config-modal-body">
+                  La categoría «{confirm.name}» será eliminada.
+                </p>
+                {confirmError && <p className="config-modal-error">{confirmError}</p>}
+                <div className="config-modal-actions">
+                  <button
+                    className="config-modal-btn config-modal-btn--secondary"
+                    onClick={() => setConfirm(null)}
+                    disabled={confirmBusy}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    className="config-modal-btn config-modal-btn--danger"
+                    onClick={handleConfirmFirstStep}
+                    disabled={confirmBusy}
+                  >
+                    {confirmBusy ? 'Eliminando…' : 'Eliminar'}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="config-modal-title" id="menu-confirm-title">¿Eliminar también los productos?</p>
+                <p className="config-modal-body">
+                  La categoría «{confirm.name}» tiene {confirm.productCount}{' '}
+                  {confirm.productCount === 1 ? 'producto asociado' : 'productos asociados'}. Al
+                  eliminarla {confirm.productCount === 1 ? 'también se eliminará' : 'también se eliminarán'}.
+                  Esta acción no se puede deshacer.
+                </p>
+                {confirmError && <p className="config-modal-error">{confirmError}</p>}
+                <div className="config-modal-actions">
+                  <button
+                    className="config-modal-btn config-modal-btn--secondary"
+                    onClick={() => setConfirm(null)}
+                    disabled={confirmBusy}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    className="config-modal-btn config-modal-btn--danger"
+                    onClick={handleDelete}
+                    disabled={confirmBusy}
+                  >
+                    {confirmBusy ? 'Eliminando…' : 'Eliminar todo'}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

@@ -112,6 +112,17 @@ export async function updateProductBranchConfig(productId, data, token) {
   return res.json()
 }
 
+// Disponibilidad inline del producto en la sucursal del MANAGER (US-14-F-04). El
+// backend resuelve el branchId desde el token, por eso no se envía X-Branch-Id.
+export async function updateProductAvailability(productId, available, token) {
+  const res = await apiFetch(`${API_URL}/backoffice/products/${productId}/availability`, {
+    method: 'PATCH',
+    headers: catalogHeaders(token, { 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ available }),
+  })
+  return res.json()
+}
+
 // data: { price, applyToAllBranches }. Exclusivo ADMIN. Con applyToAllBranches true
 // además limpia el override de todas las sucursales, igualando el precio.
 export async function updateProductPrice(productId, data, token) {

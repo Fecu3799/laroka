@@ -25,6 +25,22 @@ function SearchIcon() {
   )
 }
 
+function ChevronLeftIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="m15 6-6 6 6 6" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  )
+}
+
+function ChevronRightIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="m9 6 6 6-6 6" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  )
+}
+
 function InfoIcon() {
   return (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -132,6 +148,9 @@ export function MenuScreen({ branchId, branchName, onChangeBranch, paymentFailur
   const [activeCategory, setActiveCategory] = useState(null)
   const [activeCategoryIndex, setActiveCategoryIndex] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
+  // Indicadores de "hay más categorías" en los bordes del slider.
+  const [canScrollTabsLeft, setCanScrollTabsLeft] = useState(false)
+  const [canScrollTabsRight, setCanScrollTabsRight] = useState(false)
   const [activeTab, setActiveTab] = useState(() => (paymentFailureRecovery || pendingPaymentRecovery) ? 'cart' : 'menu')
   const [selectedProduct, setSelectedProduct] = useState(null)
   const [cartFailureData, setCartFailureData] = useState(() =>
@@ -150,6 +169,7 @@ export function MenuScreen({ branchId, branchName, onChangeBranch, paymentFailur
   const retryRef = useRef(null)
   const swipeContainerRef = useRef(null)
   const trackRef = useRef(null)
+  const tabsRef = useRef(null)
   const activeCategoryIndexRef = useRef(0)
   const gestureRef = useRef({ active: false, startX: 0, startY: 0, direction: null })
 
@@ -279,6 +299,41 @@ export function MenuScreen({ branchId, branchName, onChangeBranch, paymentFailur
         trackRef.current.style.transform = `translateX(${-(newIndex / categories.length) * 100}%)`
       }
     }
+  }
+
+  // En PC la rueda del mouse es vertical y la scrollbar está oculta: traducimos el
+  // scroll vertical de la rueda a scroll horizontal sobre el slider de categorías.
+  // Listener nativo no-pasivo para poder preventDefault (React los registra pasivos).
+  // El mismo efecto mantiene los indicadores de "hay más" en los bordes.
+  useEffect(() => {
+    const el = tabsRef.current
+    if (!el) return
+    function updateArrows() {
+      const { scrollLeft, scrollWidth, clientWidth } = el
+      setCanScrollTabsLeft(scrollLeft > 1)
+      setCanScrollTabsRight(scrollLeft + clientWidth < scrollWidth - 1)
+    }
+    function onWheel(e) {
+      if (e.deltaY === 0) return
+      if (el.scrollWidth <= el.clientWidth) return
+      el.scrollLeft += e.deltaY
+      e.preventDefault()
+    }
+    updateArrows()
+    el.addEventListener('wheel', onWheel, { passive: false })
+    el.addEventListener('scroll', updateArrows, { passive: true })
+    window.addEventListener('resize', updateArrows)
+    return () => {
+      el.removeEventListener('wheel', onWheel)
+      el.removeEventListener('scroll', updateArrows)
+      window.removeEventListener('resize', updateArrows)
+    }
+  }, [categories])
+
+  const scrollTabs = (direction) => {
+    const el = tabsRef.current
+    if (!el) return
+    el.scrollLeft += direction * el.clientWidth * 0.6
   }
 
   const isMenuTab = activeTab === 'menu'
@@ -430,17 +485,41 @@ export function MenuScreen({ branchId, branchName, onChangeBranch, paymentFailur
               </label>
             </div>
 
-            <nav className="menu-tabs" aria-label="Categorías">
-              {categories.map(cat => (
+            <div className="menu-tabs-wrapper">
+              {canScrollTabsLeft && (
                 <button
-                  key={cat.categoryId}
-                  className={`menu-tab${activeCategory === cat.categoryId ? ' menu-tab--active' : ''}`}
-                  onClick={() => handleCategoryChange(cat.categoryId)}
+                  type="button"
+                  className="menu-tabs-arrow menu-tabs-arrow--left"
+                  onClick={() => scrollTabs(-1)}
+                  aria-label="Ver categorías anteriores"
+                  tabIndex={-1}
                 >
-                  {cat.categoryName}
+                  <ChevronLeftIcon />
                 </button>
-              ))}
-            </nav>
+              )}
+              <nav className="menu-tabs" aria-label="Categorías" ref={tabsRef}>
+                {categories.map(cat => (
+                  <button
+                    key={cat.categoryId}
+                    className={`menu-tab${activeCategory === cat.categoryId ? ' menu-tab--active' : ''}`}
+                    onClick={() => handleCategoryChange(cat.categoryId)}
+                  >
+                    {cat.categoryName}
+                  </button>
+                ))}
+              </nav>
+              {canScrollTabsRight && (
+                <button
+                  type="button"
+                  className="menu-tabs-arrow menu-tabs-arrow--right"
+                  onClick={() => scrollTabs(1)}
+                  aria-label="Ver más categorías"
+                  tabIndex={-1}
+                >
+                  <ChevronRightIcon />
+                </button>
+              )}
+            </div>
 
             {loading ? (
               <div className="menu-loading" role="status" aria-label="Cargando menú">

@@ -26,7 +26,7 @@ import com.laroka.backend.catalog.mapper.MenuMapper;
 import com.laroka.backend.catalog.service.ProductService;
 import com.laroka.backend.shared.security.JwtService;
 import com.laroka.backend.shared.security.TokenBlacklist;
-import com.laroka.backend.staffuser.repository.StaffUserRepository;
+import com.laroka.backend.staffuser.service.StaffUserService;
 import com.laroka.backend.tenant.entity.Tenant;
 
 @WebMvcTest(controllers = BranchClientController.class)
@@ -57,7 +57,7 @@ class BranchClientControllerTest {
 	private TokenBlacklist tokenBlacklist;
 
 	@MockitoBean
-	private StaffUserRepository staffUserRepository;
+	private StaffUserService staffUserService;
 
 	private Branch branch(Integer tenantId) {
 		return Branch.builder()

@@ -35,7 +35,7 @@ import com.laroka.backend.shared.security.JwtService;
 import com.laroka.backend.shared.security.SecurityConfig;
 import com.laroka.backend.shared.security.SecurityUtils;
 import com.laroka.backend.shared.security.TokenBlacklist;
-import com.laroka.backend.staffuser.repository.StaffUserRepository;
+import com.laroka.backend.staffuser.service.StaffUserService;
 
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -76,12 +76,12 @@ class ProductControllerAuthorizationTest {
 	private TokenBlacklist tokenBlacklist;
 
 	@MockitoBean
-	private StaffUserRepository staffUserRepository;
+	private StaffUserService staffUserService;
 
 	@BeforeEach
 	void setUp() {
 		// El JwtAuthenticationFilter valida que el usuario del token siga activo.
-		when(staffUserRepository.findActiveById(USER_ID)).thenReturn(Optional.of(true));
+		when(staffUserService.isActive(USER_ID)).thenReturn(Optional.of(true));
 	}
 
 	private String tokenWithRole(String role) {

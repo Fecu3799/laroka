@@ -98,7 +98,7 @@ class SecurityIntegrationTest {
 
 	@Test
 	void inactiveUser_validToken_returns401Desactivado() throws Exception {
-		when(staffUserRepository.findActiveById(1)).thenReturn(Optional.of(false));
+		when(staffUserService.isActive(1)).thenReturn(Optional.of(false));
 
 		mockMvc.perform(post("/backoffice/staff-users")
 				.header("Authorization", "Bearer " + tokenWithRole("ADMIN"))
