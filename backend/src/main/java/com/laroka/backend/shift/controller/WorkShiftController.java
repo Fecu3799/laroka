@@ -162,7 +162,7 @@ public class WorkShiftController {
             .closedAt(ws.getClosedAt())
             .openedBy(ws.getOpenedBy().getName())
             .closedBy(ws.getClosedBy() != null ? ws.getClosedBy().getName() : null)
-            .summary(toCloseShiftResponse(ws.getId(), s))
+            .summary(s != null ? toCloseShiftResponse(ws.getId(), s) : null)
             .build();
     }
 
