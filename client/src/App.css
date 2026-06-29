@@ -421,12 +421,58 @@
 }
 
 /* Category tabs */
+/* Contenedor relativo para anclar las flechas indicadoras de scroll. */
+.menu-tabs-wrapper {
+  position: relative;
+}
+
+/* Flecha indicadora: aparece solo si hay más categorías hacia ese lado.
+   El degradado funde las categorías bajo la flecha para sugerir continuidad. */
+.menu-tabs-arrow {
+  position: absolute;
+  top: 0;
+  bottom: 2px; /* respeta el borde inferior de 2px del slider */
+  width: 44px;
+  display: flex;
+  align-items: center;
+  border: none;
+  cursor: pointer;
+  color: var(--text-primary);
+  z-index: 2;
+  padding: 0;
+}
+
+.menu-tabs-arrow--left {
+  left: 0;
+  justify-content: flex-start;
+  padding-left: 6px;
+  background: linear-gradient(to right, var(--bg-secondary) 55%, transparent);
+}
+
+.menu-tabs-arrow--right {
+  right: 0;
+  justify-content: flex-end;
+  padding-right: 6px;
+  background: linear-gradient(to left, var(--bg-secondary) 55%, transparent);
+}
+
 .menu-tabs {
   display: flex;
   padding: 0 16px 0;
   gap: 0;
   background: var(--bg-secondary);
   border-bottom: 2px solid color-mix(in srgb, var(--text-primary) 10%, transparent);
+  /* Scroll horizontal cuando las categorías no entran en pantalla. */
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  /* Oculta la scrollbar visualmente (Firefox). */
+  scrollbar-width: none;
+}
+
+/* Oculta la scrollbar visualmente (Chrome/Safari). */
+.menu-tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .menu-tab {
@@ -441,6 +487,9 @@
   cursor: pointer;
   position: relative;
   transition: color 0.15s;
+  /* Mantiene el ancho del tab para que el contenedor desborde y haga scroll. */
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .menu-tab--active {

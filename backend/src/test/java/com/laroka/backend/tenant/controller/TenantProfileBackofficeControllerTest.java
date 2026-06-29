@@ -16,7 +16,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.laroka.backend.shared.security.JwtService;
 import com.laroka.backend.shared.security.TokenBlacklist;
-import com.laroka.backend.staffuser.repository.StaffUserRepository;
+import com.laroka.backend.staffuser.service.StaffUserService;
 import com.laroka.backend.tenant.mapper.TenantProfileMapper;
 import com.laroka.backend.tenant.service.TenantProfileService;
 
@@ -42,7 +42,7 @@ class TenantProfileBackofficeControllerTest {
 	private TokenBlacklist tokenBlacklist;
 
 	@MockitoBean
-	private StaffUserRepository staffUserRepository;
+	private StaffUserService staffUserService;
 
 	@Test
 	void upsert_missingBusinessName_returns400() throws Exception {

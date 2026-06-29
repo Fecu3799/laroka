@@ -21,14 +21,23 @@ export default function useAuth() {
   });
 
   useEffect(() => {
+    // Re-lee el token desde localStorage. El evento "storage" solo dispara en OTRAS
+    // pestañas, así que el login/logout en la pestaña actual emite el evento custom
+    // "laroka:token-changed" para que useAuth se sincronice sin necesitar un refresh.
+    function syncFromStorage() {
+      const token = localStorage.getItem("laroka_token");
+      setRawToken(token);
+      setAuth(token ? decodeToken(token) : null);
+    }
     function handleStorage(e) {
-      if (e.key === "laroka_token") {
-        setRawToken(e.newValue);
-        setAuth(e.newValue ? decodeToken(e.newValue) : null);
-      }
+      if (e.key === "laroka_token") syncFromStorage();
     }
     window.addEventListener("storage", handleStorage);
-    return () => window.removeEventListener("storage", handleStorage);
+    window.addEventListener("laroka:token-changed", syncFromStorage);
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener("laroka:token-changed", syncFromStorage);
+    };
   }, []);
 
   const isExpired = auth === "expired";

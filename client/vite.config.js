@@ -4,6 +4,12 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig(() => {
   return {
+    // Fecha/hora del build inyectada en tiempo de build. La consume sw.js como
+    // SW_VERSION: al cambiar en cada deploy, el sw.js compilado deja de ser
+    // byte-idéntico y el browser dispara el update del Service Worker.
+    define: {
+      __SW_BUILD_DATE__: JSON.stringify(new Date().toISOString()),
+    },
     plugins: [
       react(),
       VitePWA({

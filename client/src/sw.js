@@ -10,7 +10,8 @@ import { clientsClaim } from 'workbox-core'
 // vercel.json— el sw.js compilado queda byte-idéntico y el navegador NO dispara
 // un update, dejando a los clientes con la CSP vieja. Bumpear esta constante
 // fuerza un sw.js distinto → update → reinstalación con la CSP nueva.
-const SW_VERSION = '2026-06-21-csp-r2dev'
+/* global __SW_BUILD_DATE__ -- inyectada por Vite (define) en tiempo de build */
+const SW_VERSION = __SW_BUILD_DATE__
 console.info('[SW] version', SW_VERSION)
 
 // ─── Precache ────────────────────────────────────────────────────────────────

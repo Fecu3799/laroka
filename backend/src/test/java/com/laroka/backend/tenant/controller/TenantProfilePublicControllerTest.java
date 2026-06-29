@@ -16,7 +16,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.laroka.backend.shared.security.JwtService;
 import com.laroka.backend.shared.security.TokenBlacklist;
-import com.laroka.backend.staffuser.repository.StaffUserRepository;
+import com.laroka.backend.staffuser.service.StaffUserService;
 import com.laroka.backend.tenant.dto.TenantProfilePublicDTO;
 import com.laroka.backend.tenant.entity.TenantProfile;
 import com.laroka.backend.tenant.exception.TenantProfileNotFoundException;
@@ -45,7 +45,7 @@ class TenantProfilePublicControllerTest {
 	private TokenBlacklist tokenBlacklist;
 
 	@MockitoBean
-	private StaffUserRepository staffUserRepository;
+	private StaffUserService staffUserService;
 
 	@Test
 	void getProfile_existingProfile_returnsPublicDTO() throws Exception {

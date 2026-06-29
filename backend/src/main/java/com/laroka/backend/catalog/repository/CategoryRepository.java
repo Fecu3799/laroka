@@ -11,5 +11,10 @@ import com.laroka.backend.catalog.entity.Category;
 public interface CategoryRepository extends JpaRepository<Category, Integer> {
 	List<Category> findByTenantId(Integer tenantId);
 
+	// US-14-05: el listado del backoffice retorna las categorías ordenadas por nombre.
+	List<Category> findAllByOrderByNameAsc();
+
+	List<Category> findByTenantIdOrderByNameAsc(Integer tenantId);
+
 	Category findByNameAndTenantId(String name, Integer tenantId);
 }

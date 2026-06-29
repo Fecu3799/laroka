@@ -23,4 +23,6 @@ export function logout(token) {
   localStorage.removeItem('laroka_token')
   localStorage.removeItem('laroka_refresh_token')
   localStorage.removeItem('laroka_dismissed_ids')
+  // Notifica a useAuth en esta misma pestaña (el evento "storage" no dispara aquí).
+  window.dispatchEvent(new Event('laroka:token-changed'))
 }

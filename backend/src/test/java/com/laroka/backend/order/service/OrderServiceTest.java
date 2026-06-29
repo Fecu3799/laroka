@@ -43,7 +43,6 @@ import com.laroka.backend.order.entity.OrderStatus;
 import com.laroka.backend.order.entity.OrderType;
 import com.laroka.backend.order.entity.PaymentMethod;
 import com.laroka.backend.order.exception.OrderNotFoundException;
-import com.laroka.backend.order.dto.BackofficeOrderResponseDTO;
 import com.laroka.backend.order.mapper.OrderMapper;
 import com.laroka.backend.order.repository.OrderRepository;
 import com.laroka.backend.order.repository.OrderStatusHistoryRepository;
@@ -964,9 +963,6 @@ class OrderServiceTest {
 
         when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
         when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(orderRepository.findByIdWithDetails(orderId)).thenReturn(Optional.of(order));
-        when(paymentRepository.findByOrderId(orderId)).thenReturn(Optional.empty());
-        when(orderMapper.toBackofficeResponseDTO(any(), any())).thenReturn(new BackofficeOrderResponseDTO());
 
         service.cancelOrder(orderId, null);
 
@@ -1157,9 +1153,6 @@ class OrderServiceTest {
 
         when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
         when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(orderRepository.findByIdWithDetails(orderId)).thenReturn(Optional.of(order));
-        when(paymentRepository.findByOrderId(orderId)).thenReturn(Optional.empty());
-        when(orderMapper.toBackofficeResponseDTO(any(), any())).thenReturn(new BackofficeOrderResponseDTO());
 
         service.cancelOrder(orderId, null);
 
@@ -1178,9 +1171,6 @@ class OrderServiceTest {
 
         when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
         when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(orderRepository.findByIdWithDetails(orderId)).thenReturn(Optional.of(order));
-        when(paymentRepository.findByOrderId(orderId)).thenReturn(Optional.empty());
-        when(orderMapper.toBackofficeResponseDTO(any(), any())).thenReturn(new BackofficeOrderResponseDTO());
 
         service.cancelOrder(orderId, "me equivoqué");
 

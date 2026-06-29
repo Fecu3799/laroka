@@ -1,5 +1,8 @@
 package com.laroka.backend.catalog.mapper;
 
+import java.util.List;
+import java.util.Map;
+
 import org.springframework.stereotype.Component;
 
 import com.laroka.backend.catalog.dto.CategoryRequestDTO;
@@ -17,6 +20,10 @@ public class CategoryMapper {
 	private final TenantMapper tenantMapper;
 
 	public CategoryResponseDTO toResponseDTO(Category category) {
+		return toResponseDTO(category, null);
+	}
+
+	public CategoryResponseDTO toResponseDTO(Category category, Integer productCount) {
 		if (category == null) {
 			return null;
 		}
@@ -25,9 +32,18 @@ public class CategoryMapper {
 			.name(category.getName())
 			.tenantId(category.getTenant().getId())
 			.tenant(tenantMapper.toResponseDTO(category.getTenant()))
+			.productCount(productCount)
 			.createdAt(category.getCreatedAt())
 			.updatedAt(category.getUpdatedAt())
 			.build();
+	}
+
+	// US-14-05: mapea cada categoría con su cantidad de productos. Una categoría ausente del
+	// mapa de conteos (sin productos) resuelve a productCount = 0.
+	public List<CategoryResponseDTO> toResponseDTOList(List<Category> categories, Map<Integer, Long> productCounts) {
+		return categories.stream()
+			.map(category -> toResponseDTO(category, productCounts.getOrDefault(category.getId(), 0L).intValue()))
+			.toList();
 	}
 
 	public Category toEntity(CategoryRequestDTO dto) {

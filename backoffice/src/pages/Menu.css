@@ -1,0 +1,124 @@
+/* ── Sección Productos del Menú (US-14-F-02) ─────────────────────── */
+
+.menu-products {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ── Grupo colapsable por categoría ──────────────────────────────── */
+
+.menu-group {
+  border: 1px solid color-mix(in srgb, var(--border) 22%, transparent);
+  border-radius: 10px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--border) 5%, transparent);
+}
+
+.menu-group-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 16px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text-primary);
+  text-align: left;
+  transition: background 0.15s;
+}
+
+.menu-group-head:hover {
+  background: color-mix(in srgb, var(--border) 10%, transparent);
+}
+
+.menu-group-chevron {
+  display: inline-flex;
+  color: var(--text-secondary);
+  transition: transform 0.18s ease;
+}
+
+.menu-group-chevron--collapsed {
+  transform: rotate(-90deg);
+}
+
+.menu-group-title {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.menu-group-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+/* ── Lista de productos ──────────────────────────────────────────── */
+
+.menu-product-list {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid color-mix(in srgb, var(--border) 18%, transparent);
+}
+
+.menu-product-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 12%, transparent);
+}
+
+.menu-product-row:last-child {
+  border-bottom: none;
+}
+
+.menu-product-img,
+.menu-product-img-placeholder {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  object-fit: cover;
+  background: color-mix(in srgb, var(--border) 12%, transparent);
+}
+
+.menu-product-img-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  border: 1px dashed color-mix(in srgb, var(--border) 28%, transparent);
+}
+
+.menu-product-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+}
+
+.menu-product-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.menu-product-price {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+/* Toggle de disponibilidad inline por sucursal (US-14-F-04, solo MANAGER). */
+.menu-product-toggle {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}

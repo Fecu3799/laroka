@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.laroka.backend.notification.service.NotificationService;
 import com.laroka.backend.order.dto.CancelOrderRequestDTO;
 import com.laroka.backend.order.dto.CreateOrderRequestDTO;
 import com.laroka.backend.order.dto.CreateOrderResponseDTO;
@@ -20,7 +21,9 @@ import com.laroka.backend.order.dto.OrderItemStatusDTO;
 import com.laroka.backend.order.dto.OrderStatusResponseDTO;
 import com.laroka.backend.order.entity.Order;
 import com.laroka.backend.order.entity.OrderItem;
+import com.laroka.backend.order.entity.OrderStatus;
 import com.laroka.backend.order.mapper.OrderMapper;
+import com.laroka.backend.order.service.BackofficeOrderRow;
 import com.laroka.backend.order.service.OrderCreationResult;
 import com.laroka.backend.order.service.OrderService;
 
@@ -37,6 +40,7 @@ public class OrderController {
 
     private final OrderService orderService;
     private final OrderMapper orderMapper;
+    private final NotificationService notificationService;
 
     @PostMapping
     @Operation(summary = "Create order", description = "Creates a new order for a branch. Send X-Idempotency-Key to avoid duplicate orders on retry.")
@@ -47,6 +51,16 @@ public class OrderController {
         Order order = orderMapper.toEntity(dto);
         List<OrderItem> items = orderMapper.toItems(dto);
         OrderCreationResult result = orderService.createOrder(order, items, dto.getPaymentMethod(), idempotencyKey);
+
+        // Evento SSE emitido tras el commit de createOrder. Solo para pedidos nuevos:
+        // un hit de idempotencia (fromCache) no re-notifica. Mover esto fuera de la
+        // transacción evita retener la conexión JDBC durante el send y evita emitir
+        // un NEW_ORDER de un pedido que la transacción nunca llegó a persistir.
+        if (!result.fromCache()) {
+            Order created = result.order();
+            notificationService.sendNewOrderEvent(created.getBranch().getId(), created.getId(),
+                    created.getCreatedAt(), created.getOrigin());
+        }
 
         HttpStatus status = result.fromCache() ? HttpStatus.OK : HttpStatus.CREATED;
         return ResponseEntity.status(status).body(orderMapper.toResponseDTO(result.order()));
@@ -66,6 +80,20 @@ public class OrderController {
             @RequestBody(required = false) CancelOrderRequestDTO body) {
         String reason = body != null ? body.getReason() : null;
         orderService.cancelOrder(id, reason);
+
+        // Evento SSE emitido tras el commit de cancelOrder (mismo patrón que
+        // BackofficeOrderController). Se relee el pedido para conocer el estado final
+        // resultante y emitir el evento correcto. Hacerlo fuera de la transacción evita
+        // retener la conexión JDBC durante el emitter.send() y evita notificar una
+        // cancelación que luego haga rollback.
+        BackofficeOrderRow row = orderService.findOrderRowById(id);
+        Integer branchId = row.order().getBranch().getId();
+        if (row.order().getStatus() == OrderStatus.CANCELLATION_REQUESTED) {
+            notificationService.sendCancellationRequestEvent(branchId, row.order().getId());
+        } else if (row.order().getStatus() == OrderStatus.CANCELLED) {
+            notificationService.sendOrderUpdatedEvent(branchId,
+                    orderMapper.toBackofficeResponseDTO(row.order(), row.payment()), "CLIENT");
+        }
         return ResponseEntity.noContent().build();
     }
 

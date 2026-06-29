@@ -17,7 +17,6 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 
 import com.laroka.backend.notification.repository.PushSubscriptionRepository;
-import com.laroka.backend.notification.service.NotificationService;
 import com.laroka.backend.notification.service.PushNotificationService;
 import com.laroka.backend.order.dto.OrderFilterParams;
 import com.laroka.backend.order.repository.OrderSpecification;
@@ -47,7 +46,6 @@ import com.laroka.backend.order.entity.PaymentMethod;
 import com.laroka.backend.order.exception.OrderNotFoundException;
 import com.laroka.backend.order.repository.OrderItemRepository;
 import com.laroka.backend.order.repository.OrderRepository;
-import com.laroka.backend.order.mapper.OrderMapper;
 import com.laroka.backend.order.repository.OrderStatusHistoryRepository;
 import com.laroka.backend.shift.entity.ShiftStatus;
 import com.laroka.backend.shift.entity.WorkShift;
@@ -74,8 +72,6 @@ public class OrderService {
     private final BranchProductRepository branchProductRepository;
     private final IdempotencyStore idempotencyStore;
     private final PaymentRepository paymentRepository;
-    private final NotificationService notificationService;
-    private final OrderMapper orderMapper;
     private final WorkShiftRepository workShiftRepository;
     private final PushSubscriptionRepository pushSubscriptionRepository;
     private final PushNotificationService pushNotificationService;
@@ -202,14 +198,11 @@ public class OrderService {
         recordHistory(saved, previous, next, null, reason);
         log.info("Order cancel flow | orderId={} from={} to={}", saved.getId(), previous, next);
 
-        if (next == OrderStatus.CANCELLATION_REQUESTED) {
-            notificationService.sendCancellationRequestEvent(saved.getBranch().getId(), saved.getId());
-        }
-        if (next == OrderStatus.CANCELLED) {
-            BackofficeOrderRow row = findOrderRowById(saved.getId());
-            notificationService.sendOrderUpdatedEvent(saved.getBranch().getId(),
-                    orderMapper.toBackofficeResponseDTO(row.order(), row.payment()), "CLIENT");
-        }
+        // La emisión del evento SSE se hace en OrderController, después de que esta
+        // transacción commitea (mismo patrón que BackofficeOrderController). Hacer el
+        // emitter.send() dentro de la transacción retenía la conexión JDBC mientras se
+        // escribía a un socket potencialmente lento/muerto, agotando el pool de Hikari;
+        // además evita notificar al cliente un cambio que luego haga rollback.
     }
 
     @Transactional
@@ -512,8 +505,10 @@ public class OrderService {
             idempotencyStore.put(idempotencyKey, result);
         }
 
-        notificationService.sendNewOrderEvent(result.getBranch().getId(), result.getId(), result.getCreatedAt(), result.getOrigin());
-
+        // El evento SSE NEW_ORDER se emite en OrderController, después del commit de
+        // esta transacción (mismo patrón que BackofficeOrderController). Mantenerlo aquí
+        // hacía el emitter.send() bloqueante dentro de la transacción, reteniendo la
+        // conexión JDBC; y emitía el evento aun cuando la transacción terminara en rollback.
         return new OrderCreationResult(result, false);
     }
 

@@ -2,8 +2,10 @@ package com.laroka.backend.staffuser.service;
 
 import java.text.Normalizer;
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -25,6 +27,18 @@ public class StaffUserService {
 	private final StaffUserRepository staffUserRepository;
 	private final BranchRepository branchRepository;
 	private final PasswordEncoder passwordEncoder;
+
+	/**
+	 * Estado activo del usuario, cacheado para no pegar a la DB en cada request
+	 * (JwtAuthenticationFilter lo consulta por petición). El cache vive en la capa
+	 * de service —no en el repositorio— para que el advice de @Cacheable se aplique
+	 * de forma confiable sobre el proxy del bean; la invalidación está en setStatus
+	 * vía @CacheEvict sobre el mismo cache "staffUserActive".
+	 */
+	@Cacheable(value = "staffUserActive", key = "#id")
+	public Optional<Boolean> isActive(Integer id) {
+		return staffUserRepository.findActiveById(id);
+	}
 
 	public StaffUser create(StaffUser staffUser) {
 		Branch branch = branchRepository.findById(staffUser.getBranch().getId())

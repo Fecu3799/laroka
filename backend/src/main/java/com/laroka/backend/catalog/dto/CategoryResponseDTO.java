@@ -18,6 +18,8 @@ public class CategoryResponseDTO {
 	private String name;
 	private Integer tenantId;
 	private TenantResponseDTO tenant;
+	// Cantidad de productos asociados a la categoría (US-14-05).
+	private Integer productCount;
 	private LocalDateTime createdAt;
 	private LocalDateTime updatedAt;
 }

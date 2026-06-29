@@ -13,7 +13,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-import com.laroka.backend.staffuser.repository.StaffUserRepository;
+import com.laroka.backend.staffuser.service.StaffUserService;
 
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
@@ -29,7 +29,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
 	private final JwtService jwtService;
 	private final TokenBlacklist tokenBlacklist;
-	private final StaffUserRepository staffUserRepository;
+	private final StaffUserService staffUserService;
 
 	@Override
 	protected boolean shouldNotFilterAsyncDispatch() {
@@ -53,7 +53,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 		try {
 			Integer userId = jwtService.extractUserId(token);
 
-			Optional<Boolean> active = staffUserRepository.findActiveById(userId);
+			Optional<Boolean> active = staffUserService.isActive(userId);
 			if (active.isPresent() && Boolean.FALSE.equals(active.get())) {
 				writeError(response, HttpStatus.UNAUTHORIZED, "Usuario desactivado");
 				return;
