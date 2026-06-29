@@ -8,10 +8,20 @@ Se aplicó una CSP estricta a todas las rutas (`/(.*)`) vía `vercel.json`:
 default-src 'self';
 script-src 'self';
 style-src 'self' 'unsafe-inline';
-img-src 'self' data: blob: *.r2.cloudflarestorage.com;
+img-src 'self' data: blob: *.r2.cloudflarestorage.com *.r2.dev;
 connect-src 'self' https://laroka-backend.onrender.com;
 frame-ancestors 'none'
 ```
+
+### Ajuste: imágenes de productos servidas desde `*.r2.dev`
+
+**Conflicto detectado:** las imágenes `.webp` de productos (`product.imageUrl`)
+se sirven desde el dominio público de R2 (`*.r2.dev`), no desde el endpoint S3
+API (`*.r2.cloudflarestorage.com`). Con `img-src` permitiendo únicamente
+`*.r2.cloudflarestorage.com`, el navegador bloqueaba esas imágenes.
+
+**Resolución:** se agregó `*.r2.dev` a la directiva `img-src`, dejándola
+alineada con `client/vercel.json`.
 
 ### Ajuste: Google Fonts self-hosted
 
