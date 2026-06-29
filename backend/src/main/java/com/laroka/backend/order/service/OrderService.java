@@ -17,7 +17,6 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 
 import com.laroka.backend.notification.repository.PushSubscriptionRepository;
-import com.laroka.backend.notification.service.NotificationService;
 import com.laroka.backend.notification.service.PushNotificationService;
 import com.laroka.backend.order.dto.OrderFilterParams;
 import com.laroka.backend.order.repository.OrderSpecification;
@@ -47,7 +46,6 @@ import com.laroka.backend.order.entity.PaymentMethod;
 import com.laroka.backend.order.exception.OrderNotFoundException;
 import com.laroka.backend.order.repository.OrderItemRepository;
 import com.laroka.backend.order.repository.OrderRepository;
-import com.laroka.backend.order.mapper.OrderMapper;
 import com.laroka.backend.order.repository.OrderStatusHistoryRepository;
 import com.laroka.backend.shift.entity.ShiftStatus;
 import com.laroka.backend.shift.entity.WorkShift;
@@ -74,8 +72,6 @@ public class OrderService {
     private final BranchProductRepository branchProductRepository;
     private final IdempotencyStore idempotencyStore;
     private final PaymentRepository paymentRepository;
-    private final NotificationService notificationService;
-    private final OrderMapper orderMapper;
     private final WorkShiftRepository workShiftRepository;
     private final PushSubscriptionRepository pushSubscriptionRepository;
     private final PushNotificationService pushNotificationService;
