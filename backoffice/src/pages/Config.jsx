@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import useAuth from '../hooks/useAuth'
-import { fetchStaffUsers, setStaffUserStatus } from '../services/staffService'
+import { setStaffUserStatus } from '../services/staffService'
 import { useConfig } from '../context/ConfigContext'
 import StaffUserDrawer from '../components/StaffUserDrawer'
 import ResetPasswordModal from '../components/ResetPasswordModal'
@@ -32,13 +32,10 @@ function ChevronIcon() {
 export default function Config() {
   const { token, role, userId } = useAuth()
 
-  // Sucursales desde el catálogo global cacheado (US-14-F-05) — antes se
-  // fetcheaban acá y en BranchConfigSection por separado; ahora unificadas.
-  const { branches } = useConfig()
-
-  const [staff, setStaff] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
+  // Sucursales y staff desde el cache global de sesión (US-14-F-05) — antes se
+  // fetcheaban acá; ahora viven en ConfigProvider y sobreviven a la navegación.
+  // Al volver a CONFIG los datos aparecen sin spinner.
+  const { branches, staffUsers, loadingConfig, reloadStaffUsers } = useConfig()
 
   const [menuId, setMenuId] = useState(null)
   const [drawer, setDrawer] = useState(null)        // { mode, user } | null
@@ -47,20 +44,6 @@ export default function Config() {
   const [confirmBusy, setConfirmBusy] = useState(false)
   const [confirmError, setConfirmError] = useState(null)
   const [showArchived, setShowArchived] = useState(false)
-
-  const loadStaff = useCallback(() => {
-    if (!token) return
-    setLoading(true)
-    setError(false)
-    fetchStaffUsers(token)
-      .then(setStaff)
-      .catch(() => setError(true))
-      .finally(() => setLoading(false))
-  }, [token])
-
-  useEffect(() => {
-    loadStaff()
-  }, [loadStaff])
 
   // ADMIN únicamente — guard sincrónico.
   if (role && role !== 'ADMIN') return <Navigate to="/orders" replace />
@@ -93,7 +76,7 @@ export default function Config() {
     try {
       await setStaffUserStatus(confirm.user.id, confirm.nextActive, token)
       setConfirm(null)
-      loadStaff()
+      reloadStaffUsers()
     } catch (err) {
       setConfirmError(err?.message ?? 'No se pudo actualizar el estado.')
     } finally {
@@ -102,8 +85,8 @@ export default function Config() {
   }
 
   // Activos en la tabla principal; inactivos ocultos en "Archivados".
-  const activeStaff = staff.filter(u => u.active)
-  const inactiveStaff = staff.filter(u => !u.active)
+  const activeStaff = staffUsers.filter(u => u.active)
+  const inactiveStaff = staffUsers.filter(u => !u.active)
 
   function renderStaffTable(list) {
     return (
@@ -191,13 +174,9 @@ export default function Config() {
               <button className="config-new-btn" onClick={openCreate}>+ Nuevo empleado</button>
             </div>
 
-            {loading ? (
+            {loadingConfig ? (
           <div className="config-state-center"><div className="config-spinner" /></div>
-        ) : error ? (
-          <div className="config-state-center">
-            <p className="config-state-error">No se pudo cargar el equipo.</p>
-          </div>
-        ) : staff.length === 0 ? (
+        ) : staffUsers.length === 0 ? (
           <div className="config-state-center">
             <p className="config-empty">Aún no hay empleados cargados.</p>
           </div>
@@ -248,7 +227,7 @@ export default function Config() {
           user={drawer.user}
           branches={branches}
           onClose={() => setDrawer(null)}
-          onSaved={loadStaff}
+          onSaved={reloadStaffUsers}
         />
       )}
 
@@ -256,7 +235,7 @@ export default function Config() {
         <ResetPasswordModal
           user={resetUser}
           onClose={() => setResetUser(null)}
-          onDone={() => {}}
+          onDone={reloadStaffUsers}
         />
       )}
 

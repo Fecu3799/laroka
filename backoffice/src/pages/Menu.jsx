@@ -50,7 +50,7 @@ export default function Menu() {
 
   // Catálogo global cacheado (US-14-F-05): categorías y productos vienen del
   // ConfigProvider; las mutaciones invalidan vía reloadCategories/reloadProducts.
-  const { categories, products, loadingCatalog, reloadCategories, reloadProducts } = useConfig()
+  const { categories, products, loadingConfig, reloadCategories, reloadProducts } = useConfig()
 
   const [menuId, setMenuId] = useState(null)
   const [drawer, setDrawer] = useState(null)        // { mode, category } | null
@@ -237,7 +237,7 @@ export default function Menu() {
               )}
             </div>
 
-            {loadingCatalog ? (
+            {loadingConfig ? (
               <div className="config-state-center"><div className="config-spinner" /></div>
             ) : categories.length === 0 ? (
               <div className="config-state-center">
@@ -300,7 +300,7 @@ export default function Menu() {
               )}
             </div>
 
-            {loadingCatalog ? (
+            {loadingConfig ? (
               <div className="config-state-center"><div className="config-spinner" /></div>
             ) : productGroups.length === 0 ? (
               <div className="config-state-center">

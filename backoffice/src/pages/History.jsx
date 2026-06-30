@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import useAuth from '../hooks/useAuth'
-import useBranch from '../hooks/useBranch'
 import { getShiftHistory } from '../services/shiftsService'
+import { useHistory } from '../context/HistoryContext'
 import { formatShiftDate, formatShiftClock, formatCurrency } from '../utils/shiftsUtils'
 import ShiftDetailModal from './ShiftDetailModal'
 import './History.css'
@@ -10,23 +10,28 @@ const PAGE_SIZE = 6
 
 export default function History() {
   const { token } = useAuth()
-  const { activeBranchId } = useBranch()
+  // Cache por página en HistoryProvider: sobrevive al desmontaje de la pestaña,
+  // así una página ya visitada se muestra al instante sin spinner ni refetch.
+  const { getPage, putPage, activeBranchId } = useHistory()
   const [page, setPage] = useState(0)
-  const [data, setData] = useState(null)
-  const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [selected, setSelected] = useState(null)
 
+  // Derivado del cache: si la página está cacheada, no hay spinner ni fetch.
+  const data = getPage(activeBranchId, page)
+
   useEffect(() => {
-    if (!token) return
-    setLoading(true)
+    if (!token || data) return
+    let cancelled = false
     setError(null)
     getShiftHistory(token, activeBranchId, page, PAGE_SIZE)
-      .then(setData)
-      .catch(() => setError(true))
-      .finally(() => setLoading(false))
-  }, [token, activeBranchId, page])
+      .then(d => { if (!cancelled) putPage(activeBranchId, page, d) })
+      .catch(() => { if (!cancelled) setError(true) })
+    return () => { cancelled = true }
+  }, [token, activeBranchId, page, data, putPage])
 
+  // Sin datos y sin error ⇒ cargando (incluye el primer render antes del fetch).
+  const loading = !data && !error
   const shifts = data?.content ?? []
   const totalPages = data?.page?.totalPages ?? 0
   const currentPage = data?.page?.number ?? 0

@@ -10,6 +10,7 @@ import { OrdersProvider } from '../context/OrdersContext'
 import { ShiftProvider } from '../context/ShiftContext'
 import { OperatorMessagesProvider } from '../context/OperatorMessagesContext'
 import { ConfigProvider } from '../context/ConfigContext'
+import { HistoryProvider } from '../context/HistoryContext'
 import './Layout.css'
 
 const API_URL = import.meta.env.VITE_API_URL ?? ''
@@ -280,9 +281,11 @@ export default function Layout() {
 
             <main className="layout-main">
               <ConfigProvider>
-                <OrdersProvider setOpenOrderId={setOpenOrderId}>
-                  <Outlet context={{ newOrderCount, cancelCount, resetCounts, setOpenOrderId }} />
-                </OrdersProvider>
+                <HistoryProvider>
+                  <OrdersProvider setOpenOrderId={setOpenOrderId}>
+                    <Outlet context={{ newOrderCount, cancelCount, resetCounts, setOpenOrderId }} />
+                  </OrdersProvider>
+                </HistoryProvider>
               </ConfigProvider>
             </main>
           </OperatorMessagesProvider>
