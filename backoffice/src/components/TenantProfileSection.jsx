@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import useAuth from '../hooks/useAuth'
 import { saveTenantProfile } from '../services/tenantService'
-import { useCatalog } from '../context/CatalogContext'
+import { useConfig } from '../context/ConfigContext'
 
 const EMPTY = {
   businessName: '',
@@ -27,7 +27,7 @@ function toForm(profile) {
 export default function TenantProfileSection() {
   const { token } = useAuth()
   // Perfil del tenant desde el catálogo global cacheado (US-14-F-05).
-  const { tenantProfile, loadingCatalog, reloadTenantProfile } = useCatalog()
+  const { tenantProfile, loadingConfig, reloadTenantProfile } = useConfig()
 
   const [form, setForm] = useState(EMPTY)
   const [status, setStatus] = useState('idle')   // idle | saving | saved | error
@@ -85,7 +85,7 @@ export default function TenantProfileSection() {
         </div>
       </div>
 
-      {loadingCatalog ? (
+      {loadingConfig ? (
         <div className="config-state-center"><div className="config-spinner" /></div>
       ) : (
         <div className="config-profile-form">

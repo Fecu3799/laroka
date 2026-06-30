@@ -3,33 +3,35 @@ import useAuth from '../hooks/useAuth'
 import { fetchCategories, fetchProducts } from '../services/catalogService'
 import { fetchBackofficeBranches } from '../services/branchService'
 import { fetchTenantProfile } from '../services/tenantService'
+import { fetchStaffUsers } from '../services/staffService'
 
-const CatalogContext = createContext(null)
+const ConfigContext = createContext(null)
 
 // eslint-disable-next-line react-refresh/only-export-components
-export function useCatalog() {
-  const ctx = useContext(CatalogContext)
-  if (!ctx) throw new Error('useCatalog debe usarse dentro de <CatalogProvider>')
+export function useConfig() {
+  const ctx = useContext(ConfigContext)
+  if (!ctx) throw new Error('useConfig debe usarse dentro de <ConfigProvider>')
   return ctx
 }
 
 // Cache de datos globales del tenant (US-14-F-05). Vive en Layout y persiste
-// durante toda la sesión, por lo que categorías, productos, sucursales y perfil
-// se cargan una sola vez y sobreviven a la navegación entre pestañas.
+// durante toda la sesión, por lo que categorías, productos, sucursales, perfil y
+// staff se cargan una sola vez y sobreviven a la navegación entre pestañas.
 //
 // La carga se gatea por rol para no pegarle a endpoints que el rol no puede
 // consumir (apiFetch dispara un toast ante cualquier 4xx):
 //   - categorías y productos → ADMIN y MANAGER (pestaña Menú)
-//   - sucursales y perfil del tenant → solo ADMIN (pestaña CONFIG)
+//   - sucursales, perfil del tenant y staff users → solo ADMIN (pestaña CONFIG)
 // STAFF no consume ninguno: no carga nada.
-export function CatalogProvider({ children }) {
+export function ConfigProvider({ children }) {
   const { token, role, tenantId } = useAuth()
 
   const [categories, setCategories] = useState([])
   const [products, setProducts] = useState([])
   const [branches, setBranches] = useState([])
   const [tenantProfile, setTenantProfile] = useState(null)
-  const [loadingCatalog, setLoadingCatalog] = useState(true)
+  const [staffUsers, setStaffUsers] = useState([])
+  const [loadingConfig, setLoadingConfig] = useState(true)
 
   const canCatalog = role === 'ADMIN' || role === 'MANAGER'
   const isAdmin = role === 'ADMIN'
@@ -56,24 +58,31 @@ export function CatalogProvider({ children }) {
     try { setTenantProfile(await fetchTenantProfile(token)) } catch { /* noop */ }
   }, [token, isAdmin])
 
+  const reloadStaffUsers = useCallback(async () => {
+    if (!token || !isAdmin) return
+    try { setStaffUsers(await fetchStaffUsers(token)) } catch { /* noop */ }
+  }, [token, isAdmin])
+
   // Carga inicial única por sesión (y al cambiar token/tenant/rol).
   useEffect(() => {
     if (!token || !role) return
-    if (!canCatalog) { setLoadingCatalog(false); return }
+    if (!canCatalog) { setLoadingConfig(false); return }
     let cancelled = false
-    setLoadingCatalog(true)
+    setLoadingConfig(true)
     Promise.all([
       fetchCategories(token, tenantId).catch(() => []),
       fetchProducts(token, tenantId).catch(() => []),
       isAdmin ? fetchBackofficeBranches(token, tenantId).catch(() => []) : Promise.resolve([]),
       isAdmin ? fetchTenantProfile(token).catch(() => null) : Promise.resolve(null),
-    ]).then(([cats, prods, brs, profile]) => {
+      isAdmin ? fetchStaffUsers(token).catch(() => []) : Promise.resolve([]),
+    ]).then(([cats, prods, brs, profile, staff]) => {
       if (cancelled) return
       setCategories(cats)
       setProducts(prods)
       setBranches(brs)
       setTenantProfile(profile)
-    }).finally(() => { if (!cancelled) setLoadingCatalog(false) })
+      setStaffUsers(staff)
+    }).finally(() => { if (!cancelled) setLoadingConfig(false) })
     return () => { cancelled = true }
   }, [token, role, canCatalog, isAdmin, tenantId])
 
@@ -82,12 +91,14 @@ export function CatalogProvider({ children }) {
     products,
     branches,
     tenantProfile,
-    loadingCatalog,
+    staffUsers,
+    loadingConfig,
     reloadCategories,
     reloadProducts,
     reloadBranches,
     reloadTenantProfile,
+    reloadStaffUsers,
   }
 
-  return <CatalogContext.Provider value={value}>{children}</CatalogContext.Provider>
+  return <ConfigContext.Provider value={value}>{children}</ConfigContext.Provider>
 }
