@@ -2,13 +2,12 @@ import { useState, useEffect, useCallback } from 'react'
 import { Navigate } from 'react-router-dom'
 import useAuth from '../hooks/useAuth'
 import {
-  fetchCategories,
   deleteCategory,
-  fetchProducts,
   deleteProduct,
   fetchBranchMenu,
   updateProductAvailability,
 } from '../services/catalogService'
+import { useCatalog } from '../context/CatalogContext'
 import { formatCurrency } from '../utils/shiftsUtils'
 import CategoryDrawer from '../components/CategoryDrawer'
 import ProductDrawer from '../components/ProductDrawer'
@@ -45,13 +44,13 @@ function ImagePlaceholderIcon() {
 }
 
 export default function Menu() {
-  const { token, role, tenantId, branchId } = useAuth()
+  const { token, role, branchId } = useAuth()
   const isAdmin = role === 'ADMIN'
   const isManager = role === 'MANAGER'
 
-  const [categories, setCategories] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
+  // Catálogo global cacheado (US-14-F-05): categorías y productos vienen del
+  // CatalogProvider; las mutaciones invalidan vía reloadCategories/reloadProducts.
+  const { categories, products, loadingCatalog, reloadCategories, reloadProducts } = useCatalog()
 
   const [menuId, setMenuId] = useState(null)
   const [drawer, setDrawer] = useState(null)        // { mode, category } | null
@@ -61,9 +60,6 @@ export default function Menu() {
   const [confirmStep, setConfirmStep] = useState(1) // 2 pasos si la categoría tiene productos
 
   // ── Productos (US-14-F-02) ──────────────────────────────────────
-  const [products, setProducts] = useState([])
-  const [productsLoading, setProductsLoading] = useState(true)
-  const [productsError, setProductsError] = useState(false)
   const [collapsed, setCollapsed] = useState(() => new Set()) // categoryIds colapsadas
   const [productMenuId, setProductMenuId] = useState(null)
   const [productMenuUp, setProductMenuUp] = useState(false)   // abre hacia arriba si no hay espacio abajo
@@ -78,27 +74,8 @@ export default function Menu() {
   const [availableMenuIds, setAvailableMenuIds] = useState(null)   // Set | null
   const [availability, setAvailability] = useState({})            // { [productId]: boolean }
 
-  const loadCategories = useCallback(() => {
-    if (!token) return
-    setLoading(true)
-    setError(false)
-    fetchCategories(token, tenantId)
-      .then(setCategories)
-      .catch(() => setError(true))
-      .finally(() => setLoading(false))
-  }, [token, tenantId])
-
-  const loadProducts = useCallback(() => {
-    if (!token) return
-    setProductsLoading(true)
-    setProductsError(false)
-    fetchProducts(token, tenantId)
-      .then(setProducts)
-      .catch(() => setProductsError(true))
-      .finally(() => setProductsLoading(false))
-  }, [token, tenantId])
-
   // Disponibilidad por sucursal: solo MANAGER. branchId se resuelve del token.
+  // Sigue siendo local: es específica de la sucursal del MANAGER, no es global.
   const loadAvailability = useCallback(() => {
     if (role !== 'MANAGER' || !token || branchId == null) return
     fetchBranchMenu(branchId, token)
@@ -108,14 +85,6 @@ export default function Menu() {
       })
       .catch(() => setAvailableMenuIds(new Set()))
   }, [role, token, branchId])
-
-  useEffect(() => {
-    loadCategories()
-  }, [loadCategories])
-
-  useEffect(() => {
-    loadProducts()
-  }, [loadProducts])
 
   useEffect(() => {
     loadAvailability()
@@ -167,7 +136,7 @@ export default function Menu() {
     try {
       await deleteCategory(confirm.id, token)
       setConfirm(null)
-      loadCategories()
+      reloadCategories()
     } catch (err) {
       setConfirmError(err?.message ?? 'No se pudo eliminar la categoría.')
     } finally {
@@ -233,9 +202,9 @@ export default function Menu() {
     try {
       await deleteProduct(productConfirm.id, token)
       setProductConfirm(null)
-      loadProducts()
+      reloadProducts()
       // El borrado afecta el productCount de la categoría.
-      loadCategories()
+      reloadCategories()
     } catch (err) {
       setProductConfirmError(err?.message ?? 'No se pudo eliminar el producto.')
     } finally {
@@ -268,12 +237,8 @@ export default function Menu() {
               )}
             </div>
 
-            {loading ? (
+            {loadingCatalog ? (
               <div className="config-state-center"><div className="config-spinner" /></div>
-            ) : error ? (
-              <div className="config-state-center">
-                <p className="config-state-error">No se pudieron cargar las categorías.</p>
-              </div>
             ) : categories.length === 0 ? (
               <div className="config-state-center">
                 <p className="config-empty">Aún no hay categorías cargadas.</p>
@@ -335,12 +300,8 @@ export default function Menu() {
               )}
             </div>
 
-            {productsLoading ? (
+            {loadingCatalog ? (
               <div className="config-state-center"><div className="config-spinner" /></div>
-            ) : productsError ? (
-              <div className="config-state-center">
-                <p className="config-state-error">No se pudieron cargar los productos.</p>
-              </div>
             ) : productGroups.length === 0 ? (
               <div className="config-state-center">
                 <p className="config-empty">Aún no hay productos cargados.</p>
@@ -437,7 +398,7 @@ export default function Menu() {
           mode={drawer.mode}
           category={drawer.category}
           onClose={() => setDrawer(null)}
-          onSaved={loadCategories}
+          onSaved={reloadCategories}
         />
       )}
 
@@ -507,7 +468,7 @@ export default function Menu() {
           product={productDrawer.product}
           categories={categories}
           onClose={() => setProductDrawer(null)}
-          onSaved={() => { loadProducts(); loadCategories() }}
+          onSaved={() => { reloadProducts(); reloadCategories() }}
         />
       )}
 

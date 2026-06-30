@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import useShiftSummary from '../hooks/useShiftSummary'
 import { useShift } from '../context/ShiftContext'
 import { useOrdersContext } from '../context/OrdersContext'
 import useOperatorMessages from '../hooks/useOperatorMessages'
@@ -167,8 +166,10 @@ function SummaryContent({ state }) {
 }
 
 export default function Summary() {
-  const { state, loading, error } = useShiftSummary()
-  const { shift, closeShift } = useShift()
+  // El resumen vive en ShiftProvider: persiste entre navegaciones, por lo que al
+  // volver a esta pestaña los datos se muestran de inmediato sin spinner.
+  const { shift, closeShift, summary } = useShift()
+  const { state, loading, error } = summary
   const { orders, clearOrders } = useOrdersContext()
   const { addMessage } = useOperatorMessages()
 
@@ -181,8 +182,9 @@ export default function Summary() {
     setCloseError(null)
     try {
       // Reutiliza la lógica compartida de cierre. Al resolver, el turno compartido
-      // pasa a null: el sub-header se actualiza y useShiftSummary recarga solo,
-      // reemplazando las métricas en vivo por el último turno cerrado (o empty state).
+      // pasa a null: el sub-header se actualiza y el resumen del ShiftProvider
+      // recarga solo (cambia openedAt), reemplazando las métricas en vivo por el
+      // último turno cerrado (o empty state).
       await closeShift()
       setConfirmOpen(false)
     } catch (err) {

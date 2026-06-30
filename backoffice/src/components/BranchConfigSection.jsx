@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import useAuth from '../hooks/useAuth'
-import { fetchBackofficeBranches, updateBranchConfig } from '../services/branchService'
+import { updateBranchConfig } from '../services/branchService'
+import { useCatalog } from '../context/CatalogContext'
 import BranchScheduleEditor from './BranchScheduleEditor'
 
 function ChevronIcon() {
@@ -19,30 +20,24 @@ function minutesToHours(minutes) {
 }
 
 export default function BranchConfigSection() {
-  const { token, tenantId } = useAuth()
+  const { token } = useAuth()
+  // Sucursales desde el catálogo global cacheado (US-14-F-05).
+  const { branches, loadingCatalog, reloadBranches } = useCatalog()
 
   const [rows, setRows] = useState([])      // { id, name, hours, original, status, error }
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
   const [expanded, setExpanded] = useState({})  // { [branchId]: bool } — horarios desplegados
   const timersRef = useRef({})
 
-  const load = useCallback(() => {
-    if (!token) return
-    setLoading(true)
-    setError(false)
-    fetchBackofficeBranches(token, tenantId)
-      .then(list => {
-        setRows(list.map(b => {
-          const hours = minutesToHours(b.maxShiftDurationMinutes)
-          return { id: b.id, name: b.name, hours, original: hours, status: 'idle', error: null }
-        }))
-      })
-      .catch(() => setError(true))
-      .finally(() => setLoading(false))
-  }, [token, tenantId])
-
-  useEffect(() => { load() }, [load])
+  // Deriva las filas editables desde el catálogo, preservando ediciones en curso
+  // y el feedback de guardado: solo refresca el baseline `original` y el nombre.
+  useEffect(() => {
+    setRows(prev => branches.map(b => {
+      const hours = minutesToHours(b.maxShiftDurationMinutes)
+      const existing = prev.find(r => r.id === b.id)
+      if (existing) return { ...existing, name: b.name, original: hours }
+      return { id: b.id, name: b.name, hours, original: hours, status: 'idle', error: null }
+    }))
+  }, [branches])
 
   // Limpia timeouts de feedback al desmontar.
   useEffect(() => {
@@ -73,6 +68,8 @@ export default function BranchConfigSection() {
       const updated = await updateBranchConfig(row.id, minutes, token)
       const hours = minutesToHours(updated.maxShiftDurationMinutes)
       patchRow(row.id, { hours, original: hours, status: 'saved', error: null })
+      // Refresca el catálogo global; el merge en el effect preserva el feedback.
+      reloadBranches()
       timersRef.current[row.id] = setTimeout(() => patchRow(row.id, { status: 'idle' }), 2500)
     } catch (err) {
       patchRow(row.id, { status: 'error', error: err?.message ?? 'No se pudo guardar.' })
@@ -88,12 +85,8 @@ export default function BranchConfigSection() {
         </div>
       </div>
 
-      {loading ? (
+      {loadingCatalog || (branches.length > 0 && rows.length === 0) ? (
         <div className="config-state-center"><div className="config-spinner" /></div>
-      ) : error ? (
-        <div className="config-state-center">
-          <p className="config-state-error">No se pudieron cargar las sucursales.</p>
-        </div>
       ) : rows.length === 0 ? (
         <div className="config-state-center">
           <p className="config-empty">No hay sucursales para configurar.</p>

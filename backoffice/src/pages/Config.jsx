@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Navigate } from 'react-router-dom'
 import useAuth from '../hooks/useAuth'
 import { fetchStaffUsers, setStaffUserStatus } from '../services/staffService'
-import { fetchBranches } from '../services/branchService'
+import { useCatalog } from '../context/CatalogContext'
 import StaffUserDrawer from '../components/StaffUserDrawer'
 import ResetPasswordModal from '../components/ResetPasswordModal'
 import BranchConfigSection from '../components/BranchConfigSection'
@@ -32,8 +32,11 @@ function ChevronIcon() {
 export default function Config() {
   const { token, role, userId } = useAuth()
 
+  // Sucursales desde el catálogo global cacheado (US-14-F-05) — antes se
+  // fetcheaban acá y en BranchConfigSection por separado; ahora unificadas.
+  const { branches } = useCatalog()
+
   const [staff, setStaff] = useState([])
-  const [branches, setBranches] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
 
@@ -58,11 +61,6 @@ export default function Config() {
   useEffect(() => {
     loadStaff()
   }, [loadStaff])
-
-  useEffect(() => {
-    if (!token) return
-    fetchBranches(token).then(setBranches).catch(() => setBranches([]))
-  }, [token])
 
   // ADMIN únicamente — guard sincrónico.
   if (role && role !== 'ADMIN') return <Navigate to="/orders" replace />
