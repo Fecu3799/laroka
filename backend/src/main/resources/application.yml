@@ -1,6 +1,13 @@
 spring:
   application:
     name: laroka-backend
+  servlet:
+    multipart:
+      # Límite de la capa de parsing multipart. Se alinea con MAX_UPLOAD_SIZE_MB
+      # para que la validación de negocio (US-15-01) sea la autoridad; si igual se
+      # excede a nivel transporte, MaxUploadSizeExceededException retorna 400.
+      max-file-size: ${MAX_UPLOAD_SIZE_MB:5}MB
+      max-request-size: ${MAX_UPLOAD_SIZE_MB:5}MB
   datasource:
     url: ${DB_URL}
     username: ${DB_USER}
@@ -69,6 +76,14 @@ r2:
   secret-key: ${R2_SECRET_KEY:}
   bucket-name: ${R2_BUCKET_NAME:laroka-dev}
   endpoint: ${R2_ENDPOINT:}
+  # Base de la URL pública del bucket (ej: https://<hash>.r2.dev o dominio
+  # custom). Es distinta del endpoint S3 de escritura. La URL retornada por el
+  # upload se construye como ${r2.public-url}/{tenantId}/{uuid}.{ext}.
+  public-url: ${R2_PUBLIC_URL:}
+
+media:
+  # Tamaño máximo de imagen permitido en el endpoint de upload (US-15-01).
+  max-upload-size-mb: ${MAX_UPLOAD_SIZE_MB:5}
 
 rate:
   limit:

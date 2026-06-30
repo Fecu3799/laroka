@@ -17,11 +17,15 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.context.request.async.AsyncRequestTimeoutException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 
 import com.laroka.backend.auth.exception.InvalidCredentialsException;
 import com.laroka.backend.auth.exception.RefreshTokenInvalidException;
+import com.laroka.backend.media.exception.InvalidFileException;
+import com.laroka.backend.media.exception.StorageException;
 
 @Slf4j
 @ControllerAdvice
@@ -56,6 +60,32 @@ public class GlobalExceptionHandler {
 			BusinessException ex, HttpServletRequest request) {
 		log.warn("BusinessException en {} {}: {}", request.getMethod(), request.getRequestURI(), ex.getMessage());
 		return buildResponse(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage(), null, request);
+	}
+
+	@ExceptionHandler(InvalidFileException.class)
+	public ResponseEntity<Map<String, Object>> handleInvalidFile(
+			InvalidFileException ex, HttpServletRequest request) {
+		return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), null, request);
+	}
+
+	@ExceptionHandler(MaxUploadSizeExceededException.class)
+	public ResponseEntity<Map<String, Object>> handleMaxUploadSize(
+			MaxUploadSizeExceededException ex, HttpServletRequest request) {
+		return buildResponse(HttpStatus.BAD_REQUEST, "El archivo excede el tamaño máximo permitido", null, request);
+	}
+
+	@ExceptionHandler(MissingServletRequestPartException.class)
+	public ResponseEntity<Map<String, Object>> handleMissingPart(
+			MissingServletRequestPartException ex, HttpServletRequest request) {
+		String message = "Falta la parte requerida: " + ex.getRequestPartName();
+		return buildResponse(HttpStatus.BAD_REQUEST, message, null, request);
+	}
+
+	@ExceptionHandler(StorageException.class)
+	public ResponseEntity<Map<String, Object>> handleStorage(
+			StorageException ex, HttpServletRequest request) {
+		log.error("Fallo de almacenamiento en {} {}", request.getMethod(), request.getRequestURI(), ex);
+		return buildResponse(HttpStatus.BAD_GATEWAY, "Error al procesar el archivo", null, request);
 	}
 
 	@ExceptionHandler(MethodArgumentNotValidException.class)
