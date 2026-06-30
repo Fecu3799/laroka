@@ -16,4 +16,10 @@ public class BranchConfigRequestDTO {
 	@NotNull(message = "maxShiftDurationMinutes is required")
 	@Min(value = 1, message = "maxShiftDurationMinutes must be at least 1")
 	private Integer maxShiftDurationMinutes;
+
+	// US-15-02: campos opcionales del patch parcial. Si llegan null se omiten y
+	// no se pisan los valores existentes en DB.
+	private String address;
+
+	private String phone;
 }

@@ -174,6 +174,46 @@ class BranchServiceTest {
 			.isInstanceOf(BranchNotFoundException.class);
 	}
 
+	// --- US-15-02: updateConfig (maxShiftDurationMinutes + address/phone patch parcial) ---
+
+	@Test
+	void updateConfig_updatesAddressAndPhone() {
+		Branch existing = branch(tenant());
+		when(branchRepository.existsByIdAndTenantId(1, 1)).thenReturn(true);
+		when(branchRepository.findById(1)).thenReturn(Optional.of(existing));
+		when(branchRepository.save(any(Branch.class))).thenAnswer(inv -> inv.getArgument(0));
+
+		Branch result = service.updateConfig(1, 1, 480, "Nueva Dirección 999", "+542804999999");
+
+		assertThat(result.getAddress()).isEqualTo("Nueva Dirección 999");
+		assertThat(result.getPhone()).isEqualTo("+542804999999");
+		assertThat(result.getMaxShiftDurationMinutes()).isEqualTo(480);
+		verify(branchRepository).save(existing);
+	}
+
+	@Test
+	void updateConfig_nullAddressAndPhone_keepsExistingValues() {
+		Branch existing = branch(tenant()); // address "Av. Principal 123", phone "+542804123456"
+		when(branchRepository.existsByIdAndTenantId(1, 1)).thenReturn(true);
+		when(branchRepository.findById(1)).thenReturn(Optional.of(existing));
+		when(branchRepository.save(any(Branch.class))).thenAnswer(inv -> inv.getArgument(0));
+
+		Branch result = service.updateConfig(1, 1, 480, null, null);
+
+		assertThat(result.getAddress()).isEqualTo("Av. Principal 123");
+		assertThat(result.getPhone()).isEqualTo("+542804123456");
+		assertThat(result.getMaxShiftDurationMinutes()).isEqualTo(480);
+	}
+
+	@Test
+	void updateConfig_otherTenant_throws403() {
+		when(branchRepository.existsByIdAndTenantId(1, 99)).thenReturn(false);
+
+		assertThatThrownBy(() -> service.updateConfig(1, 99, 480, "x", "y"))
+			.isInstanceOf(ResponseStatusException.class)
+			.satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
+	}
+
 	// --- US-13-07: schedule por sucursal (ADMIN) ---
 
 	private BranchSchedule dayInput(WeekDay day, boolean active, LocalTime o1, LocalTime c1, LocalTime o2, LocalTime c2) {

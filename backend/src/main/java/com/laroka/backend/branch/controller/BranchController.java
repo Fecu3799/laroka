@@ -109,7 +109,8 @@ public class BranchController {
 			@PathVariable Integer id,
 			@Valid @RequestBody BranchConfigRequestDTO dto,
 			@AuthenticationPrincipal CustomUserDetails principal) {
-		Branch updated = service.updateConfig(id, principal.getTenantId(), dto.getMaxShiftDurationMinutes());
+		Branch updated = service.updateConfig(id, principal.getTenantId(), dto.getMaxShiftDurationMinutes(),
+				dto.getAddress(), dto.getPhone());
 		return ResponseEntity.ok(mapper.toResponseDTO(updated));
 	}
 

@@ -70,12 +70,22 @@ public class BranchService {
 		repository.delete(findById(id));
 	}
 
-	public Branch updateConfig(Integer id, Integer tenantId, Integer maxShiftDurationMinutes) {
+	public Branch updateConfig(Integer id, Integer tenantId, Integer maxShiftDurationMinutes,
+			String address, String phone) {
 		if (!repository.existsByIdAndTenantId(id, tenantId)) {
 			throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Branch does not belong to your tenant");
 		}
 		Branch branch = findById(id);
 		branch.setMaxShiftDurationMinutes(maxShiftDurationMinutes);
+		// US-15-02: patch parcial — solo se actualizan address/phone si vienen en el
+		// body. Un null significa "omitido" y conserva el valor existente (las
+		// columnas son NOT NULL, así que nunca deben pisarse con null).
+		if (address != null) {
+			branch.setAddress(address);
+		}
+		if (phone != null) {
+			branch.setPhone(phone);
+		}
 		repository.save(branch);
 		// save() (merge) puede devolver el branch con el tenant como proxy lazy sin
 		// inicializar; releemos con findById (que trae el tenant vía @EntityGraph)
