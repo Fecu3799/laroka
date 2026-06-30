@@ -9,6 +9,7 @@ import { Toast } from './Toast'
 import { OrdersProvider } from '../context/OrdersContext'
 import { ShiftProvider } from '../context/ShiftContext'
 import { OperatorMessagesProvider } from '../context/OperatorMessagesContext'
+import { CatalogProvider } from '../context/CatalogContext'
 import './Layout.css'
 
 const API_URL = import.meta.env.VITE_API_URL ?? ''
@@ -271,9 +272,11 @@ export default function Layout() {
             <SubHeader />
 
             <main className="layout-main">
-              <OrdersProvider setOpenOrderId={setOpenOrderId}>
-                <Outlet context={{ newOrderCount, cancelCount, resetCounts, setOpenOrderId }} />
-              </OrdersProvider>
+              <CatalogProvider>
+                <OrdersProvider setOpenOrderId={setOpenOrderId}>
+                  <Outlet context={{ newOrderCount, cancelCount, resetCounts, setOpenOrderId }} />
+                </OrdersProvider>
+              </CatalogProvider>
             </main>
           </OperatorMessagesProvider>
         </ShiftProvider>

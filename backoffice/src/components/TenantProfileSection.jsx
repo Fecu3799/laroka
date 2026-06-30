@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import useAuth from '../hooks/useAuth'
-import { fetchTenantProfile, saveTenantProfile } from '../services/tenantService'
+import { saveTenantProfile } from '../services/tenantService'
+import { useCatalog } from '../context/CatalogContext'
 
 const EMPTY = {
   businessName: '',
@@ -25,26 +26,16 @@ function toForm(profile) {
 
 export default function TenantProfileSection() {
   const { token } = useAuth()
+  // Perfil del tenant desde el catálogo global cacheado (US-14-F-05).
+  const { tenantProfile, loadingCatalog, reloadTenantProfile } = useCatalog()
 
   const [form, setForm] = useState(EMPTY)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
   const [status, setStatus] = useState('idle')   // idle | saving | saved | error
   const [saveError, setSaveError] = useState(null)
   const timerRef = useRef(null)
 
-  const load = useCallback(() => {
-    if (!token) return
-    setLoading(true)
-    setError(false)
-    // 404 → null: formulario vacío listo para crear, no es error.
-    fetchTenantProfile(token)
-      .then(profile => setForm(toForm(profile)))
-      .catch(() => setError(true))
-      .finally(() => setLoading(false))
-  }, [token])
-
-  useEffect(() => { load() }, [load])
+  // Seedea el formulario desde el perfil cacheado (404 → null → formulario vacío).
+  useEffect(() => { setForm(toForm(tenantProfile)) }, [tenantProfile])
 
   useEffect(() => () => clearTimeout(timerRef.current), [])
 
@@ -73,6 +64,8 @@ export default function TenantProfileSection() {
       }
       const saved = await saveTenantProfile(payload, token)
       setForm(toForm(saved))
+      // Refresca el perfil en el catálogo global.
+      reloadTenantProfile()
       setStatus('saved')
       timerRef.current = setTimeout(() => setStatus('idle'), 2500)
     } catch (err) {
@@ -92,12 +85,8 @@ export default function TenantProfileSection() {
         </div>
       </div>
 
-      {loading ? (
+      {loadingCatalog ? (
         <div className="config-state-center"><div className="config-spinner" /></div>
-      ) : error ? (
-        <div className="config-state-center">
-          <p className="config-state-error">No se pudo cargar el perfil.</p>
-        </div>
       ) : (
         <div className="config-profile-form">
           <div className="config-profile-field">
