@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import useAuth from '../hooks/useAuth'
 import { updateBranchConfig } from '../services/branchService'
-import { useCatalog } from '../context/CatalogContext'
+import { useConfig } from '../context/ConfigContext'
 import BranchScheduleEditor from './BranchScheduleEditor'
 
 function ChevronIcon() {
@@ -22,7 +22,7 @@ function minutesToHours(minutes) {
 export default function BranchConfigSection() {
   const { token } = useAuth()
   // Sucursales desde el catálogo global cacheado (US-14-F-05).
-  const { branches, loadingCatalog, reloadBranches } = useCatalog()
+  const { branches, loadingCatalog, reloadBranches } = useConfig()
 
   const [rows, setRows] = useState([])      // { id, name, hours, original, status, error }
   const [expanded, setExpanded] = useState({})  // { [branchId]: bool } — horarios desplegados

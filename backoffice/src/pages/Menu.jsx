@@ -7,7 +7,7 @@ import {
   fetchBranchMenu,
   updateProductAvailability,
 } from '../services/catalogService'
-import { useCatalog } from '../context/CatalogContext'
+import { useConfig } from '../context/ConfigContext'
 import { formatCurrency } from '../utils/shiftsUtils'
 import CategoryDrawer from '../components/CategoryDrawer'
 import ProductDrawer from '../components/ProductDrawer'
@@ -49,8 +49,8 @@ export default function Menu() {
   const isManager = role === 'MANAGER'
 
   // Catálogo global cacheado (US-14-F-05): categorías y productos vienen del
-  // CatalogProvider; las mutaciones invalidan vía reloadCategories/reloadProducts.
-  const { categories, products, loadingCatalog, reloadCategories, reloadProducts } = useCatalog()
+  // ConfigProvider; las mutaciones invalidan vía reloadCategories/reloadProducts.
+  const { categories, products, loadingCatalog, reloadCategories, reloadProducts } = useConfig()
 
   const [menuId, setMenuId] = useState(null)
   const [drawer, setDrawer] = useState(null)        // { mode, category } | null

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Navigate } from 'react-router-dom'
 import useAuth from '../hooks/useAuth'
 import { fetchStaffUsers, setStaffUserStatus } from '../services/staffService'
-import { useCatalog } from '../context/CatalogContext'
+import { useConfig } from '../context/ConfigContext'
 import StaffUserDrawer from '../components/StaffUserDrawer'
 import ResetPasswordModal from '../components/ResetPasswordModal'
 import BranchConfigSection from '../components/BranchConfigSection'
@@ -34,7 +34,7 @@ export default function Config() {
 
   // Sucursales desde el catálogo global cacheado (US-14-F-05) — antes se
   // fetcheaban acá y en BranchConfigSection por separado; ahora unificadas.
-  const { branches } = useCatalog()
+  const { branches } = useConfig()
 
   const [staff, setStaff] = useState([])
   const [loading, setLoading] = useState(true)

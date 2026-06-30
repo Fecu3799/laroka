@@ -4,12 +4,12 @@ import { fetchCategories, fetchProducts } from '../services/catalogService'
 import { fetchBackofficeBranches } from '../services/branchService'
 import { fetchTenantProfile } from '../services/tenantService'
 
-const CatalogContext = createContext(null)
+const ConfigContext = createContext(null)
 
 // eslint-disable-next-line react-refresh/only-export-components
-export function useCatalog() {
-  const ctx = useContext(CatalogContext)
-  if (!ctx) throw new Error('useCatalog debe usarse dentro de <CatalogProvider>')
+export function useConfig() {
+  const ctx = useContext(ConfigContext)
+  if (!ctx) throw new Error('useConfig debe usarse dentro de <ConfigProvider>')
   return ctx
 }
 
@@ -22,7 +22,7 @@ export function useCatalog() {
 //   - categorías y productos → ADMIN y MANAGER (pestaña Menú)
 //   - sucursales y perfil del tenant → solo ADMIN (pestaña CONFIG)
 // STAFF no consume ninguno: no carga nada.
-export function CatalogProvider({ children }) {
+export function ConfigProvider({ children }) {
   const { token, role, tenantId } = useAuth()
 
   const [categories, setCategories] = useState([])
@@ -89,5 +89,5 @@ export function CatalogProvider({ children }) {
     reloadTenantProfile,
   }
 
-  return <CatalogContext.Provider value={value}>{children}</CatalogContext.Provider>
+  return <ConfigContext.Provider value={value}>{children}</ConfigContext.Provider>
 }
