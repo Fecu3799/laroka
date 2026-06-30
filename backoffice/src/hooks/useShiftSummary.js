@@ -1,36 +1,37 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import useAuth from './useAuth'
 import useBranch from './useBranch'
-import { useShift } from '../context/ShiftContext'
 import {
   getCurrentShift,
   getCurrentShiftSummary,
   getShiftHistory,
 } from '../services/shiftsService'
 
-const REFRESH_MS = 60_000
-
 // Tres estados posibles:
-//   'active' → turno abierto, summary calculado en vivo (refresca cada 60s)
+//   'active' → turno abierto, summary calculado en vivo
 //   'closed' → sin turno activo, muestra el último turno cerrado
 //   'empty'  → no hay ningún turno registrado
 //
 // Nota: usamos el flag `active` de GET /shifts/current como discriminador en
 // lugar del 404 de /current/summary, porque apiFetch dispara un toast de error
 // ante cualquier 4xx — un 404 esperado ensuciaría la UX con un falso error.
-export default function useShiftSummary() {
+//
+// Este hook se instancia una única vez en ShiftProvider (no en la página), por
+// lo que el estado del resumen sobrevive a la navegación entre pestañas. No hace
+// polling: el resumen solo recarga (1) al montar o al cambiar de turno —cambia
+// `activeShiftKey`—, (2) al recibir un evento SSE ORDER_UPDATED con status
+// DELIVERED o CANCELLED, que son los únicos que modifican las métricas.
+//
+// `activeShiftKey` es el openedAt del turno compartido (o null). Se recibe por
+// parámetro —en vez de leer useShift() acá— porque el provider que expone el
+// turno es el mismo que instancia este hook.
+export default function useShiftSummary(activeShiftKey) {
   const { token } = useAuth()
   const { activeBranchId } = useBranch()
-  // Estado de turno compartido: cuando pasa de activo a null (cierre) o null a
-  // activo (apertura), volvemos a evaluar qué mostrar.
-  const { shift } = useShift()
 
   const [state, setState] = useState(null) // { mode, label, openedAt, openedBy, closedAt, summary }
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
-
-  // Mantiene el modo actual accesible dentro del intervalo sin recrearlo.
-  const modeRef = useRef(null)
 
   const load = useCallback(async ({ silent = false } = {}) => {
     if (!token || activeBranchId == null) {
@@ -52,7 +53,6 @@ export default function useShiftSummary() {
           closedAt: null,
           summary,
         })
-        modeRef.current = 'active'
         return
       }
 
@@ -60,7 +60,6 @@ export default function useShiftSummary() {
       const last = history?.content?.[0]
       if (!last) {
         setState({ mode: 'empty' })
-        modeRef.current = 'empty'
         return
       }
       setState({
@@ -71,7 +70,6 @@ export default function useShiftSummary() {
         closedAt: last.closedAt,
         summary: last.summary,
       })
-      modeRef.current = 'closed'
     } catch {
       // apiFetch ya muestra el toast correspondiente.
       setError(true)
@@ -81,18 +79,18 @@ export default function useShiftSummary() {
   }, [token, activeBranchId])
 
   // Carga inicial, al cambiar de sucursal y cada vez que el turno compartido se
-  // abre o se cierra (transición null ↔ activo). Así, al cerrar el turno desde
-  // esta pantalla, las métricas en vivo se reemplazan por el último turno cerrado
-  // —o por el empty state si no hay historial.
-  const activeShiftKey = shift?.openedAt ?? null
+  // abre o se cierra (transición null ↔ activo). Así, al cerrar el turno, las
+  // métricas en vivo se reemplazan por el último turno cerrado —o por el empty
+  // state si no hay historial.
   useEffect(() => { load() }, [load, activeShiftKey])
 
-  // Refresco automático cada 60s mientras haya un turno activo.
+  // Recarga silenciosa cuando un pedido se entrega o cancela. El evento lo emite
+  // Layout.jsx al procesar el SSE ORDER_UPDATED con status DELIVERED/CANCELLED.
+  // Silenciosa: la pantalla muestra los datos previos sin spinner mientras tanto.
   useEffect(() => {
-    const id = setInterval(() => {
-      if (modeRef.current === 'active') load({ silent: true })
-    }, REFRESH_MS)
-    return () => clearInterval(id)
+    function handle() { load({ silent: true }) }
+    window.addEventListener('laroka:shift-summary-stale', handle)
+    return () => window.removeEventListener('laroka:shift-summary-stale', handle)
   }, [load])
 
   return { state, loading, error, refresh: load }

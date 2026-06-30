@@ -153,6 +153,13 @@ export default function Layout() {
                   if (json.type === 'SHIFT_AUTO_CLOSED') {
                     window.dispatchEvent(new CustomEvent('laroka:shift-auto-closed'))
                   }
+                  // Entrega/cancelación de un pedido: son los únicos eventos que
+                  // alteran las métricas del turno. Avisamos al resumen (vive en
+                  // ShiftProvider) para que recargue en silencio.
+                  if (json.type === 'ORDER_UPDATED' &&
+                      (json.order?.status === 'DELIVERED' || json.order?.status === 'CANCELLED')) {
+                    window.dispatchEvent(new CustomEvent('laroka:shift-summary-stale'))
+                  }
                 } catch { /* noop */ }
               }
             }
