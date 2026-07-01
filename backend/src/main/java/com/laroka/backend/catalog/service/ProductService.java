@@ -62,6 +62,10 @@ public class ProductService {
 		return repository.findAll();
 	}
 
+	// @Transactional: el producto y sus branch_product se persisten atómicamente. Si
+	// falla la generación de branch_product, se hace rollback también del producto en
+	// vez de dejar un producto sin sus branch_product correspondientes.
+	@Transactional
 	public Product create(Product product) {
 		Category category = validateCategoryExists(product.getCategory().getId());
 		Tenant tenant = validateTenantExists(product.getTenant().getId());
@@ -130,7 +134,12 @@ public class ProductService {
 	// branch y product cargados para resolver branchName y precio efectivo en el mapper.
 	public List<BranchProduct> getBranchProductConfig(Integer productId) {
 		findById(productId);
-		return branchProductRepository.findConfigByProductId(productId);
+		// US-15-06: se excluyen las sucursales inactivas de la config por sucursal. El
+		// BranchProduct NO se borra ni modifica: sigue en DB con su priceOverride/available;
+		// al reactivar la sucursal reaparece con esos mismos valores (solo se filtra al leer).
+		return branchProductRepository.findConfigByProductId(productId).stream()
+			.filter(bp -> bp.getBranch().isActive())
+			.toList();
 	}
 
 	@CacheEvict(value = "menu", key = "#branchId")
@@ -138,6 +147,14 @@ public class ProductService {
 			Boolean available) {
 		if (branchId == null) {
 			throw new BusinessException("Branch ID is required to update branch product config");
+		}
+		// US-15-06: guard de escritura. No se permite modificar la config de un producto
+		// para una sucursal desactivada (el GET ya la excluye; esto cierra el acceso directo
+		// vía API). La branch se carga aparte porque bp.getBranch() es lazy y open-in-view=false.
+		Branch branch = branchRepository.findById(branchId)
+			.orElseThrow(() -> new BranchNotFoundException(branchId));
+		if (!branch.isActive()) {
+			throw new BusinessException("No se puede modificar la configuración de una sucursal desactivada");
 		}
 		BranchProduct branchProduct = branchProductRepository.findByBranchIdAndProductId(branchId, productId)
 			.orElseThrow(() -> new BranchProductNotFoundException(branchId, productId));

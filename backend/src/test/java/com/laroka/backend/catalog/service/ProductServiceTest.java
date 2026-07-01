@@ -374,6 +374,48 @@ class ProductServiceTest {
 			.isInstanceOf(ProductNotFoundException.class);
 	}
 
+	// US-15-06: la config por sucursal excluye sucursales inactivas sin tocar el BranchProduct.
+
+	@Test
+	void getBranchProductConfig_excludesInactiveBranches() {
+		Tenant p = tenant();
+		Product product = product(category(p), p);
+		Branch active = Branch.builder().id(1).name("Playa Unión").tenant(p).active(true).build();
+		Branch inactive = Branch.builder().id(2).name("Trelew").tenant(p).active(false).build();
+		BranchProduct bpActive = branchProduct(active, product, new BigDecimal("3100.00"));
+		BranchProduct bpInactive = branchProduct(inactive, product, new BigDecimal("9999.00"));
+		when(productRepository.findById(1)).thenReturn(Optional.of(product));
+		when(branchProductRepository.findConfigByProductId(1)).thenReturn(List.of(bpActive, bpInactive));
+
+		List<BranchProduct> result = service.getBranchProductConfig(1);
+
+		assertThat(result).hasSize(1);
+		assertThat(result.get(0).getBranch().getId()).isEqualTo(1);
+	}
+
+	@Test
+	void getBranchProductConfig_reactivatedBranch_reappearsWithPreviousValues() {
+		Tenant p = tenant();
+		Product product = product(category(p), p);
+		Branch branch = Branch.builder().id(2).name("Trelew").tenant(p).active(false).build();
+		// BranchProduct con valores propios; nunca se modifica al filtrar.
+		BranchProduct bp = branchProduct(branch, product, new BigDecimal("4200.00"));
+		bp.setAvailable(false);
+		when(productRepository.findById(1)).thenReturn(Optional.of(product));
+		when(branchProductRepository.findConfigByProductId(1)).thenReturn(List.of(bp));
+
+		// Sucursal inactiva → no aparece.
+		assertThat(service.getBranchProductConfig(1)).isEmpty();
+
+		// Se reactiva la sucursal (el mismo BranchProduct, sin resetear valores).
+		branch.setActive(true);
+
+		List<BranchProduct> result = service.getBranchProductConfig(1);
+		assertThat(result).hasSize(1);
+		assertThat(result.get(0).getPriceOverride()).isEqualByComparingTo("4200.00");
+		assertThat(result.get(0).getAvailable()).isFalse();
+	}
+
 	// --- updateBranchConfig ---
 
 	@Test
@@ -382,6 +424,7 @@ class ProductServiceTest {
 		Branch b = branch(p);
 		Product product = product(category(p), p);
 		BranchProduct bp = branchProduct(b, product, new BigDecimal("3100.00"));
+		when(branchRepository.findById(1)).thenReturn(Optional.of(b));
 		when(branchProductRepository.findByBranchIdAndProductId(1, 1)).thenReturn(Optional.of(bp));
 		when(branchProductRepository.save(any(BranchProduct.class))).thenReturn(bp);
 
@@ -397,6 +440,7 @@ class ProductServiceTest {
 		Branch b = branch(p);
 		Product product = product(category(p), p);
 		BranchProduct bp = branchProduct(b, product, null);
+		when(branchRepository.findById(1)).thenReturn(Optional.of(b));
 		when(branchProductRepository.findByBranchIdAndProductId(1, 1)).thenReturn(Optional.of(bp));
 		when(branchProductRepository.save(any(BranchProduct.class))).thenReturn(bp);
 
@@ -408,10 +452,23 @@ class ProductServiceTest {
 
 	@Test
 	void updateBranchConfig_productNotInBranch_throwsBranchProductNotFoundException() {
+		when(branchRepository.findById(1)).thenReturn(Optional.of(branch(tenant())));
 		when(branchProductRepository.findByBranchIdAndProductId(1, 99)).thenReturn(Optional.empty());
 
 		assertThatThrownBy(() -> service.updateBranchConfig(99, 1, null, null))
 			.isInstanceOf(BranchProductNotFoundException.class);
+	}
+
+	@Test
+	void updateBranchConfig_inactiveBranch_rejectsUpdate() {
+		// US-15-06: guard de escritura — una sucursal desactivada no puede modificarse
+		// vía API directa aunque el frontend la oculte.
+		Branch inactive = Branch.builder().id(1).name("Trelew").tenant(tenant()).active(false).build();
+		when(branchRepository.findById(1)).thenReturn(Optional.of(inactive));
+
+		assertThatThrownBy(() -> service.updateBranchConfig(1, 1, new BigDecimal("3300.00"), true))
+			.isInstanceOf(BusinessException.class);
+		verify(branchProductRepository, never()).save(any());
 	}
 
 	// --- updatePrice ---
