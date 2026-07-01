@@ -20,6 +20,7 @@ public class BranchPublicDTO {
 	private BigDecimal serviceFee;
 	private Integer estimatedDeliveryMinutes;
 	private String phone;
+	private String imageUrl;
 	private boolean acceptingOrders;
 	private List<BranchScheduleDayResponseDTO> schedule;
 }

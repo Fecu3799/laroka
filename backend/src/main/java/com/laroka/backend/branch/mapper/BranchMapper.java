@@ -53,6 +53,7 @@ public class BranchMapper {
 			.serviceFee(branch.getServiceFee())
 			.estimatedDeliveryMinutes(branch.getEstimatedDeliveryMinutes())
 			.phone(branch.getPhone())
+			.imageUrl(branch.getImageUrl())
 			.acceptingOrders(branch.isAcceptingOrders())
 			.schedule(branchScheduleMapper.toWeekResponse(
 				branchScheduleRepository.findByBranchId(branch.getId())))

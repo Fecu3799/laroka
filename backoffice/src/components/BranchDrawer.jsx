@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import ReactDOM from 'react-dom'
 import useAuth from '../hooks/useAuth'
 import { createBranch, updateBranchConfig } from '../services/branchService'
+import ImageUploader from './ui/ImageUploader'
 import './StaffUserDrawer.css'
 
 // minutos → horas como string editable ('' si no hay valor cargado).
@@ -19,6 +20,7 @@ const EMPTY_FORM = {
   name: '',
   address: '',
   phone: '',
+  imageUrl: '',
   deliveryFee: '',
   serviceFee: '',
   estimatedDeliveryMinutes: '',
@@ -42,6 +44,7 @@ export default function BranchDrawer({ open, mode, branch, onClose, onSaved }) {
         name: branch.name ?? '',
         address: branch.address ?? '',
         phone: branch.phone ?? '',
+        imageUrl: branch.imageUrl ?? '',
         deliveryFee: numToStr(branch.deliveryFee),
         serviceFee: numToStr(branch.serviceFee),
         estimatedDeliveryMinutes: numToStr(branch.estimatedDeliveryMinutes),
@@ -89,6 +92,7 @@ export default function BranchDrawer({ open, mode, branch, onClose, onSaved }) {
           name: form.name.trim(),
           address: form.address.trim(),
           phone: form.phone.trim(),
+          imageUrl: form.imageUrl || null,
           deliveryFee: deliveryFeeNum,
           serviceFee: serviceFeeNum,
           estimatedDeliveryMinutes: etaNum,
@@ -98,6 +102,7 @@ export default function BranchDrawer({ open, mode, branch, onClose, onSaved }) {
           name: form.name.trim(),
           address: form.address.trim(),
           phone: form.phone.trim(),
+          imageUrl: form.imageUrl || null,
           deliveryFee: deliveryFeeNum,
           serviceFee: serviceFeeNum,
           estimatedDeliveryMinutes: etaNum,
@@ -165,6 +170,17 @@ export default function BranchDrawer({ open, mode, branch, onClose, onSaved }) {
               placeholder="+54 280 ..."
               value={form.phone}
               onChange={e => setField('phone', e.target.value)}
+            />
+          </div>
+
+          <div className="sud-field">
+            <ImageUploader
+              label="Imagen"
+              value={form.imageUrl || null}
+              onChange={url => setField('imageUrl', url)}
+              token={token}
+              aspectRatio={3.1}
+              helperText="Recomendado: imagen horizontal, tipo banner"
             />
           </div>
 

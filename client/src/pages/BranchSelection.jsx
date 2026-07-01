@@ -16,11 +16,21 @@ function getCityImage(name) {
   return null
 }
 
-function CityThumb({ index, name }) {
-  const result = getCityImage(name)
+function CityThumb({ index, name, imageUrl }) {
   const colorVars = ['--bg-card', '--bg-secondary', '--border']
   const colorVar = colorVars[index % colorVars.length]
 
+  // US-15-CF-04: si la sucursal cargó su propia imagen, se usa directamente.
+  if (imageUrl) {
+    return (
+      <div className="branch-city-thumb">
+        <img src={imageUrl} alt="" className="branch-city-img" aria-hidden="true" />
+      </div>
+    )
+  }
+
+  // Fallback (sin imagen propia): asset genérico por ciudad mapeado por nombre.
+  const result = getCityImage(name)
   if (result) {
     return (
       <div className="branch-city-thumb">
@@ -190,7 +200,7 @@ export function BranchSelection({ onSelect }) {
                   onPointerCancel={handlePointerCancel}
                   aria-label={`Seleccionar sucursal ${branch.name}`}
                 >
-                  <CityThumb index={index} name={branch.name} />
+                  <CityThumb index={index} name={branch.name} imageUrl={branch.imageUrl} />
                   <div className="branch-label">
                     <span className="branch-btn-name">{branch.name}</span>
                   </div>
