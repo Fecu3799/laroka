@@ -26,6 +26,7 @@ import com.laroka.backend.branch.dto.BranchRequestDTO;
 import com.laroka.backend.branch.dto.BranchResponseDTO;
 import com.laroka.backend.branch.dto.BranchScheduleDayRequestDTO;
 import com.laroka.backend.branch.dto.BranchScheduleDayResponseDTO;
+import com.laroka.backend.branch.dto.BranchStatusRequestDTO;
 import com.laroka.backend.branch.dto.QrConfigRequestDTO;
 import com.laroka.backend.branch.dto.QrConfigResponseDTO;
 import com.laroka.backend.branch.entity.Branch;
@@ -113,6 +114,19 @@ public class BranchController {
 				dto.getName(), dto.getAddress(), dto.getPhone(), dto.getImageUrl(), dto.getDeliveryFee(),
 				dto.getServiceFee(), dto.getEstimatedDeliveryMinutes());
 		return ResponseEntity.ok(mapper.toResponseDTO(updated));
+	}
+
+	@PatchMapping("/{id}/status")
+	@PreAuthorize("hasRole('ADMIN')")
+	@Operation(summary = "Set branch status",
+			description = "Activates or deactivates a branch (ADMIN only). Deactivating a branch with an open "
+					+ "work shift returns 400. Inactive branches are excluded from the public GET /branches.")
+	public ResponseEntity<Void> setStatus(
+			@PathVariable Integer id,
+			@Valid @RequestBody BranchStatusRequestDTO dto,
+			@AuthenticationPrincipal CustomUserDetails principal) {
+		service.setStatus(id, principal.getTenantId(), dto.getActive());
+		return ResponseEntity.ok().build();
 	}
 
 	@GetMapping("/{id}/schedule")

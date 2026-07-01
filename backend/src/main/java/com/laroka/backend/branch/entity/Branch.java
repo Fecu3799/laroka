@@ -58,6 +58,10 @@ public class Branch {
 	private boolean acceptingOrders;
 
 	@Builder.Default
+	@Column(name = "active", nullable = false)
+	private boolean active = true;
+
+	@Builder.Default
 	@Column(name = "max_shift_duration_minutes", nullable = false)
 	private Integer maxShiftDurationMinutes = 720;
 

@@ -50,6 +50,16 @@ export async function createBranch(payload, token) {
   return res.json()
 }
 
+// Activa/desactiva una sucursal (ADMIN, US-15-04). Al desactivar con un turno
+// abierto el backend responde 400; apiFetch propaga ese mensaje en err.message.
+export async function setBranchStatus(branchId, active, token) {
+  await apiFetch(`${API_URL}/backoffice/branches/${branchId}/status`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ active }),
+  })
+}
+
 // Horario semanal de una sucursal (ADMIN). Siempre 7 días (MON..SUN).
 export async function fetchBranchSchedule(branchId, token) {
   const res = await apiFetch(`${API_URL}/backoffice/branches/${branchId}/schedule`, {

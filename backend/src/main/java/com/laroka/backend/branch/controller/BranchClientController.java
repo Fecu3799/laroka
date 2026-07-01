@@ -36,7 +36,7 @@ public class BranchClientController {
 	@GetMapping
 	@Operation(summary = "Get branches by tenant", description = "Returns the branches that belong to the given tenant. The tenantId query param is required; omitting it returns 400.")
 	public ResponseEntity<List<BranchPublicDTO>> findAll(@RequestParam Integer tenantId) {
-		return ResponseEntity.ok(branchService.findByTenant(tenantId).stream().map(branchMapper::toPublicDTO).toList());
+		return ResponseEntity.ok(branchService.findActiveByTenant(tenantId).stream().map(branchMapper::toPublicDTO).toList());
 	}
 
 	@GetMapping("/{id}")

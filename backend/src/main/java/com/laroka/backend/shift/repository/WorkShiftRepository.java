@@ -18,6 +18,8 @@ public interface WorkShiftRepository extends JpaRepository<WorkShift, UUID> {
 
     Optional<WorkShift> findByBranchIdAndStatus(Integer branchId, ShiftStatus status);
 
+    boolean existsByBranchIdAndStatus(Integer branchId, ShiftStatus status);
+
     @Query("SELECT s FROM WorkShift s JOIN FETCH s.branch WHERE s.status = :status")
     List<WorkShift> findAllByStatusWithBranch(@Param("status") ShiftStatus status);
 

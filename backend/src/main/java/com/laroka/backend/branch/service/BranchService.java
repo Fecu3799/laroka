@@ -20,6 +20,8 @@ import com.laroka.backend.branch.repository.BranchQRRepository;
 import com.laroka.backend.branch.repository.BranchRepository;
 import com.laroka.backend.branch.repository.BranchScheduleOverrideRepository;
 import com.laroka.backend.branch.repository.BranchScheduleRepository;
+import com.laroka.backend.shift.entity.ShiftStatus;
+import com.laroka.backend.shift.repository.WorkShiftRepository;
 import com.laroka.backend.tenant.entity.Tenant;
 import com.laroka.backend.tenant.exception.TenantNotFoundException;
 import com.laroka.backend.tenant.repository.TenantRepository;
@@ -35,6 +37,7 @@ public class BranchService {
 	private final BranchQRRepository branchQrRepository;
 	private final BranchScheduleRepository branchScheduleRepository;
 	private final BranchScheduleOverrideRepository branchScheduleOverrideRepository;
+	private final WorkShiftRepository workShiftRepository;
 
 	public Branch findById(Integer id) {
 		return repository.findById(id)
@@ -44,6 +47,13 @@ public class BranchService {
 	public List<Branch> findByTenant(Integer tenantId) {
 		validateTenantExists(tenantId);
 		return repository.findByTenantId(tenantId);
+	}
+
+	// US-15-04: sólo sucursales activas (endpoint público del client). El backoffice
+	// sigue usando findByTenant/findAll para ver también las inactivas.
+	public List<Branch> findActiveByTenant(Integer tenantId) {
+		validateTenantExists(tenantId);
+		return repository.findByTenantIdAndActiveTrue(tenantId);
 	}
 
 	public List<Branch> findAll() {
@@ -108,6 +118,22 @@ public class BranchService {
 		// inicializar; releemos con findById (que trae el tenant vía @EntityGraph)
 		// para que BranchMapper.toResponseDTO no falle con LazyInitializationException.
 		return findById(id);
+	}
+
+	// US-15-04: activa/desactiva una sucursal (ADMIN). Al desactivar valida que no
+	// haya un turno abierto; reactivar no tiene esa restricción. No hay mínimo de
+	// sucursales activas ni auto-gestión de StaffUser asociados.
+	public void setStatus(Integer id, Integer tenantId, boolean active) {
+		if (!repository.existsByIdAndTenantId(id, tenantId)) {
+			throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Branch does not belong to your tenant");
+		}
+		if (!active && workShiftRepository.existsByBranchIdAndStatus(id, ShiftStatus.OPEN)) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+				"No se puede desactivar una sucursal con un turno abierto");
+		}
+		Branch branch = findById(id);
+		branch.setActive(active);
+		repository.save(branch);
 	}
 
 	public BranchQR saveQrConfig(Integer branchId, String mpPosId, String mpQrId) {

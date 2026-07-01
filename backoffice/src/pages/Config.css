@@ -345,7 +345,10 @@
   background: var(--color-sidebar-bg);
   border: 1px solid color-mix(in srgb, var(--border) 28%, transparent);
   border-radius: 14px;
-  overflow: hidden;
+  /* Sin overflow:hidden a propósito: recortaba el dropdown de acciones del último
+     ítem dentro de la fila. El redondeo de esquinas lo dan el background/border/
+     border-radius de la propia lista; ningún hijo tiene fondo en las esquinas. */
+  overflow: visible;
 }
 
 .config-branch-row {

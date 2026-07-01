@@ -33,6 +33,7 @@ public class BranchMapper {
 			.estimatedDeliveryMinutes(branch.getEstimatedDeliveryMinutes())
 			.phone(branch.getPhone())
 			.imageUrl(branch.getImageUrl())
+			.active(branch.isActive())
 			.maxShiftDurationMinutes(branch.getMaxShiftDurationMinutes())
 			.tenantId(branch.getTenant().getId())
 			.tenant(tenantMapper.toResponseDTO(branch.getTenant()))

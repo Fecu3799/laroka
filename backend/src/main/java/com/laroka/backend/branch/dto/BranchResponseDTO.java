@@ -23,6 +23,7 @@ public class BranchResponseDTO {
 	private Integer estimatedDeliveryMinutes;
 	private String phone;
 	private String imageUrl;
+	private boolean active;
 	private Integer maxShiftDurationMinutes;
 	private Integer tenantId;
 	private TenantResponseDTO tenant;

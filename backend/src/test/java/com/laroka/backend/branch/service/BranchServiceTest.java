@@ -3,6 +3,7 @@ package com.laroka.backend.branch.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -29,6 +30,8 @@ import com.laroka.backend.branch.repository.BranchQRRepository;
 import com.laroka.backend.branch.repository.BranchRepository;
 import com.laroka.backend.branch.repository.BranchScheduleOverrideRepository;
 import com.laroka.backend.branch.repository.BranchScheduleRepository;
+import com.laroka.backend.shift.entity.ShiftStatus;
+import com.laroka.backend.shift.repository.WorkShiftRepository;
 import com.laroka.backend.tenant.entity.Tenant;
 import com.laroka.backend.tenant.exception.TenantNotFoundException;
 import com.laroka.backend.tenant.repository.TenantRepository;
@@ -50,6 +53,9 @@ class BranchServiceTest {
 
 	@Mock
 	private BranchScheduleOverrideRepository branchScheduleOverrideRepository;
+
+	@Mock
+	private WorkShiftRepository workShiftRepository;
 
 	@InjectMocks
 	private BranchService service;
@@ -276,6 +282,57 @@ class BranchServiceTest {
 			"https://cdn.laroka.com/new.jpg", null, null, null);
 
 		assertThat(result.getImageUrl()).isEqualTo("https://cdn.laroka.com/new.jpg");
+	}
+
+	// --- US-15-04: activar/desactivar sucursal ---
+
+	@Test
+	void setStatus_deactivate_noOpenShift_succeeds() {
+		Branch existing = branch(tenant());
+		when(branchRepository.existsByIdAndTenantId(1, 1)).thenReturn(true);
+		when(workShiftRepository.existsByBranchIdAndStatus(1, ShiftStatus.OPEN)).thenReturn(false);
+		when(branchRepository.findById(1)).thenReturn(Optional.of(existing));
+		when(branchRepository.save(any(Branch.class))).thenAnswer(inv -> inv.getArgument(0));
+
+		service.setStatus(1, 1, false);
+
+		assertThat(existing.isActive()).isFalse();
+		verify(branchRepository).save(existing);
+	}
+
+	@Test
+	void setStatus_deactivate_withOpenShift_throws400() {
+		when(branchRepository.existsByIdAndTenantId(1, 1)).thenReturn(true);
+		when(workShiftRepository.existsByBranchIdAndStatus(1, ShiftStatus.OPEN)).thenReturn(true);
+
+		assertThatThrownBy(() -> service.setStatus(1, 1, false))
+			.isInstanceOf(ResponseStatusException.class)
+			.satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
+		verify(branchRepository, never()).save(any());
+	}
+
+	@Test
+	void setStatus_reactivate_ignoresOpenShiftRestriction() {
+		Branch existing = branch(tenant());
+		existing.setActive(false);
+		when(branchRepository.existsByIdAndTenantId(1, 1)).thenReturn(true);
+		when(branchRepository.findById(1)).thenReturn(Optional.of(existing));
+		when(branchRepository.save(any(Branch.class))).thenAnswer(inv -> inv.getArgument(0));
+
+		service.setStatus(1, 1, true);
+
+		assertThat(existing.isActive()).isTrue();
+		// Reactivar no consulta turnos abiertos.
+		verify(workShiftRepository, never()).existsByBranchIdAndStatus(any(), any());
+	}
+
+	@Test
+	void setStatus_otherTenant_throws403() {
+		when(branchRepository.existsByIdAndTenantId(1, 99)).thenReturn(false);
+
+		assertThatThrownBy(() -> service.setStatus(1, 99, false))
+			.isInstanceOf(ResponseStatusException.class)
+			.satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
 	}
 
 	// --- US-13-07: schedule por sucursal (ADMIN) ---
