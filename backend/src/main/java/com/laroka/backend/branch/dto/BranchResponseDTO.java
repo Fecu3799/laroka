@@ -22,6 +22,7 @@ public class BranchResponseDTO {
 	private BigDecimal serviceFee;
 	private Integer estimatedDeliveryMinutes;
 	private String phone;
+	private String imageUrl;
 	private Integer maxShiftDurationMinutes;
 	private Integer tenantId;
 	private TenantResponseDTO tenant;

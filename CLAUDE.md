@@ -86,6 +86,7 @@ Capas obligatorias por módulo:
 | V25     | tenant email_domain                        |
 | V26     | tenant_profile                             |
 | V27     | branch_schedule + branch_schedule_override (drop branch opening_time/closing_time/open_days) |
+| V28     | branch image_url                           |
 
 Toda migración nueva debe ser la siguiente versión disponible en esta tabla.
 Actualizar esta tabla al agregar una migración.

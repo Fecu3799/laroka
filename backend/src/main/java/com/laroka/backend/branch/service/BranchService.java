@@ -72,7 +72,7 @@ public class BranchService {
 	}
 
 	public Branch updateConfig(Integer id, Integer tenantId, Integer maxShiftDurationMinutes,
-			String name, String address, String phone, BigDecimal deliveryFee,
+			String name, String address, String phone, String imageUrl, BigDecimal deliveryFee,
 			BigDecimal serviceFee, Integer estimatedDeliveryMinutes) {
 		if (!repository.existsByIdAndTenantId(id, tenantId)) {
 			throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Branch does not belong to your tenant");
@@ -90,6 +90,9 @@ public class BranchService {
 		}
 		if (phone != null) {
 			branch.setPhone(phone);
+		}
+		if (imageUrl != null) {
+			branch.setImageUrl(imageUrl);
 		}
 		if (deliveryFee != null) {
 			branch.setDeliveryFee(deliveryFee);

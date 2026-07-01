@@ -28,6 +28,9 @@ public class BranchConfigRequestDTO {
 
 	private String phone;
 
+	// US-15-03: imagen propia de la sucursal. Patch parcial — null se omite.
+	private String imageUrl;
+
 	@DecimalMin(value = "0", message = "deliveryFee must be at least 0")
 	private BigDecimal deliveryFee;
 

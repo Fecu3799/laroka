@@ -39,4 +39,7 @@ public class BranchRequestDTO {
 
 	@NotBlank(message = "Phone is required")
 	private String phone;
+
+	// US-15-03: imagen propia de la sucursal. Opcional en la creación.
+	private String imageUrl;
 }

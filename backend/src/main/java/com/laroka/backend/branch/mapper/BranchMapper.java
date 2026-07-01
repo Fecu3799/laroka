@@ -32,6 +32,7 @@ public class BranchMapper {
 			.serviceFee(branch.getServiceFee())
 			.estimatedDeliveryMinutes(branch.getEstimatedDeliveryMinutes())
 			.phone(branch.getPhone())
+			.imageUrl(branch.getImageUrl())
 			.maxShiftDurationMinutes(branch.getMaxShiftDurationMinutes())
 			.tenantId(branch.getTenant().getId())
 			.tenant(tenantMapper.toResponseDTO(branch.getTenant()))
@@ -69,6 +70,7 @@ public class BranchMapper {
 			.serviceFee(dto.getServiceFee())
 			.estimatedDeliveryMinutes(dto.getEstimatedDeliveryMinutes())
 			.phone(dto.getPhone())
+			.imageUrl(dto.getImageUrl())
 			.tenant(Tenant.builder().id(dto.getTenantId()).build())
 			.build();
 	}

@@ -185,11 +185,13 @@ class BranchServiceTest {
 		when(branchRepository.save(any(Branch.class))).thenAnswer(inv -> inv.getArgument(0));
 
 		Branch result = service.updateConfig(1, 1, 480, "Sucursal Centro", "Nueva Dirección 999",
-			"+542804999999", new BigDecimal("150.00"), new BigDecimal("50.00"), 45);
+			"+542804999999", "https://cdn.laroka.com/branch-1.jpg", new BigDecimal("150.00"),
+			new BigDecimal("50.00"), 45);
 
 		assertThat(result.getName()).isEqualTo("Sucursal Centro");
 		assertThat(result.getAddress()).isEqualTo("Nueva Dirección 999");
 		assertThat(result.getPhone()).isEqualTo("+542804999999");
+		assertThat(result.getImageUrl()).isEqualTo("https://cdn.laroka.com/branch-1.jpg");
 		assertThat(result.getDeliveryFee()).isEqualByComparingTo("150.00");
 		assertThat(result.getServiceFee()).isEqualByComparingTo("50.00");
 		assertThat(result.getEstimatedDeliveryMinutes()).isEqualTo(45);
@@ -204,7 +206,7 @@ class BranchServiceTest {
 		when(branchRepository.findById(1)).thenReturn(Optional.of(existing));
 		when(branchRepository.save(any(Branch.class))).thenAnswer(inv -> inv.getArgument(0));
 
-		Branch result = service.updateConfig(1, 1, 480, null, null, null, null, null, null);
+		Branch result = service.updateConfig(1, 1, 480, null, null, null, null, null, null, null);
 
 		assertThat(result.getName()).isEqualTo("Playa Unión");
 		assertThat(result.getAddress()).isEqualTo("Av. Principal 123");
@@ -217,9 +219,63 @@ class BranchServiceTest {
 	void updateConfig_otherTenant_throws403() {
 		when(branchRepository.existsByIdAndTenantId(1, 99)).thenReturn(false);
 
-		assertThatThrownBy(() -> service.updateConfig(1, 99, 480, "x", "x", "y", null, null, null))
+		assertThatThrownBy(() -> service.updateConfig(1, 99, 480, "x", "x", "y", null, null, null, null))
 			.isInstanceOf(ResponseStatusException.class)
 			.satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
+	}
+
+	// --- US-15-03: imageUrl en creación y patch parcial ---
+
+	@Test
+	void create_withImageUrl_persistsImageUrl() {
+		Tenant p = tenant();
+		Branch branch = branch(p);
+		branch.setImageUrl("https://cdn.laroka.com/branch-1.jpg");
+		when(tenantRepository.findById(1)).thenReturn(Optional.of(p));
+		when(branchRepository.save(any(Branch.class))).thenAnswer(inv -> inv.getArgument(0));
+
+		Branch result = service.create(branch);
+
+		assertThat(result.getImageUrl()).isEqualTo("https://cdn.laroka.com/branch-1.jpg");
+	}
+
+	@Test
+	void create_withoutImageUrl_leavesImageUrlNull() {
+		Tenant p = tenant();
+		Branch branch = branch(p); // sin imageUrl
+		when(tenantRepository.findById(1)).thenReturn(Optional.of(p));
+		when(branchRepository.save(any(Branch.class))).thenAnswer(inv -> inv.getArgument(0));
+
+		Branch result = service.create(branch);
+
+		assertThat(result.getImageUrl()).isNull();
+	}
+
+	@Test
+	void updateConfig_nullImageUrl_keepsExistingImageUrl() {
+		Branch existing = branch(tenant());
+		existing.setImageUrl("https://cdn.laroka.com/existing.jpg");
+		when(branchRepository.existsByIdAndTenantId(1, 1)).thenReturn(true);
+		when(branchRepository.findById(1)).thenReturn(Optional.of(existing));
+		when(branchRepository.save(any(Branch.class))).thenAnswer(inv -> inv.getArgument(0));
+
+		Branch result = service.updateConfig(1, 1, 480, null, null, null, null, null, null, null);
+
+		assertThat(result.getImageUrl()).isEqualTo("https://cdn.laroka.com/existing.jpg");
+	}
+
+	@Test
+	void updateConfig_withImageUrl_updatesImageUrl() {
+		Branch existing = branch(tenant());
+		existing.setImageUrl("https://cdn.laroka.com/old.jpg");
+		when(branchRepository.existsByIdAndTenantId(1, 1)).thenReturn(true);
+		when(branchRepository.findById(1)).thenReturn(Optional.of(existing));
+		when(branchRepository.save(any(Branch.class))).thenAnswer(inv -> inv.getArgument(0));
+
+		Branch result = service.updateConfig(1, 1, 480, null, null, null,
+			"https://cdn.laroka.com/new.jpg", null, null, null);
+
+		assertThat(result.getImageUrl()).isEqualTo("https://cdn.laroka.com/new.jpg");
 	}
 
 	// --- US-13-07: schedule por sucursal (ADMIN) ---

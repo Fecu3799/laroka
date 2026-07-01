@@ -51,6 +51,9 @@ public class Branch {
 	@Column(name = "phone", nullable = false)
 	private String phone;
 
+	@Column(name = "image_url")
+	private String imageUrl;
+
 	@Column(name = "accepting_orders", nullable = false)
 	private boolean acceptingOrders;
 
