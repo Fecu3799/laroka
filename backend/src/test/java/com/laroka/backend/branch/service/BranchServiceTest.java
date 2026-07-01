@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
@@ -174,34 +175,41 @@ class BranchServiceTest {
 			.isInstanceOf(BranchNotFoundException.class);
 	}
 
-	// --- US-15-02: updateConfig (maxShiftDurationMinutes + address/phone patch parcial) ---
+	// --- US-15-02 / US-15-F-01: updateConfig (maxShiftDurationMinutes + patch parcial) ---
 
 	@Test
-	void updateConfig_updatesAddressAndPhone() {
+	void updateConfig_updatesAllFields() {
 		Branch existing = branch(tenant());
 		when(branchRepository.existsByIdAndTenantId(1, 1)).thenReturn(true);
 		when(branchRepository.findById(1)).thenReturn(Optional.of(existing));
 		when(branchRepository.save(any(Branch.class))).thenAnswer(inv -> inv.getArgument(0));
 
-		Branch result = service.updateConfig(1, 1, 480, "Nueva Dirección 999", "+542804999999");
+		Branch result = service.updateConfig(1, 1, 480, "Sucursal Centro", "Nueva Dirección 999",
+			"+542804999999", new BigDecimal("150.00"), new BigDecimal("50.00"), 45);
 
+		assertThat(result.getName()).isEqualTo("Sucursal Centro");
 		assertThat(result.getAddress()).isEqualTo("Nueva Dirección 999");
 		assertThat(result.getPhone()).isEqualTo("+542804999999");
+		assertThat(result.getDeliveryFee()).isEqualByComparingTo("150.00");
+		assertThat(result.getServiceFee()).isEqualByComparingTo("50.00");
+		assertThat(result.getEstimatedDeliveryMinutes()).isEqualTo(45);
 		assertThat(result.getMaxShiftDurationMinutes()).isEqualTo(480);
 		verify(branchRepository).save(existing);
 	}
 
 	@Test
-	void updateConfig_nullAddressAndPhone_keepsExistingValues() {
-		Branch existing = branch(tenant()); // address "Av. Principal 123", phone "+542804123456"
+	void updateConfig_nullOptionalFields_keepsExistingValues() {
+		Branch existing = branch(tenant()); // name "Playa Unión", address "Av. Principal 123", phone "+542804123456"
 		when(branchRepository.existsByIdAndTenantId(1, 1)).thenReturn(true);
 		when(branchRepository.findById(1)).thenReturn(Optional.of(existing));
 		when(branchRepository.save(any(Branch.class))).thenAnswer(inv -> inv.getArgument(0));
 
-		Branch result = service.updateConfig(1, 1, 480, null, null);
+		Branch result = service.updateConfig(1, 1, 480, null, null, null, null, null, null);
 
+		assertThat(result.getName()).isEqualTo("Playa Unión");
 		assertThat(result.getAddress()).isEqualTo("Av. Principal 123");
 		assertThat(result.getPhone()).isEqualTo("+542804123456");
+		assertThat(result.getEstimatedDeliveryMinutes()).isEqualTo(30);
 		assertThat(result.getMaxShiftDurationMinutes()).isEqualTo(480);
 	}
 
@@ -209,7 +217,7 @@ class BranchServiceTest {
 	void updateConfig_otherTenant_throws403() {
 		when(branchRepository.existsByIdAndTenantId(1, 99)).thenReturn(false);
 
-		assertThatThrownBy(() -> service.updateConfig(1, 99, 480, "x", "y"))
+		assertThatThrownBy(() -> service.updateConfig(1, 99, 480, "x", "x", "y", null, null, null))
 			.isInstanceOf(ResponseStatusException.class)
 			.satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
 	}

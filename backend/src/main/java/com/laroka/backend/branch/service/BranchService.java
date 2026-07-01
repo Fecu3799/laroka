@@ -1,5 +1,6 @@
 package com.laroka.backend.branch.service;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
@@ -71,20 +72,33 @@ public class BranchService {
 	}
 
 	public Branch updateConfig(Integer id, Integer tenantId, Integer maxShiftDurationMinutes,
-			String address, String phone) {
+			String name, String address, String phone, BigDecimal deliveryFee,
+			BigDecimal serviceFee, Integer estimatedDeliveryMinutes) {
 		if (!repository.existsByIdAndTenantId(id, tenantId)) {
 			throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Branch does not belong to your tenant");
 		}
 		Branch branch = findById(id);
 		branch.setMaxShiftDurationMinutes(maxShiftDurationMinutes);
-		// US-15-02: patch parcial — solo se actualizan address/phone si vienen en el
-		// body. Un null significa "omitido" y conserva el valor existente (las
-		// columnas son NOT NULL, así que nunca deben pisarse con null).
+		// US-15-02 / US-15-F-01: patch parcial — solo se actualizan los campos que
+		// vienen en el body. Un null significa "omitido" y conserva el valor existente
+		// (las columnas son NOT NULL, así que nunca deben pisarse con null).
+		if (name != null) {
+			branch.setName(name);
+		}
 		if (address != null) {
 			branch.setAddress(address);
 		}
 		if (phone != null) {
 			branch.setPhone(phone);
+		}
+		if (deliveryFee != null) {
+			branch.setDeliveryFee(deliveryFee);
+		}
+		if (serviceFee != null) {
+			branch.setServiceFee(serviceFee);
+		}
+		if (estimatedDeliveryMinutes != null) {
+			branch.setEstimatedDeliveryMinutes(estimatedDeliveryMinutes);
 		}
 		repository.save(branch);
 		// save() (merge) puede devolver el branch con el tenant como proxy lazy sin
