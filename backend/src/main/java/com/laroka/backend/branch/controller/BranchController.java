@@ -27,6 +27,9 @@ import com.laroka.backend.branch.dto.BranchResponseDTO;
 import com.laroka.backend.branch.dto.BranchScheduleDayRequestDTO;
 import com.laroka.backend.branch.dto.BranchScheduleDayResponseDTO;
 import com.laroka.backend.branch.dto.BranchStatusRequestDTO;
+import com.laroka.backend.catalog.dto.BranchProductsAvailabilityRequestDTO;
+import com.laroka.backend.catalog.dto.BranchProductsAvailabilityResponseDTO;
+import com.laroka.backend.catalog.service.ProductService;
 import com.laroka.backend.branch.dto.QrConfigRequestDTO;
 import com.laroka.backend.branch.dto.QrConfigResponseDTO;
 import com.laroka.backend.branch.entity.Branch;
@@ -54,6 +57,7 @@ public class BranchController {
 	private final BranchScheduleMapper scheduleMapper;
 	private final WorkShiftService workShiftService;
 	private final SecurityUtils securityUtils;
+	private final ProductService productService;
 
 	@GetMapping("/{id}")
 	@Operation(summary = "Get branch by ID", description = "Returns a specific branch")
@@ -127,6 +131,23 @@ public class BranchController {
 			@AuthenticationPrincipal CustomUserDetails principal) {
 		service.setStatus(id, principal.getTenantId(), dto.getActive());
 		return ResponseEntity.ok().build();
+	}
+
+	@PatchMapping("/{id}/products/availability")
+	@PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+	@Operation(summary = "Bulk update product availability for a branch",
+			description = "Sets `available` for every BranchProduct of the branch whose productId is in the list, "
+					+ "in a single transaction. productIds without a BranchProduct for the branch are ignored. "
+					+ "A deactivated branch is rejected with 422. Returns the number of updated records.")
+	public ResponseEntity<BranchProductsAvailabilityResponseDTO> updateProductsAvailability(
+			@PathVariable Integer id,
+			@Valid @RequestBody BranchProductsAvailabilityRequestDTO dto,
+			@AuthenticationPrincipal CustomUserDetails principal) {
+		// MANAGER solo puede operar sobre su propia sucursal; ADMIN sobre cualquiera de su
+		// tenant. Sin esto, un MANAGER de la sucursal A podría modificar la B por el path.
+		securityUtils.validateBranchScope(principal, id);
+		int updated = productService.updateBranchProductsAvailability(id, dto.getProductIds(), dto.getAvailable());
+		return ResponseEntity.ok(BranchProductsAvailabilityResponseDTO.builder().updated(updated).build());
 	}
 
 	@GetMapping("/{id}/schedule")

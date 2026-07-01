@@ -471,6 +471,66 @@ class ProductServiceTest {
 		verify(branchProductRepository, never()).save(any());
 	}
 
+	// --- US-15-07: updateBranchProductsAvailability (bulk) ---
+
+	@Test
+	void updateBranchProductsAvailability_updatesMatchingBranchProducts() {
+		Tenant p = tenant();
+		Branch b = branch(p); // activa
+		BranchProduct bp1 = branchProduct(b, Product.builder().id(10).build(), null);
+		BranchProduct bp2 = branchProduct(b, Product.builder().id(11).build(), null);
+		when(branchRepository.findById(1)).thenReturn(Optional.of(b));
+		when(branchProductRepository.findByBranchIdAndProductIdIn(1, List.of(10, 11)))
+			.thenReturn(List.of(bp1, bp2));
+
+		int updated = service.updateBranchProductsAvailability(1, List.of(10, 11), false);
+
+		assertThat(updated).isEqualTo(2);
+		assertThat(bp1.getAvailable()).isFalse();
+		assertThat(bp2.getAvailable()).isFalse();
+		verify(branchProductRepository).saveAll(any());
+		verify(branchProductRepository, never()).save(any());
+	}
+
+	@Test
+	void updateBranchProductsAvailability_emptyList_returnsZeroWithoutQuery() {
+		when(branchRepository.findById(1)).thenReturn(Optional.of(branch(tenant())));
+
+		int updated = service.updateBranchProductsAvailability(1, List.of(), true);
+
+		assertThat(updated).isZero();
+		verify(branchProductRepository, never()).findByBranchIdAndProductIdIn(any(), any());
+		verify(branchProductRepository, never()).saveAll(any());
+	}
+
+	@Test
+	void updateBranchProductsAvailability_ignoresProductIdsWithoutBranchProduct() {
+		Tenant p = tenant();
+		Branch b = branch(p);
+		BranchProduct bp = branchProduct(b, Product.builder().id(10).build(), null);
+		when(branchRepository.findById(1)).thenReturn(Optional.of(b));
+		// productId 999 no tiene BranchProduct para esta sucursal → la query solo trae el de 10.
+		when(branchProductRepository.findByBranchIdAndProductIdIn(1, List.of(10, 999)))
+			.thenReturn(List.of(bp));
+
+		int updated = service.updateBranchProductsAvailability(1, List.of(10, 999), true);
+
+		assertThat(updated).isEqualTo(1);
+		assertThat(bp.getAvailable()).isTrue();
+		verify(branchProductRepository).saveAll(any());
+	}
+
+	@Test
+	void updateBranchProductsAvailability_inactiveBranch_rejectsWithoutTouchingData() {
+		Branch inactive = Branch.builder().id(1).name("Trelew").tenant(tenant()).active(false).build();
+		when(branchRepository.findById(1)).thenReturn(Optional.of(inactive));
+
+		assertThatThrownBy(() -> service.updateBranchProductsAvailability(1, List.of(10), true))
+			.isInstanceOf(BusinessException.class);
+		verify(branchProductRepository, never()).findByBranchIdAndProductIdIn(any(), any());
+		verify(branchProductRepository, never()).saveAll(any());
+	}
+
 	// --- updatePrice ---
 
 	@Test

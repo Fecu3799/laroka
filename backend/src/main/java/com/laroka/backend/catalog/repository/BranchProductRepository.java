@@ -27,6 +27,10 @@ public interface BranchProductRepository extends JpaRepository<BranchProduct, Br
 
     boolean existsByBranchIdAndProductId(Integer branchId, Integer productId);
 
+    // US-15-07: BranchProduct de una sucursal cuyos productId estén en la lista. Los
+    // productId sin BranchProduct para esa sucursal simplemente no vienen en el resultado.
+    List<BranchProduct> findByBranchIdAndProductIdIn(Integer branchId, List<Integer> productIds);
+
     List<BranchProduct> findByProductId(Integer productId);
 
     // Carga branch + product en la misma query: la config por sucursal se mapea fuera de

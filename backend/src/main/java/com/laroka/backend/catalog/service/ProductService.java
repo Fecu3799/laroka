@@ -167,6 +167,33 @@ public class ProductService {
 		return branchProduct.getProduct();
 	}
 
+	// US-15-07: actualización masiva de disponibilidad de productos para una sucursal.
+	// El batch es atómico por la transacción propia de saveAll (criterio US-15-05).
+	// A propósito SIN @Transactional: combinar @Transactional + @CacheEvict en el mismo
+	// método deja el orden entre el advisor de transacción y el de cache sin garantía, y
+	// la evicción podría ejecutarse ANTES del commit → una lectura concurrente repuebla el
+	// cache con el dato viejo (bajo READ COMMITTED) y queda stale. Con @CacheEvict solo, la
+	// evicción corre después de que saveAll commitea (mismo criterio que updateBranchConfig).
+	@CacheEvict(value = "menu", key = "#branchId")
+	public int updateBranchProductsAvailability(Integer branchId, List<Integer> productIds, boolean available) {
+		// Mismo guard de escritura que updateBranchConfig (US-15-06): una sucursal
+		// desactivada se rechaza (422) sin tocar ningún BranchProduct.
+		Branch branch = branchRepository.findById(branchId)
+			.orElseThrow(() -> new BranchNotFoundException(branchId));
+		if (!branch.isActive()) {
+			throw new BusinessException("No se puede modificar la configuración de una sucursal desactivada");
+		}
+		if (productIds == null || productIds.isEmpty()) {
+			return 0;
+		}
+		// Los productId sin BranchProduct para esta sucursal no vienen en la query, así que
+		// se ignoran sin romper el resto del batch.
+		List<BranchProduct> toUpdate = branchProductRepository.findByBranchIdAndProductIdIn(branchId, productIds);
+		toUpdate.forEach(bp -> bp.setAvailable(available));
+		branchProductRepository.saveAll(toUpdate);
+		return toUpdate.size();
+	}
+
 	// applyToAllBranches afecta potencialmente todas las sucursales (override limpiado) y,
 	// aun en false, el nuevo precio base afecta a las sucursales sin override. Por eso se
 	// evicta el menú completo en ambos casos.
