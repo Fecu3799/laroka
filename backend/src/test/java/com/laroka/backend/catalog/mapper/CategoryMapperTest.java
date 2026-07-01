@@ -11,7 +11,6 @@ import org.junit.jupiter.api.Test;
 import com.laroka.backend.catalog.dto.CategoryResponseDTO;
 import com.laroka.backend.catalog.entity.Category;
 import com.laroka.backend.tenant.entity.Tenant;
-import com.laroka.backend.tenant.mapper.TenantMapper;
 
 /**
  * US-14-05: el listado de categorías expone productCount. Una categoría sin
@@ -19,7 +18,7 @@ import com.laroka.backend.tenant.mapper.TenantMapper;
  */
 class CategoryMapperTest {
 
-	private final CategoryMapper mapper = new CategoryMapper(new TenantMapper());
+	private final CategoryMapper mapper = new CategoryMapper();
 
 	private Category category(Integer id, String name) {
 		return Category.builder()

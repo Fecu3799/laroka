@@ -27,12 +27,25 @@ export async function fetchBackofficeBranches(token, tenantId) {
   return res.json()
 }
 
-// Actualiza la configuración de una sucursal (ADMIN). maxShiftDurationMinutes en minutos.
-export async function updateBranchConfig(branchId, maxShiftDurationMinutes, token) {
+// Actualiza la configuración de una sucursal (ADMIN). config incluye
+// maxShiftDurationMinutes (minutos, obligatorio) y los campos opcionales de patch
+// parcial: name, address, phone, deliveryFee, serviceFee, estimatedDeliveryMinutes.
+export async function updateBranchConfig(branchId, config, token) {
   const res = await apiFetch(`${API_URL}/backoffice/branches/${branchId}/config`, {
     method: 'PATCH',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ maxShiftDurationMinutes }),
+    body: JSON.stringify(config),
+  })
+  return res.json()
+}
+
+// Crea una sucursal (ADMIN). payload: name, address, phone, deliveryFee, serviceFee,
+// estimatedDeliveryMinutes, tenantId. maxShiftDurationMinutes usa el default del backend.
+export async function createBranch(payload, token) {
+  const res = await apiFetch(`${API_URL}/backoffice/branches`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
   })
   return res.json()
 }
