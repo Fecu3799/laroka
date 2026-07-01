@@ -1883,10 +1883,10 @@
 }
 
 .welcome-logo {
-  width: 96px;
   height: 96px;
+  width: auto;
+  max-width: 100%;
   object-fit: contain;
-  border-radius: 16px;
 }
 
 .welcome-name {

@@ -160,6 +160,7 @@ export default function TenantProfileSection() {
               value={form.logoUrl || null}
               onChange={url => handleChange('logoUrl', url)}
               token={token}
+              helperText="Se admite cualquier proporción; el logo se muestra completo."
             />
           </div>
 

@@ -11,7 +11,11 @@
 .menu-group {
   border: 1px solid color-mix(in srgb, var(--border) 22%, transparent);
   border-radius: 10px;
-  overflow: hidden;
+  /* Sin overflow:hidden a propósito: recortaba el dropdown de acciones del último
+     producto de cada categoría cuando se abre hacia abajo. El redondeo de esquinas
+     lo dan el background/border del grupo (que respetan border-radius) y el radio
+     del header (única parte con fill en las esquinas superiores, por el hover). */
+  overflow: visible;
   background: color-mix(in srgb, var(--border) 5%, transparent);
 }
 
@@ -27,6 +31,14 @@
   color: var(--text-primary);
   text-align: left;
   transition: background 0.15s;
+  /* Redondeo de las esquinas superiores para que el fondo del :hover no sobresalga
+     de las esquinas del grupo (radio interno = 10px del grupo − 1px de borde). */
+  border-radius: 9px 9px 0 0;
+}
+
+/* Colapsado: el header es el único elemento del grupo → redondea las 4 esquinas. */
+.menu-group-head[aria-expanded="false"] {
+  border-radius: 9px;
 }
 
 .menu-group-head:hover {
