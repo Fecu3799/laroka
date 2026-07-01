@@ -44,14 +44,7 @@ import com.laroka.backend.order.entity.OrderStatusHistory;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 
-@SpringBootTest(
-    webEnvironment = SpringBootTest.WebEnvironment.MOCK,
-    // El chequeo de horarios de sucursal corre contra el reloj real; en CI esto
-    // rechaza la creación de pedidos (422). Lo deshabilitamos para este test de
-    // flujo. Se define acá (no en application-test.yml) porque ese archivo está
-    // gitignored y no llega a CI.
-    
-    properties = "order.bypass-branch-hours=true")
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
@@ -81,6 +74,9 @@ class OrderFlowsIntegrationTest {
 
         jdbcTemplate.update("INSERT INTO tenant (name, email_domain) VALUES (?, ?)", "Test Tenant", "laroka.com");
         jdbcTemplate.update("INSERT INTO branch (name, address, tenant_id) VALUES (?, ?, ?)", "Test Branch", "Test Address", 1);
+        // accepting_orders es el único gate de creación de pedidos; la sucursal de test
+        // debe aceptarlos (la columna default es false).
+        jdbcTemplate.update("UPDATE branch SET accepting_orders = true WHERE id = ?", BRANCH_ID);
         // Two staff users so that the second one (auto-id=2) matches STAFF_USER_ID=2
         jdbcTemplate.update(
             "INSERT INTO staff_user (name, email, password_hash, role, branch_id) VALUES (?, ?, ?, ?, ?)",

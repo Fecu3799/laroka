@@ -11,7 +11,6 @@ import java.util.UUID;
 
 import lombok.extern.slf4j.Slf4j;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -21,7 +20,6 @@ import org.springframework.transaction.annotation.Transactional;
 import com.laroka.backend.branch.entity.Branch;
 import com.laroka.backend.branch.exception.BranchNotFoundException;
 import com.laroka.backend.branch.repository.BranchRepository;
-import com.laroka.backend.branch.service.BranchService;
 import com.laroka.backend.shared.exception.BusinessException;
 import com.laroka.backend.order.entity.Order;
 import com.laroka.backend.order.entity.OrderStatus;
@@ -54,10 +52,6 @@ public class WorkShiftService {
     private final PaymentRepository paymentRepository;
     private final StaffUserRepository staffUserRepository;
     private final BranchRepository branchRepository;
-    private final BranchService branchService;
-
-    @Value("${order.bypass-branch-hours:false}")
-    private boolean bypassBranchHours;
 
     @Transactional
     public OpenShiftResult openShift(Integer branchId, Integer userId) {
@@ -159,11 +153,8 @@ public class WorkShiftService {
         Branch branch = branchRepository.findById(branchId)
             .orElseThrow(() -> new BranchNotFoundException(branchId));
         boolean next = !branch.isAcceptingOrders();
-        // Al activar la recepción, la sucursal debe estar dentro de su horario
-        // operativo (salvo que el bypass de dev esté habilitado).
-        if (next && !bypassBranchHours && !branchService.isOpen(branchId)) {
-            throw new BusinessException("La sucursal está fuera de su horario operativo");
-        }
+        // El operador puede activar/desactivar la recepción en cualquier momento
+        // mientras haya un turno activo; no hay restricción de horario.
         branchRepository.updateAcceptingOrders(branchId, next);
         return next;
     }

@@ -9,7 +9,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -31,7 +30,6 @@ import org.springframework.transaction.annotation.Transactional;
 import com.laroka.backend.branch.entity.Branch;
 import com.laroka.backend.branch.exception.BranchNotFoundException;
 import com.laroka.backend.branch.repository.BranchRepository;
-import com.laroka.backend.branch.service.BranchService;
 import com.laroka.backend.catalog.entity.Product;
 import com.laroka.backend.catalog.exception.ProductNotFoundException;
 import com.laroka.backend.catalog.repository.BranchProductRepository;
@@ -60,14 +58,10 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class OrderService {
 
-    @Value("${order.bypass-branch-hours:false}")
-    private boolean bypassBranchHours;
-
     private final OrderRepository orderRepository;
     private final OrderStatusHistoryRepository historyRepository;
     private final OrderItemRepository orderItemRepository;
     private final BranchRepository branchRepository;
-    private final BranchService branchService;
     private final ProductRepository productRepository;
     private final BranchProductRepository branchProductRepository;
     private final IdempotencyStore idempotencyStore;
@@ -405,12 +399,9 @@ public class OrderService {
                     return new BranchNotFoundException(order.getBranch().getId());
                 });
 
-        if (!bypassBranchHours && !branchService.isOpen(branch.getId())) {
-            log.warn("Order rejected — branch closed | branchId={}", branch.getId());
-            throw new BusinessException("El local no está disponible en este momento");
-        }
-        if (bypassBranchHours) {
-            log.warn("Branch hours check bypassed — order.bypass-branch-hours=true | branchId={}", branch.getId());
+        if (!branch.isAcceptingOrders()) {
+            log.warn("Order rejected — branch not accepting orders | branchId={}", branch.getId());
+            throw new BusinessException("El local no está aceptando pedidos en este momento");
         }
 
         if (order.getOrderType() == OrderType.DELIVERY

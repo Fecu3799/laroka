@@ -23,7 +23,6 @@ Rama: `features/quick-fixes`
 
 | # | Propiedad | Archivo:Línea | Dev | Prod | Qué controla |
 |---|-----------|--------------|-----|------|-------------|
-| B-01 | `order.bypass-branch-hours` | `application.yml:46` | `true` | debe ser `false` | **Omite validación de horarios de sucursal al crear pedidos** |
 | B-02 | `swagger.enabled` | `application.yml:56` | `false` | `false` | Activa/desactiva endpoints de Swagger/OpenAPI |
 | B-03 | `r2.bucket-name` | `application.yml:51` | `"laroka-dev"` | bucket prod | Nombre del bucket Cloudflare R2 |
 | B-04 | `cors.allowed-origins` | `application.yml:38` | `localhost:5173, localhost:5174, 192.168.1.114:5173` | dominios prod | Orígenes CORS permitidos |
@@ -65,16 +64,6 @@ Rama: `features/quick-fixes`
 | B-21 | `webhookSecret` | `mercadopago.webhook-secret` | `PaymentService.java:52` | `""` | Secreto para verificar firma de webhooks |
 
 Cuando `B-20` es `true`, el servicio loguea: `"SIGNATURE VALIDATION SKIPPED (debug flag active)"` (`PaymentService.java:282`).
-
-### 2.2 `OrderService.java`
-
-| # | Variable | Propiedad | Archivo:Línea | Default | Qué controla |
-|---|----------|-----------|--------------|---------|-------------|
-| B-22 | `bypassBranchHours` | `order.bypass-branch-hours` | `OrderService.java:59` | `true` | **Omite validación de horarios de atención al crear pedidos** |
-
-Cuando es `true` loguea: `"Branch hours check bypassed — order.bypass-branch-hours=true"` (`OrderService.java:383`).
-
-**Riesgo: el default en `application.yml` es `true`, lo que significa que en producción también se omite la validación si la variable de entorno no está seteada.**
 
 ### 2.3 `OpenApiConfig.java`
 
@@ -210,7 +199,6 @@ Logs de debug de MercadoPago presentes en producción (no condicionados a DEV):
 
 | ID | Tipo | Nombre | Ubicación | Default dev | Default prod | Riesgo |
 |----|------|--------|-----------|-------------|--------------|--------|
-| B-01 | Property | `order.bypass-branch-hours` | `application.yml:46` | `true` | `true` ⚠️ | **ALTO** |
 | B-20 | Property | `debug.skip-webhook-signature-validation` | `PaymentService.java:55` | `false` | `false` | ALTO si se activa |
 | B-23 | Conditional | `swagger.enabled` | `OpenApiConfig.java:14` | activo por default | desactivado | MEDIO |
 | B-12 | Hardcoded | `jwt.secret` local | `application-local.yml:21` | clave de prueba | — | MEDIO |
