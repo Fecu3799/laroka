@@ -66,7 +66,25 @@ describe('OrderTrackingBanner', () => {
     })
   })
 
-  it('removes order from banner after DELIVERED status', async () => {
+  it('mantiene el pedido DELIVERED visible con badge y botón Listo, sin removerlo automáticamente', async () => {
+    seedOrder('order-1', 1)
+    mockStatus('order-1', {
+      status: 'DELIVERED',
+      orderType: 'DELIVERY',
+      history: [],
+    })
+
+    render(<OrderTrackingBanner branchId={1} />)
+
+    await waitFor(() => {
+      expect(screen.getByText('ENTREGADO')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /listo/i })).toBeInTheDocument()
+    })
+    // No se removió automáticamente de laroka_active_orders.
+    expect(JSON.parse(localStorage.getItem(KEY))).toHaveLength(1)
+  })
+
+  it('al presionar Listo descarta el pedido DELIVERED y lo remueve de localStorage', async () => {
     seedOrder('order-1', 1)
     mockStatus('order-1', {
       status: 'DELIVERED',
@@ -75,10 +93,14 @@ describe('OrderTrackingBanner', () => {
     })
 
     const { container } = render(<OrderTrackingBanner branchId={1} />)
+    await waitFor(() => screen.getByRole('button', { name: /listo/i }))
+
+    await userEvent.setup().click(screen.getByRole('button', { name: /listo/i }))
 
     await waitFor(() => {
       expect(container).toBeEmptyDOMElement()
     })
+    expect(JSON.parse(localStorage.getItem(KEY) ?? '[]')).toHaveLength(0)
   })
 
   it('muestra botón Entendido cuando la cancelación fue iniciada por el cliente', async () => {
