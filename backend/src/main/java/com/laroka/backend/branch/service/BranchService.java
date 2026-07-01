@@ -8,6 +8,7 @@ import java.util.Optional;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.laroka.backend.branch.entity.Branch;
@@ -20,6 +21,9 @@ import com.laroka.backend.branch.repository.BranchQRRepository;
 import com.laroka.backend.branch.repository.BranchRepository;
 import com.laroka.backend.branch.repository.BranchScheduleOverrideRepository;
 import com.laroka.backend.branch.repository.BranchScheduleRepository;
+import com.laroka.backend.catalog.entity.BranchProduct;
+import com.laroka.backend.catalog.repository.BranchProductRepository;
+import com.laroka.backend.catalog.repository.ProductRepository;
 import com.laroka.backend.shift.entity.ShiftStatus;
 import com.laroka.backend.shift.repository.WorkShiftRepository;
 import com.laroka.backend.tenant.entity.Tenant;
@@ -38,6 +42,8 @@ public class BranchService {
 	private final BranchScheduleRepository branchScheduleRepository;
 	private final BranchScheduleOverrideRepository branchScheduleOverrideRepository;
 	private final WorkShiftRepository workShiftRepository;
+	private final ProductRepository productRepository;
+	private final BranchProductRepository branchProductRepository;
 
 	public Branch findById(Integer id) {
 		return repository.findById(id)
@@ -60,10 +66,33 @@ public class BranchService {
 		return repository.findAll();
 	}
 
+	// @Transactional: la sucursal y sus branch_product se persisten atómicamente. Si
+	// falla la generación de branch_product, se hace rollback también de la sucursal
+	// en vez de dejar un estado parcial.
+	@Transactional
 	public Branch create(Branch branch) {
 		Tenant tenant = validateTenantExists(branch.getTenant().getId());
 		branch.setTenant(tenant);
-		return repository.save(branch);
+		Branch saved = repository.save(branch);
+		// US-15-05: inverso de US-14-04. Tras persistir la sucursal, se crea un
+		// BranchProduct por cada producto del tenant, disponible y sin override. Si el
+		// tenant no tiene productos, no genera nada. La selección de qué mostrar/ocultar
+		// se resuelve después desde la edición de la sucursal (US-15-F-08).
+		createBranchProductsForBranch(saved);
+		return saved;
+	}
+
+	private void createBranchProductsForBranch(Branch branch) {
+		List<BranchProduct> branchProducts = productRepository.findByTenantId(branch.getTenant().getId())
+			.stream()
+			.map(product -> BranchProduct.builder()
+				.branch(branch)
+				.product(product)
+				.available(true)
+				.priceOverride(null)
+				.build())
+			.toList();
+		branchProductRepository.saveAll(branchProducts);
 	}
 
 	public Branch update(Integer id, Branch updates) {

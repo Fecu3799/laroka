@@ -15,6 +15,7 @@ import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -30,6 +31,10 @@ import com.laroka.backend.branch.repository.BranchQRRepository;
 import com.laroka.backend.branch.repository.BranchRepository;
 import com.laroka.backend.branch.repository.BranchScheduleOverrideRepository;
 import com.laroka.backend.branch.repository.BranchScheduleRepository;
+import com.laroka.backend.catalog.entity.BranchProduct;
+import com.laroka.backend.catalog.entity.Product;
+import com.laroka.backend.catalog.repository.BranchProductRepository;
+import com.laroka.backend.catalog.repository.ProductRepository;
 import com.laroka.backend.shift.entity.ShiftStatus;
 import com.laroka.backend.shift.repository.WorkShiftRepository;
 import com.laroka.backend.tenant.entity.Tenant;
@@ -56,6 +61,12 @@ class BranchServiceTest {
 
 	@Mock
 	private WorkShiftRepository workShiftRepository;
+
+	@Mock
+	private ProductRepository productRepository;
+
+	@Mock
+	private BranchProductRepository branchProductRepository;
 
 	@InjectMocks
 	private BranchService service;
@@ -123,6 +134,7 @@ class BranchServiceTest {
 		Branch branch = branch(p);
 		when(tenantRepository.findById(1)).thenReturn(Optional.of(p));
 		when(branchRepository.save(any(Branch.class))).thenReturn(branch);
+		when(productRepository.findByTenantId(1)).thenReturn(List.of());
 
 		Branch result = service.create(branch);
 
@@ -239,6 +251,7 @@ class BranchServiceTest {
 		branch.setImageUrl("https://cdn.laroka.com/branch-1.jpg");
 		when(tenantRepository.findById(1)).thenReturn(Optional.of(p));
 		when(branchRepository.save(any(Branch.class))).thenAnswer(inv -> inv.getArgument(0));
+		when(productRepository.findByTenantId(1)).thenReturn(List.of());
 
 		Branch result = service.create(branch);
 
@@ -251,10 +264,54 @@ class BranchServiceTest {
 		Branch branch = branch(p); // sin imageUrl
 		when(tenantRepository.findById(1)).thenReturn(Optional.of(p));
 		when(branchRepository.save(any(Branch.class))).thenAnswer(inv -> inv.getArgument(0));
+		when(productRepository.findByTenantId(1)).thenReturn(List.of());
 
 		Branch result = service.create(branch);
 
 		assertThat(result.getImageUrl()).isNull();
+	}
+
+	// --- US-15-05: alta automática de BranchProduct al crear la sucursal ---
+
+	@Test
+	@SuppressWarnings("unchecked")
+	void create_generatesBranchProductForEachTenantProduct() {
+		Tenant p = tenant();
+		Branch branch = branch(p);
+		when(tenantRepository.findById(1)).thenReturn(Optional.of(p));
+		when(branchRepository.save(any(Branch.class))).thenReturn(branch);
+		when(productRepository.findByTenantId(1))
+			.thenReturn(List.of(Product.builder().id(10).build(), Product.builder().id(11).build()));
+
+		service.create(branch);
+
+		// Una sola llamada a saveAll con la lista completa (available=true, sin override).
+		ArgumentCaptor<List<BranchProduct>> captor = ArgumentCaptor.forClass(List.class);
+		verify(branchProductRepository).saveAll(captor.capture());
+		assertThat(captor.getValue()).hasSize(2)
+			.allSatisfy(bp -> {
+				assertThat(bp.getAvailable()).isTrue();
+				assertThat(bp.getPriceOverride()).isNull();
+				assertThat(bp.getBranch()).isEqualTo(branch);
+			});
+		verify(branchProductRepository, never()).save(any());
+	}
+
+	@Test
+	@SuppressWarnings("unchecked")
+	void create_tenantWithoutProducts_generatesNoBranchProduct() {
+		Tenant p = tenant();
+		Branch branch = branch(p);
+		when(tenantRepository.findById(1)).thenReturn(Optional.of(p));
+		when(branchRepository.save(any(Branch.class))).thenReturn(branch);
+		when(productRepository.findByTenantId(1)).thenReturn(List.of());
+
+		service.create(branch);
+
+		ArgumentCaptor<List<BranchProduct>> captor = ArgumentCaptor.forClass(List.class);
+		verify(branchProductRepository).saveAll(captor.capture());
+		assertThat(captor.getValue()).isEmpty();
+		verify(branchProductRepository, never()).save(any());
 	}
 
 	@Test
