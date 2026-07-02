@@ -636,3 +636,118 @@
   opacity: 0.3;
   cursor: not-allowed;
 }
+
+/* ── US-15-F-09: producto no disponible en el selector ──────────── */
+
+.nom-product-row--unavailable .nom-product-name,
+.nom-product-row--unavailable .nom-product-price {
+  color: rgba(212, 232, 214, 0.5);
+}
+
+.nom-product-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--color-warning);
+  background: color-mix(in srgb, var(--color-warning) 16%, transparent);
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+/* ── US-15-F-09: modal de confirmación de no disponibles ─────────── */
+
+.nom-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.nom-confirm-dialog {
+  width: min(420px, 92vw);
+  background: #0d1e10;
+  border: 1px solid color-mix(in srgb, var(--color-warning) 40%, transparent);
+  border-radius: 12px;
+  padding: 1.25rem 1.4rem 1.1rem;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.85);
+  font-family: 'Inter', sans-serif;
+}
+
+.nom-confirm-title {
+  margin: 0 0 0.6rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-warning);
+}
+
+.nom-confirm-text {
+  margin: 0.5rem 0;
+  font-size: 0.85rem;
+  color: #d4e8d6;
+}
+
+.nom-confirm-list {
+  margin: 0.4rem 0;
+  padding-left: 1.2rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #d4e8d6;
+}
+
+.nom-confirm-list li {
+  margin: 2px 0;
+}
+
+.nom-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  margin-top: 1.1rem;
+}
+
+.nom-confirm-cancel-btn,
+.nom-confirm-force-btn {
+  padding: 0.5rem 0.9rem;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: 'Inter', sans-serif;
+  transition: filter 0.12s, background 0.12s, border-color 0.12s;
+}
+
+.nom-confirm-cancel-btn {
+  border: 1px solid rgba(212, 232, 214, 0.25);
+  background: transparent;
+  color: #d4e8d6;
+}
+
+.nom-confirm-cancel-btn:hover {
+  background: rgba(212, 232, 214, 0.08);
+}
+
+.nom-confirm-force-btn {
+  border: 1px solid var(--color-warning);
+  background: var(--color-warning);
+  color: #0d1e10;
+}
+
+.nom-confirm-force-btn:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.nom-confirm-force-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
