@@ -306,6 +306,7 @@ export default function ProductDrawer({ open, mode, product, categories, onClose
               value={form.imageUrl || null}
               onChange={url => setField('imageUrl', url)}
               token={token}
+              context="products"
               aspectRatio={1}
               helperText="Recomendado: imagen cuadrada"
             />

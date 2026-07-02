@@ -181,3 +181,115 @@
   background: color-mix(in srgb, var(--accent) 88%, #000);
   border-color: color-mix(in srgb, var(--accent) 88%, #000);
 }
+
+/* ── Picker de galería (US-R2-F-02) ────────────────────────────── */
+
+.iu-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.iu-gallery-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.65);
+}
+
+.iu-gallery-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: min(640px, 100%);
+  max-height: min(80vh, 620px);
+  padding: 18px;
+  border-radius: 14px;
+  background: var(--bg-secondary, #14161a);
+  border: 1px solid color-mix(in srgb, var(--border) 28%, transparent);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+}
+
+.iu-gallery-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.iu-gallery-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.iu-gallery-close {
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+.iu-gallery-close:hover {
+  color: var(--text-primary);
+}
+
+.iu-gallery-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.iu-gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 12px;
+  overflow-y: auto;
+  padding: 2px;
+}
+
+.iu-thumb {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 10px;
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--border) 28%, transparent);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.iu-thumb:hover {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--border) 12%, transparent);
+}
+
+.iu-thumb-img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 7px;
+  display: block;
+  background: color-mix(in srgb, var(--border) 8%, transparent);
+}
+
+.iu-thumb-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

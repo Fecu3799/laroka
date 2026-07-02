@@ -9,6 +9,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.Instant;
+import java.util.List;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,6 +27,7 @@ import com.laroka.backend.media.exception.InvalidFileException;
 class MediaServiceTest {
 
     private static final Integer TENANT_ID = 7;
+    private static final String CONTEXT = "products";
 
     @Mock
     private StorageService storageService;
@@ -37,15 +41,39 @@ class MediaServiceTest {
     }
 
     @Test
+    void uploadRejectsInvalidContext() {
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "photo.png", "image/png", new byte[] { 1, 2, 3 });
+
+        assertThatThrownBy(() -> mediaService.upload(file, TENANT_ID, "avatars"))
+                .isInstanceOf(InvalidFileException.class)
+                .hasMessageContaining("Contexto no permitido");
+
+        verify(storageService, never()).upload(any(), anyString(), anyString(), any());
+    }
+
+    @Test
+    void uploadRejectsNullContext() {
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "photo.png", "image/png", new byte[] { 1, 2, 3 });
+
+        assertThatThrownBy(() -> mediaService.upload(file, TENANT_ID, null))
+                .isInstanceOf(InvalidFileException.class)
+                .hasMessageContaining("Contexto no permitido");
+
+        verify(storageService, never()).upload(any(), anyString(), anyString(), any());
+    }
+
+    @Test
     void uploadRejectsInvalidContentType() {
         MockMultipartFile file = new MockMultipartFile(
                 "file", "doc.pdf", "application/pdf", new byte[] { 1, 2, 3 });
 
-        assertThatThrownBy(() -> mediaService.upload(file, TENANT_ID))
+        assertThatThrownBy(() -> mediaService.upload(file, TENANT_ID, CONTEXT))
                 .isInstanceOf(InvalidFileException.class)
                 .hasMessageContaining("Tipo de archivo no permitido");
 
-        verify(storageService, never()).upload(any(), anyString(), anyString());
+        verify(storageService, never()).upload(any(), anyString(), anyString(), any());
     }
 
     @Test
@@ -55,31 +83,57 @@ class MediaServiceTest {
         MockMultipartFile file = new MockMultipartFile(
                 "file", "big.jpg", "image/jpeg", tooBig);
 
-        assertThatThrownBy(() -> mediaService.upload(file, TENANT_ID))
+        assertThatThrownBy(() -> mediaService.upload(file, TENANT_ID, CONTEXT))
                 .isInstanceOf(InvalidFileException.class)
                 .hasMessageContaining("tamaño máximo");
 
-        verify(storageService, never()).upload(any(), anyString(), anyString());
+        verify(storageService, never()).upload(any(), anyString(), anyString(), any());
     }
 
     @Test
-    void uploadReturnsPublicUrlOnSuccess() {
+    void uploadBuildsKeyWithTenantAndContextAndForwardsOriginalName() {
         byte[] content = new byte[] { 10, 20, 30 };
         MockMultipartFile file = new MockMultipartFile(
-                "file", "photo.png", "image/png", content);
+                "file", "mi-foto.png", "image/png", content);
 
-        String expectedUrl = "https://pub-xxxx.r2.dev/7/some-uuid.png";
-        when(storageService.upload(any(), anyString(), eq("image/png"))).thenReturn(expectedUrl);
+        String expectedUrl = "https://pub-xxxx.r2.dev/7/products/some-uuid.png";
+        when(storageService.upload(any(), anyString(), eq("image/png"), anyString()))
+                .thenReturn(expectedUrl);
 
-        String result = mediaService.upload(file, TENANT_ID);
+        String result = mediaService.upload(file, TENANT_ID, CONTEXT);
 
         assertThat(result).isEqualTo(expectedUrl);
 
         ArgumentCaptor<String> keyCaptor = ArgumentCaptor.forClass(String.class);
-        verify(storageService).upload(eq(content), keyCaptor.capture(), eq("image/png"));
-        // La clave se organiza por tenant y termina con la extensión derivada del tipo.
+        ArgumentCaptor<String> nameCaptor = ArgumentCaptor.forClass(String.class);
+        verify(storageService).upload(eq(content), keyCaptor.capture(), eq("image/png"), nameCaptor.capture());
+        // La clave se organiza por tenant y contexto, y termina con la extensión derivada del tipo.
         assertThat(keyCaptor.getValue())
-                .startsWith(TENANT_ID + "/")
+                .startsWith(TENANT_ID + "/" + CONTEXT + "/")
                 .endsWith(".png");
+        // El nombre original se reenvía al storage para guardarlo como metadata.
+        assertThat(nameCaptor.getValue()).isEqualTo("mi-foto.png");
+    }
+
+    @Test
+    void listRejectsInvalidContext() {
+        assertThatThrownBy(() -> mediaService.list(TENANT_ID, "avatars"))
+                .isInstanceOf(InvalidFileException.class)
+                .hasMessageContaining("Contexto no permitido");
+
+        verify(storageService, never()).list(anyString());
+    }
+
+    @Test
+    void listFiltersByTenantAndContextSubfolder() {
+        StoredObject stored = new StoredObject(
+                "https://pub-xxxx.r2.dev/7/products/a.png", "a.png", Instant.EPOCH);
+        when(storageService.list(anyString())).thenReturn(List.of(stored));
+
+        List<StoredObject> result = mediaService.list(TENANT_ID, CONTEXT);
+
+        assertThat(result).containsExactly(stored);
+        // El prefijo acota a la subcarpeta exacta del contexto (con barra final).
+        verify(storageService).list(TENANT_ID + "/" + CONTEXT + "/");
     }
 }
