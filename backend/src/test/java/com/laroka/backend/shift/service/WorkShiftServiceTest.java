@@ -103,6 +103,37 @@ class WorkShiftServiceTest {
     }
 
     @Test
+    void openShift_inactiveBranch_throwsBusinessException() {
+        Branch branch = Branch.builder().id(1).name("Playa Unión").active(false).build();
+        StaffUser opener = staffUser();
+
+        when(staffUserRepository.findById(10)).thenReturn(Optional.of(opener));
+        when(branchRepository.findById(1)).thenReturn(Optional.of(branch));
+
+        assertThatThrownBy(() -> workShiftService.openShift(1, 10))
+            .isInstanceOf(BusinessException.class)
+            .hasMessage("No se puede abrir turno en una sucursal desactivada");
+
+        verify(workShiftRepository, never()).save(any());
+    }
+
+    @Test
+    void openShift_activeBranch_createsShift() {
+        Branch branch = Branch.builder().id(1).name("Playa Unión").active(true).build();
+        StaffUser opener = staffUser();
+
+        when(staffUserRepository.findById(10)).thenReturn(Optional.of(opener));
+        when(branchRepository.findById(1)).thenReturn(Optional.of(branch));
+        when(workShiftRepository.findByBranchIdAndStatus(1, ShiftStatus.OPEN)).thenReturn(Optional.empty());
+        when(workShiftRepository.save(any(WorkShift.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        OpenShiftResult result = workShiftService.openShift(1, 10);
+
+        assertThat(result.shift().getStatus()).isEqualTo(ShiftStatus.OPEN);
+        verify(workShiftRepository).save(any(WorkShift.class));
+    }
+
+    @Test
     void openShift_withExistingOpenShift_closesPreviousAndCreatesNew() {
         Branch branch = branch();
         StaffUser opener = staffUser();

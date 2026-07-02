@@ -60,6 +60,12 @@ public class WorkShiftService {
         Branch branch = branchRepository.findById(branchId)
             .orElseThrow(() -> new BranchNotFoundException(branchId));
 
+        // US-15-10: una sucursal desactivada no puede abrir turno — cierra la
+        // ventana por la que una sucursal inactiva volvería a aceptar pedidos.
+        if (!branch.isActive()) {
+            throw new BusinessException("No se puede abrir turno en una sucursal desactivada");
+        }
+
         boolean previousShiftClosed = false;
         Optional<WorkShift> existing = workShiftRepository.findByBranchIdAndStatus(branchId, ShiftStatus.OPEN);
         if (existing.isPresent()) {
