@@ -179,6 +179,7 @@ export default function BranchDrawer({ open, mode, branch, onClose, onSaved }) {
               value={form.imageUrl || null}
               onChange={url => setField('imageUrl', url)}
               token={token}
+              context="branches"
               aspectRatio={3.1}
               helperText="Recomendado: imagen horizontal, tipo banner"
             />

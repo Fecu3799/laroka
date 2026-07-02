@@ -468,6 +468,22 @@
 
 ---
 
+## Sprint Fix R2 Storage
+
+### Backend
+
+| ID | Historia | Criterios de Aceptación | Prioridad |
+|---|---|---|---|
+| US-R2-01 | Como sistema, necesito que las imágenes subidas a R2 se organicen en subcarpetas por contexto y conserven su nombre original como metadata, para poder listarlas y mostrarlas de forma reconocible. | La key de subida pasa de `{tenantId}/{uuid}.{ext}` a `{tenantId}/{context}/{uuid}.{ext}`, donde `context` es uno de `products`, `branches`, `logo` — recibido como parámetro en `POST /backoffice/media/upload` (nuevo campo en el multipart, validado contra una lista cerrada de valores permitidos, 400 si no coincide). Al subir, se adjunta el nombre original del archivo como metadata custom del objeto en R2 (`x-amz-meta-original-name` o el mecanismo equivalente del SDK de S3 usado). Nuevo endpoint `GET /backoffice/media?context={context}` que lista los objetos de esa subcarpeta del tenant vía `ListObjectsV2`, retornando por cada uno `{ url, originalName, uploadedAt }` — `originalName` leído de la metadata (si no está presente, por ejemplo en archivos subidos antes de este cambio, se omite o se retorna null sin romper el listado). Test unitario cubre: upload con context válido genera la key correcta y persiste la metadata, context inválido retorna 400, listado retorna solo objetos de la subcarpeta correspondiente con su metadata cuando existe. | Alta |
+
+### Frontend: Backoffice
+
+| ID | Historia | Criterios de Aceptación | Prioridad |
+|---|---|---|---|
+| US-R2-F-02 | Como ADMIN, necesito poder elegir una imagen ya subida en vez de subir una nueva, para no duplicar archivos de la misma foto. | En `ImageUploader`, agregar una pestaña o botón "Elegir de la galería" junto al de "Subir nueva imagen". Al seleccionarlo, muestra una grilla de miniaturas obtenida de `GET /backoffice/media?context={context}` (el `context` correspondiente al uso: `products`, `branches`, o `logo`, pasado como nueva prop del componente). Cada miniatura muestra el `originalName` si está disponible (fallback a la fecha de subida si no lo tiene, para imágenes previas a este cambio). Al elegir una imagen existente, se usa su URL directamente sin volver a subir nada — mismo comportamiento final que un upload exitoso (`onChange(url)`). Sigue permitiendo subir una imagen nueva como alternativa. | Media |
+
+---
+
 ## Sprint 16 — Impresión y Descarga de Tickets (Frontend Backoffice)
 
 | ID       | Historia                                                                                                                                  | Criterios de Aceptación                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | Prioridad |

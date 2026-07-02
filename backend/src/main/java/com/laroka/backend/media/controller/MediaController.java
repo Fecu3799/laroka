@@ -1,15 +1,19 @@
 package com.laroka.backend.media.controller;
 
+import java.util.List;
+
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.laroka.backend.media.dto.MediaObjectResponseDTO;
 import com.laroka.backend.media.dto.MediaUploadResponseDTO;
 import com.laroka.backend.media.service.MediaService;
 import com.laroka.backend.shared.security.CustomUserDetails;
@@ -19,16 +23,16 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 
 /**
- * Endpoint de subida de imágenes a Cloudflare R2 (US-15-01).
+ * Endpoints de subida y listado de imágenes en Cloudflare R2 (US-15-01, US-R2-01).
  *
- * Solo expone el endpoint; toda la lógica vive en {@link MediaService}. El
+ * Solo exponen los endpoints; toda la lógica vive en {@link MediaService}. El
  * tenant se extrae del JWT del usuario autenticado, igual que en el resto de
  * endpoints de backoffice.
  */
 @RestController
 @RequestMapping("/backoffice/media")
 @RequiredArgsConstructor
-@Tag(name = "Backoffice Media", description = "Upload de imágenes a R2")
+@Tag(name = "Backoffice Media", description = "Upload y listado de imágenes en R2")
 public class MediaController {
 
     private final MediaService mediaService;
@@ -36,12 +40,30 @@ public class MediaController {
     @PostMapping(path = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     @Operation(summary = "Subir imagen",
-            description = "Sube una imagen (JPEG, PNG o WebP) a R2 y retorna su URL pública. "
+            description = "Sube una imagen (JPEG, PNG o WebP) a R2 bajo la subcarpeta del "
+                    + "contexto (products, branches o logo) y retorna su URL pública. "
                     + "No persiste ninguna entidad.")
     public ResponseEntity<MediaUploadResponseDTO> upload(
             @RequestParam("file") MultipartFile file,
+            @RequestParam("context") String context,
             @AuthenticationPrincipal CustomUserDetails principal) {
-        String url = mediaService.upload(file, principal.getTenantId());
+        String url = mediaService.upload(file, principal.getTenantId(), context);
         return ResponseEntity.ok(new MediaUploadResponseDTO(url));
+    }
+
+    @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    @Operation(summary = "Listar imágenes",
+            description = "Lista las imágenes del tenant en la subcarpeta del contexto pedido "
+                    + "(products, branches o logo), con su URL, nombre original y fecha de subida.")
+    public ResponseEntity<List<MediaObjectResponseDTO>> list(
+            @RequestParam("context") String context,
+            @AuthenticationPrincipal CustomUserDetails principal) {
+        List<MediaObjectResponseDTO> objects = mediaService.list(principal.getTenantId(), context)
+                .stream()
+                .map(object -> new MediaObjectResponseDTO(
+                        object.url(), object.originalName(), object.uploadedAt()))
+                .toList();
+        return ResponseEntity.ok(objects);
     }
 }

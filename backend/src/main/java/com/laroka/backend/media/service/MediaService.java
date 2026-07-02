@@ -1,6 +1,8 @@
 package com.laroka.backend.media.service;
 
 import java.io.IOException;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -13,11 +15,11 @@ import com.laroka.backend.media.exception.StorageException;
 import lombok.RequiredArgsConstructor;
 
 /**
- * Lógica de negocio del upload de imágenes (US-15-01).
+ * Lógica de negocio del upload y listado de imágenes (US-15-01, US-R2-01).
  *
- * Valida tipo y tamaño del archivo, organiza la clave por tenant
- * ({tenantId}/{uuid}.{ext}) y delega la subida al {@link StorageService}. No
- * persiste nada en base de datos: solo sube y retorna la URL pública.
+ * Valida tipo y tamaño del archivo, organiza la clave por tenant y contexto
+ * ({tenantId}/{context}/{uuid}.{ext}) y delega la subida al {@link StorageService}.
+ * No persiste nada en base de datos: solo sube/lista y retorna URLs públicas.
  */
 @Service
 @RequiredArgsConstructor
@@ -26,6 +28,12 @@ public class MediaService {
     private static final String CONTENT_TYPE_JPEG = "image/jpeg";
     private static final String CONTENT_TYPE_PNG = "image/png";
     private static final String CONTENT_TYPE_WEBP = "image/webp";
+
+    /**
+     * Contextos válidos: subcarpetas cerradas bajo las que se organizan las
+     * imágenes del tenant. Cualquier otro valor se rechaza con 400.
+     */
+    private static final Set<String> VALID_CONTEXTS = Set.of("products", "branches", "logo");
 
     private final StorageService storageService;
 
@@ -37,12 +45,16 @@ public class MediaService {
      *
      * @param file     archivo multipart recibido (campo "file")
      * @param tenantId tenant del usuario autenticado (extraído del JWT)
+     * @param context  subcarpeta de destino: products, branches o logo
      * @return URL pública del archivo subido
-     * @throws InvalidFileException si el tipo no es permitido, el tamaño excede
-     *                              el máximo o el archivo está vacío
+     * @throws InvalidFileException si el contexto no es válido, el tipo no es
+     *                              permitido, el tamaño excede el máximo o el
+     *                              archivo está vacío
      * @throws StorageException     si el almacenamiento falla
      */
-    public String upload(MultipartFile file, Integer tenantId) {
+    public String upload(MultipartFile file, Integer tenantId, String context) {
+        validateContext(context);
+
         if (file == null || file.isEmpty()) {
             throw new InvalidFileException("El archivo es obligatorio y no puede estar vacío");
         }
@@ -55,7 +67,7 @@ public class MediaService {
                     "El archivo excede el tamaño máximo permitido de " + maxUploadSizeMb + " MB");
         }
 
-        String key = tenantId + "/" + UUID.randomUUID() + extension;
+        String key = tenantId + "/" + context + "/" + UUID.randomUUID() + extension;
 
         byte[] content;
         try {
@@ -64,7 +76,34 @@ public class MediaService {
             throw new StorageException("No se pudo leer el archivo recibido", ex);
         }
 
-        return storageService.upload(content, key, file.getContentType());
+        return storageService.upload(content, key, file.getContentType(), file.getOriginalFilename());
+    }
+
+    /**
+     * Lista los objetos subidos por el tenant en la subcarpeta del contexto pedido.
+     *
+     * @param tenantId tenant del usuario autenticado (extraído del JWT)
+     * @param context  subcarpeta a listar: products, branches o logo
+     * @return objetos de esa subcarpeta; lista vacía si no hay ninguno
+     * @throws InvalidFileException si el contexto no es válido
+     * @throws StorageException     si el listado falla
+     */
+    public List<StoredObject> list(Integer tenantId, String context) {
+        validateContext(context);
+        // La barra final acota el listado a la subcarpeta exacta del contexto.
+        String prefix = tenantId + "/" + context + "/";
+        return storageService.list(prefix);
+    }
+
+    /**
+     * Valida el contexto contra la lista cerrada de subcarpetas permitidas.
+     */
+    private void validateContext(String context) {
+        if (context == null || !VALID_CONTEXTS.contains(context)) {
+            throw new InvalidFileException(
+                    "Contexto no permitido: " + context
+                            + ". Valores válidos: " + VALID_CONTEXTS);
+        }
     }
 
     /**

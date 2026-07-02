@@ -1,10 +1,19 @@
 import { useRef, useState, useEffect, useCallback } from 'react'
 import ReactDOM from 'react-dom'
 import Cropper from 'react-easy-crop'
-import { uploadImage } from '../../services/mediaService'
+import { uploadImage, fetchMedia } from '../../services/mediaService'
 import './ImageUploader.css'
 
 const ACCEPTED = 'image/jpeg,image/png,image/webp'
+
+// Fallback de etiqueta cuando la miniatura no tiene originalName (imágenes
+// subidas antes de US-R2-01): fecha de subida formateada.
+function formatUploadedAt(iso) {
+  if (!iso) return 'Imagen'
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return 'Imagen'
+  return date.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+}
 // Tipos que preservan transparencia; si el original no es uno de estos, el recorte
 // se emite como JPEG. Así un logo PNG/WebP no pierde su fondo transparente.
 const TRANSPARENT_TYPES = new Set(['image/png', 'image/webp'])
@@ -58,12 +67,20 @@ async function getCroppedBlob(imageSrc, pixelCrop, mimeType) {
  * - aspectRatio: número ancho/alto del marco de recorte. Si es null/omitido, se
  *   omite el editor y la imagen se sube tal cual (cualquier proporción), sin recorte.
  * - helperText: texto de ayuda opcional, visible antes de seleccionar el archivo.
+ * - context: subcarpeta de R2 (products, branches o logo). Habilita el picker
+ *   "Elegir de la galería" (US-R2-F-02) y define dónde se sube/lista la imagen.
  */
-export default function ImageUploader({ value, onChange, token, label, aspectRatio = null, helperText }) {
+export default function ImageUploader({ value, onChange, token, label, aspectRatio = null, helperText, context }) {
   const inputRef = useRef(null)
   const [localPreview, setLocalPreview] = useState(null)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState(null)
+
+  // Estado del picker de galería (US-R2-F-02).
+  const [galleryOpen, setGalleryOpen] = useState(false)
+  const [galleryItems, setGalleryItems] = useState([])
+  const [galleryLoading, setGalleryLoading] = useState(false)
+  const [galleryError, setGalleryError] = useState(null)
 
   // Estado del editor de recorte.
   const [cropSrc, setCropSrc] = useState(null)     // objectURL del archivo original
@@ -117,7 +134,7 @@ export default function ImageUploader({ value, onChange, token, label, aspectRat
     setLocalPreview(URL.createObjectURL(file)) // preview local inmediato
     setUploading(true)
     try {
-      const uploadedUrl = await uploadImage(file, token)
+      const uploadedUrl = await uploadImage(file, token, context)
       onChange(uploadedUrl)
     } catch (err) {
       // apiFetch ya emitió un toast con el mensaje del backend; lo repetimos inline.
@@ -148,7 +165,7 @@ export default function ImageUploader({ value, onChange, token, label, aspectRat
       const outType = TRANSPARENT_TYPES.has(sourceMeta.type) ? sourceMeta.type : 'image/jpeg'
       const blob = await getCroppedBlob(cropSrc, croppedAreaPixels, outType)
       const croppedFile = new File([blob], sourceMeta.name, { type: outType })
-      const uploadedUrl = await uploadImage(croppedFile, token)
+      const uploadedUrl = await uploadImage(croppedFile, token, context)
       // Preview local inmediato con el recorte ya generado.
       setLocalPreview(URL.createObjectURL(blob))
       onChange(uploadedUrl)
@@ -159,6 +176,37 @@ export default function ImageUploader({ value, onChange, token, label, aspectRat
     } finally {
       setUploading(false)
     }
+  }
+
+  async function openGallery() {
+    if (uploading) return
+    setError(null)
+    setGalleryError(null)
+    setGalleryOpen(true)
+    setGalleryLoading(true)
+    try {
+      const items = await fetchMedia(context, token)
+      setGalleryItems(Array.isArray(items) ? items : [])
+    } catch (err) {
+      // apiFetch ya emitió un toast; lo repetimos inline dentro del picker.
+      setGalleryError(err?.message ?? 'No se pudieron cargar las imágenes.')
+      setGalleryItems([])
+    } finally {
+      setGalleryLoading(false)
+    }
+  }
+
+  function closeGallery() {
+    setGalleryOpen(false)
+  }
+
+  // Selecciona una imagen ya subida: mismo resultado que un upload exitoso, sin
+  // pasar por el editor de recorte ni volver a subir nada.
+  function selectFromGallery(url) {
+    setError(null)
+    setLocalPreview(null) // descarta cualquier preview local; manda `value`
+    onChange(url)
+    closeGallery()
   }
 
   const editor = editing && (
@@ -205,6 +253,49 @@ export default function ImageUploader({ value, onChange, token, label, aspectRat
     </div>
   )
 
+  const gallery = galleryOpen && (
+    <div className="iu-gallery-backdrop" role="dialog" aria-modal="true" aria-label="Elegir de la galería" onClick={closeGallery}>
+      <div className="iu-gallery-modal" onClick={e => e.stopPropagation()}>
+        <div className="iu-gallery-header">
+          <h3 className="iu-gallery-title">Elegir de la galería</h3>
+          <button type="button" className="iu-gallery-close" onClick={closeGallery} aria-label="Cerrar">×</button>
+        </div>
+
+        {galleryLoading && (
+          <div className="iu-gallery-status" aria-live="polite">
+            <span className="iu-spinner" aria-hidden="true" />
+            Cargando…
+          </div>
+        )}
+
+        {!galleryLoading && galleryError && <p className="iu-error">{galleryError}</p>}
+
+        {!galleryLoading && !galleryError && galleryItems.length === 0 && (
+          <p className="iu-gallery-status">Todavía no hay imágenes en la galería.</p>
+        )}
+
+        {!galleryLoading && !galleryError && galleryItems.length > 0 && (
+          <div className="iu-gallery-grid">
+            {galleryItems.map(item => (
+              <button
+                type="button"
+                key={item.url}
+                className="iu-thumb"
+                onClick={() => selectFromGallery(item.url)}
+                title={item.originalName || formatUploadedAt(item.uploadedAt)}
+              >
+                <img src={item.url} alt={item.originalName || 'Imagen'} className="iu-thumb-img" />
+                <span className="iu-thumb-label">
+                  {item.originalName || formatUploadedAt(item.uploadedAt)}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+
   return (
     <div className="iu">
       {label && <span className="iu-label">{label}</span>}
@@ -221,9 +312,16 @@ export default function ImageUploader({ value, onChange, token, label, aspectRat
           )}
         </div>
 
-        <button type="button" className="iu-btn" onClick={openPicker} disabled={uploading}>
-          {preview ? 'Reemplazar imagen' : 'Subir imagen'}
-        </button>
+        <div className="iu-actions">
+          <button type="button" className="iu-btn" onClick={openPicker} disabled={uploading}>
+            {preview ? 'Reemplazar imagen' : 'Subir imagen'}
+          </button>
+          {context && (
+            <button type="button" className="iu-btn" onClick={openGallery} disabled={uploading}>
+              Elegir de la galería
+            </button>
+          )}
+        </div>
 
         <input
           ref={inputRef}
@@ -241,6 +339,7 @@ export default function ImageUploader({ value, onChange, token, label, aspectRat
       {error && !editing && <p className="iu-error">{error}</p>}
 
       {editor && ReactDOM.createPortal(editor, document.body)}
+      {gallery && ReactDOM.createPortal(gallery, document.body)}
     </div>
   )
 }
