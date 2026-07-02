@@ -42,6 +42,7 @@ import com.laroka.backend.order.entity.OrderStatus;
 import com.laroka.backend.order.entity.OrderType;
 import com.laroka.backend.order.entity.PaymentMethod;
 import com.laroka.backend.order.exception.OrderNotFoundException;
+import com.laroka.backend.order.exception.ProductUnavailableException;
 import com.laroka.backend.order.mapper.OrderMapper;
 import com.laroka.backend.order.repository.OrderRepository;
 import com.laroka.backend.order.repository.OrderStatusHistoryRepository;
@@ -409,7 +410,7 @@ class OrderServiceTest {
     // --- createOrder: disponibilidad de producto por sucursal (US-15-09) ---
 
     @Test
-    void createOrder_clientOrder_unavailableProduct_throwsBusinessException() {
+    void createOrder_clientOrder_unavailableProduct_throwsProductUnavailableWithProductId() {
         Branch branch = branch(tenant());
         Product product = product(new BigDecimal("2800.00"));
 
@@ -421,9 +422,13 @@ class OrderServiceTest {
 
         assertThatThrownBy(() ->
                 service.createOrder(takeawayOrder(branch), List.of(itemFor(1, 1)), PaymentMethod.MERCADOPAGO, "key-unavail-client"))
+                .isInstanceOf(ProductUnavailableException.class)
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("Muzzarella")
-                .hasMessageContaining("no está disponible");
+                .hasMessageContaining("no está disponible")
+                // El productId viaja como dato estructurado (US-15-CF-05), no solo en el mensaje.
+                .extracting(e -> ((ProductUnavailableException) e).getProductId())
+                .isEqualTo(product.getId());
         verify(orderRepository, never()).save(any());
     }
 
@@ -440,8 +445,10 @@ class OrderServiceTest {
 
         assertThatThrownBy(() ->
                 service.createOrder(takeawayOrder(branch), List.of(itemFor(1, 1)), PaymentMethod.MERCADOPAGO, "key-nobp-client"))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("Muzzarella");
+                .isInstanceOf(ProductUnavailableException.class)
+                .hasMessageContaining("Muzzarella")
+                .extracting(e -> ((ProductUnavailableException) e).getProductId())
+                .isEqualTo(product.getId());
         verify(orderRepository, never()).save(any());
     }
 

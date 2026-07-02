@@ -319,4 +319,36 @@ class OrderFlowsIntegrationTest {
         assertThat(orderRepository.findById(orderId).orElseThrow().getStatus())
             .isEqualTo(OrderStatus.DELIVERED);
     }
+
+    // --- Flujo 4: producto no disponible (US-15-09 / US-15-CF-05) ---
+
+    @Test
+    @Order(4)
+    void createOrder_clientOrder_unavailableProduct_returns422WithProductId() throws Exception {
+        // El producto 1 se marca no disponible en la sucursal. Se restaura al final
+        // para no afectar el estado compartido entre tests ordenados.
+        jdbcTemplate.update("UPDATE branch_product SET available = false WHERE branch_id = ? AND product_id = ?",
+            BRANCH_ID, 1);
+        try {
+            String body = String.format("""
+                {
+                    "branchId": %d,
+                    "orderType": "TAKEAWAY",
+                    "paymentMethod": "CASH",
+                    "items": [{"productId": 1, "quantity": 1}]
+                }
+                """, BRANCH_ID);
+
+            mockMvc.perform(post("/orders")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(body))
+                .andExpect(status().isUnprocessableEntity())
+                // El productId viaja como campo estructurado del body, no solo en el string.
+                .andExpect(jsonPath("$.productId").value(1))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("no está disponible")));
+        } finally {
+            jdbcTemplate.update("UPDATE branch_product SET available = true WHERE branch_id = ? AND product_id = ?",
+                BRANCH_ID, 1);
+        }
+    }
 }

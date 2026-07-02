@@ -45,6 +45,7 @@ import com.laroka.backend.order.entity.OrderStatusHistory;
 import com.laroka.backend.order.entity.OrderType;
 import com.laroka.backend.order.entity.PaymentMethod;
 import com.laroka.backend.order.exception.OrderNotFoundException;
+import com.laroka.backend.order.exception.ProductUnavailableException;
 import com.laroka.backend.order.repository.OrderItemRepository;
 import com.laroka.backend.order.repository.OrderRepository;
 import com.laroka.backend.order.repository.OrderStatusHistoryRepository;
@@ -430,7 +431,7 @@ public class OrderService {
                     && branchProduct.map(bp -> !Boolean.TRUE.equals(bp.getAvailable())).orElse(true)) {
                 log.warn("Order rejected — product not available | branchId={} productId={} productName={}",
                         branch.getId(), product.getId(), product.getName());
-                throw new BusinessException("El producto no está disponible: " + product.getName());
+                throw new ProductUnavailableException(product.getId(), product.getName());
             }
 
             BigDecimal unitPrice = branchProduct

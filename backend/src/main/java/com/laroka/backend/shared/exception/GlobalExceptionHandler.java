@@ -26,6 +26,7 @@ import com.laroka.backend.auth.exception.InvalidCredentialsException;
 import com.laroka.backend.auth.exception.RefreshTokenInvalidException;
 import com.laroka.backend.media.exception.InvalidFileException;
 import com.laroka.backend.media.exception.StorageException;
+import com.laroka.backend.order.exception.ProductUnavailableException;
 
 @Slf4j
 @ControllerAdvice
@@ -53,6 +54,19 @@ public class GlobalExceptionHandler {
 	public ResponseEntity<Map<String, Object>> handleEntityNotFound(
 			EntityNotFoundException ex, HttpServletRequest request) {
 		return buildResponse(HttpStatus.NOT_FOUND, "Recurso no encontrado: " + ex.getMessage(), null, request);
+	}
+
+	// Más específico que BusinessException: además del mensaje, expone productId
+	// como campo estructurado del body para que el cliente (US-15-CF-05) sepa qué
+	// producto remover del carrito sin parsear el string del mensaje.
+	@ExceptionHandler(ProductUnavailableException.class)
+	public ResponseEntity<Map<String, Object>> handleProductUnavailable(
+			ProductUnavailableException ex, HttpServletRequest request) {
+		log.warn("ProductUnavailableException en {} {}: productId={} {}",
+				request.getMethod(), request.getRequestURI(), ex.getProductId(), ex.getMessage());
+		Map<String, Object> extra = new LinkedHashMap<>();
+		extra.put("productId", ex.getProductId());
+		return buildResponse(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage(), null, extra, request);
 	}
 
 	@ExceptionHandler(BusinessException.class)
@@ -148,10 +162,19 @@ public class GlobalExceptionHandler {
 
 	private ResponseEntity<Map<String, Object>> buildResponse(
 			HttpStatus status, String message, Map<String, String> errors, HttpServletRequest request) {
+		return buildResponse(status, message, errors, null, request);
+	}
+
+	private ResponseEntity<Map<String, Object>> buildResponse(
+			HttpStatus status, String message, Map<String, String> errors,
+			Map<String, Object> extra, HttpServletRequest request) {
 		Map<String, Object> body = new LinkedHashMap<>();
 		body.put("status", status.value());
 		body.put("error", status.getReasonPhrase());
 		body.put("message", message);
+		if (extra != null) {
+			extra.forEach(body::put);
+		}
 		if (errors != null && !errors.isEmpty()) {
 			body.put("errors", errors);
 		}

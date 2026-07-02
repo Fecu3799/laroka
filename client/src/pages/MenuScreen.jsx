@@ -82,13 +82,19 @@ function ProductImage({ src, alt }) {
 }
 
 function ProductCard({ product, onSelect, onAdd }) {
+  // US-15-CF-05: un producto no disponible en la sucursal (available=false) se
+  // muestra atenuado, con badge "No disponible" y precio visible, pero no es
+  // clickeable: el tap no abre el detalle ni lo agrega al carrito.
+  const unavailable = product.available === false
+
   return (
     <li
-      className="product-card"
-      onClick={() => onSelect(product)}
-      role="button"
-      tabIndex={0}
-      onKeyDown={e => e.key === 'Enter' && onSelect(product)}
+      className={`product-card${unavailable ? ' product-card--unavailable' : ''}`}
+      onClick={unavailable ? undefined : () => onSelect(product)}
+      role={unavailable ? undefined : 'button'}
+      tabIndex={unavailable ? undefined : 0}
+      onKeyDown={unavailable ? undefined : (e => e.key === 'Enter' && onSelect(product))}
+      aria-disabled={unavailable || undefined}
     >
       <ProductImage src={product.imageUrl} alt={product.name} />
       <div className="product-info">
@@ -96,15 +102,22 @@ function ProductCard({ product, onSelect, onAdd }) {
         {product.description && (
           <p className="product-description">{product.description}</p>
         )}
-        <span className="product-price">{formatPrice(product.price)}</span>
+        <div className="product-price-row">
+          <span className="product-price">{formatPrice(product.price)}</span>
+          {unavailable && (
+            <span className="product-unavailable-badge">No disponible</span>
+          )}
+        </div>
       </div>
-      <button
-        className="product-add-btn"
-        aria-label={`Agregar ${product.name}`}
-        onClick={e => { e.stopPropagation(); onAdd(product) }}
-      >
-        <AddIcon />
-      </button>
+      {!unavailable && (
+        <button
+          className="product-add-btn"
+          aria-label={`Agregar ${product.name}`}
+          onClick={e => { e.stopPropagation(); onAdd(product) }}
+        >
+          <AddIcon />
+        </button>
+      )}
     </li>
   )
 }

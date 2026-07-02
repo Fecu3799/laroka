@@ -227,11 +227,23 @@ export function CartScreen({ items, extras = [], onBack, onRemove, onUpdateQty, 
       items: items.map(i => ({ productId: i.id, quantity: i.qty })),
       ...(pushSubscriptionId ? { pushSubscriptionId } : {}),
     }
-    const res = await apiFetch(`${API_BASE}/orders`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    })
+    let res
+    try {
+      res = await apiFetch(`${API_BASE}/orders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+    } catch (err) {
+      // apiFetch ya mostró el toast con el mensaje del backend (indica qué
+      // producto no está disponible). El 422 de producto no disponible trae el
+      // productId como campo estructurado (US-15-CF-05): lo removemos del carrito
+      // para que el reintento no vuelva a fallar por lo mismo.
+      if (err?.status === 422 && err.body?.productId != null) {
+        onRemove(err.body.productId)
+      }
+      throw err
+    }
     const data = await res.json()
     onClear()
 
