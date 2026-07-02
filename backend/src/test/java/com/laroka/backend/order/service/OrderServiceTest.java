@@ -138,12 +138,36 @@ class OrderServiceTest {
                 .build();
     }
 
+    private Order backofficeOrder(Branch branch) {
+        return Order.builder()
+                .branch(Branch.builder().id(branch.getId()).build())
+                .orderType(OrderType.TAKEAWAY)
+                .origin(OrderOrigin.BACKOFFICE)
+                .build();
+    }
+
+    private BranchProduct availableBranchProduct(Branch branch, Product product) {
+        return BranchProduct.builder()
+                .branch(branch).product(product)
+                .available(true).priceOverride(null)
+                .build();
+    }
+
+    private BranchProduct unavailableBranchProduct(Branch branch, Product product) {
+        return BranchProduct.builder()
+                .branch(branch).product(product)
+                .available(false).priceOverride(null)
+                .build();
+    }
+
     private void stubBaseCreation(Branch branch, Product product) {
         when(idempotencyStore.get(any())).thenReturn(Optional.empty());
         when(branchRepository.findById(branch.getId())).thenReturn(Optional.of(branch));
         when(productRepository.findById(product.getId())).thenReturn(Optional.of(product));
+        // US-15-09: para pedidos CLIENT el producto debe estar disponible en la
+        // sucursal. priceOverride=null preserva el precio base del producto.
         when(branchProductRepository.findByBranchIdAndProductId(branch.getId(), product.getId()))
-                .thenReturn(Optional.empty());
+                .thenReturn(Optional.of(availableBranchProduct(branch, product)));
         when(workShiftRepository.findByBranchIdAndStatus(branch.getId(), ShiftStatus.OPEN))
                 .thenReturn(Optional.of(WorkShift.builder().id(UUID.randomUUID()).build()));
         when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -262,7 +286,7 @@ class OrderServiceTest {
         when(branchRepository.findById(branch.getId())).thenReturn(Optional.of(branch));
         when(productRepository.findById(product.getId())).thenReturn(Optional.of(product));
         when(branchProductRepository.findByBranchIdAndProductId(branch.getId(), product.getId()))
-                .thenReturn(Optional.empty());
+                .thenReturn(Optional.of(availableBranchProduct(branch, product)));
         when(workShiftRepository.findByBranchIdAndStatus(branch.getId(), ShiftStatus.OPEN))
                 .thenReturn(Optional.empty());
 
@@ -380,6 +404,81 @@ class OrderServiceTest {
                 service.createOrder(takeawayOrder(branch), List.of(itemFor(1, 1)), PaymentMethod.MERCADOPAGO, "key-not-accepting"))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("El local no está aceptando pedidos en este momento");
+    }
+
+    // --- createOrder: disponibilidad de producto por sucursal (US-15-09) ---
+
+    @Test
+    void createOrder_clientOrder_unavailableProduct_throwsBusinessException() {
+        Branch branch = branch(tenant());
+        Product product = product(new BigDecimal("2800.00"));
+
+        when(idempotencyStore.get(any())).thenReturn(Optional.empty());
+        when(branchRepository.findById(branch.getId())).thenReturn(Optional.of(branch));
+        when(productRepository.findById(product.getId())).thenReturn(Optional.of(product));
+        when(branchProductRepository.findByBranchIdAndProductId(branch.getId(), product.getId()))
+                .thenReturn(Optional.of(unavailableBranchProduct(branch, product)));
+
+        assertThatThrownBy(() ->
+                service.createOrder(takeawayOrder(branch), List.of(itemFor(1, 1)), PaymentMethod.MERCADOPAGO, "key-unavail-client"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Muzzarella")
+                .hasMessageContaining("no está disponible");
+        verify(orderRepository, never()).save(any());
+    }
+
+    @Test
+    void createOrder_clientOrder_noBranchProduct_throwsBusinessException() {
+        Branch branch = branch(tenant());
+        Product product = product(new BigDecimal("2800.00"));
+
+        when(idempotencyStore.get(any())).thenReturn(Optional.empty());
+        when(branchRepository.findById(branch.getId())).thenReturn(Optional.of(branch));
+        when(productRepository.findById(product.getId())).thenReturn(Optional.of(product));
+        when(branchProductRepository.findByBranchIdAndProductId(branch.getId(), product.getId()))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() ->
+                service.createOrder(takeawayOrder(branch), List.of(itemFor(1, 1)), PaymentMethod.MERCADOPAGO, "key-nobp-client"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Muzzarella");
+        verify(orderRepository, never()).save(any());
+    }
+
+    @Test
+    void createOrder_backofficeOrder_unavailableProduct_createsOrderWithoutError() {
+        Branch branch = branch(tenant());
+        Product product = product(new BigDecimal("2800.00"));
+
+        when(idempotencyStore.get(any())).thenReturn(Optional.empty());
+        when(branchRepository.findById(branch.getId())).thenReturn(Optional.of(branch));
+        when(productRepository.findById(product.getId())).thenReturn(Optional.of(product));
+        when(branchProductRepository.findByBranchIdAndProductId(branch.getId(), product.getId()))
+                .thenReturn(Optional.of(unavailableBranchProduct(branch, product)));
+        when(workShiftRepository.findByBranchIdAndStatus(branch.getId(), ShiftStatus.OPEN))
+                .thenReturn(Optional.of(WorkShift.builder().id(UUID.randomUUID()).build()));
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(orderRepository.findByIdWithDetails(any()))
+                .thenReturn(Optional.of(minimalSavedOrder(OrderStatus.PENDING_PAYMENT)));
+
+        OrderCreationResult result = service.createOrder(
+                backofficeOrder(branch), List.of(itemFor(1, 1)), PaymentMethod.MERCADOPAGO, "key-unavail-bo");
+
+        assertThat(result.order()).isNotNull();
+        verify(orderRepository).save(any(Order.class));
+    }
+
+    @Test
+    void createOrder_backofficeOrder_availableProduct_createsOrder() {
+        Branch branch = branch(tenant());
+        Product product = product(new BigDecimal("2800.00"));
+        stubBaseCreation(branch, product);
+
+        OrderCreationResult result = service.createOrder(
+                backofficeOrder(branch), List.of(itemFor(1, 1)), PaymentMethod.MERCADOPAGO, "key-avail-bo");
+
+        assertThat(result.order()).isNotNull();
+        verify(orderRepository).save(any(Order.class));
     }
 
     // --- createOrder: idempotencia ---

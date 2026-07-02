@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -30,6 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.laroka.backend.branch.entity.Branch;
 import com.laroka.backend.branch.exception.BranchNotFoundException;
 import com.laroka.backend.branch.repository.BranchRepository;
+import com.laroka.backend.catalog.entity.BranchProduct;
 import com.laroka.backend.catalog.entity.Product;
 import com.laroka.backend.catalog.exception.ProductNotFoundException;
 import com.laroka.backend.catalog.repository.BranchProductRepository;
@@ -37,6 +39,7 @@ import com.laroka.backend.catalog.repository.ProductRepository;
 import com.laroka.backend.order.domain.OrderStateMachine;
 import com.laroka.backend.order.entity.Order;
 import com.laroka.backend.order.entity.OrderItem;
+import com.laroka.backend.order.entity.OrderOrigin;
 import com.laroka.backend.order.entity.OrderStatus;
 import com.laroka.backend.order.entity.OrderStatusHistory;
 import com.laroka.backend.order.entity.OrderType;
@@ -416,8 +419,21 @@ public class OrderService {
             Product product = productRepository.findById(item.getProduct().getId())
                     .orElseThrow(() -> new ProductNotFoundException(item.getProduct().getId()));
 
-            BigDecimal unitPrice = branchProductRepository
-                    .findByBranchIdAndProductId(branch.getId(), product.getId())
+            Optional<BranchProduct> branchProduct =
+                    branchProductRepository.findByBranchIdAndProductId(branch.getId(), product.getId());
+
+            // US-15-09: pedidos del client rechazan productos no disponibles en la
+            // sucursal (BranchProduct inexistente o available=false). El backoffice
+            // (ADMIN/STAFF) puede forzar el pedido igual — ya fue advertido en el
+            // frontend (US-15-F-09). Rechaza el pedido completo antes de persistir nada.
+            if (order.getOrigin() == OrderOrigin.CLIENT
+                    && branchProduct.map(bp -> !Boolean.TRUE.equals(bp.getAvailable())).orElse(true)) {
+                log.warn("Order rejected — product not available | branchId={} productId={} productName={}",
+                        branch.getId(), product.getId(), product.getName());
+                throw new BusinessException("El producto no está disponible: " + product.getName());
+            }
+
+            BigDecimal unitPrice = branchProduct
                     .map(bp -> bp.getPriceOverride() != null ? bp.getPriceOverride() : product.getPrice())
                     .orElse(product.getPrice());
 
