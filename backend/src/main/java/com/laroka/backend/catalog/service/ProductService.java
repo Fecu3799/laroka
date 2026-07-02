@@ -174,6 +174,13 @@ public class ProductService {
 	// la evicción podría ejecutarse ANTES del commit → una lectura concurrente repuebla el
 	// cache con el dato viejo (bajo READ COMMITTED) y queda stale. Con @CacheEvict solo, la
 	// evicción corre después de que saveAll commitea (mismo criterio que updateBranchConfig).
+	// US-15-08: todos los productos de la sucursal con su disponibilidad (available true y
+	// false), para el checklist de "Gestionar productos". Incluye sucursales inactivas a
+	// propósito: la lectura NO aplica el guard de sucursal activa (solo la escritura lo hace).
+	public List<BranchProduct> getBranchProducts(Integer branchId) {
+		return branchProductRepository.findByBranchIdWithProductAndCategory(branchId);
+	}
+
 	@CacheEvict(value = "menu", key = "#branchId")
 	public int updateBranchProductsAvailability(Integer branchId, List<Integer> productIds, boolean available) {
 		// Mismo guard de escritura que updateBranchConfig (US-15-06): una sucursal

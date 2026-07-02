@@ -471,6 +471,38 @@ class ProductServiceTest {
 		verify(branchProductRepository, never()).save(any());
 	}
 
+	// --- US-15-08: getBranchProducts (lista con disponibilidad, incluye inactivas) ---
+
+	@Test
+	void getBranchProducts_returnsProductsWithTheirAvailability() {
+		Tenant p = tenant();
+		Branch b = branch(p);
+		Product prodA = product(category(p), p);
+		Product prodB = product(category(p), p);
+		BranchProduct available = branchProduct(b, prodA, null);
+		BranchProduct hidden = branchProduct(b, prodB, null);
+		hidden.setAvailable(false);
+		when(branchProductRepository.findByBranchIdWithProductAndCategory(1))
+			.thenReturn(List.of(available, hidden));
+
+		List<BranchProduct> result = service.getBranchProducts(1);
+
+		assertThat(result).hasSize(2);
+		assertThat(result).extracting(BranchProduct::getAvailable).containsExactly(true, false);
+	}
+
+	@Test
+	void getBranchProducts_noActiveGuard_worksForInactiveBranch() {
+		// La lectura NO consulta branchRepository (no aplica guard de sucursal activa):
+		// una sucursal inactiva devuelve sus productos igual.
+		when(branchProductRepository.findByBranchIdWithProductAndCategory(2)).thenReturn(List.of());
+
+		List<BranchProduct> result = service.getBranchProducts(2);
+
+		assertThat(result).isEmpty();
+		verify(branchRepository, never()).findById(any());
+	}
+
 	// --- US-15-07: updateBranchProductsAvailability (bulk) ---
 
 	@Test

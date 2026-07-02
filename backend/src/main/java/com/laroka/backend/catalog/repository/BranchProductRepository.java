@@ -31,6 +31,14 @@ public interface BranchProductRepository extends JpaRepository<BranchProduct, Br
     // productId sin BranchProduct para esa sucursal simplemente no vienen en el resultado.
     List<BranchProduct> findByBranchIdAndProductIdIn(Integer branchId, List<Integer> productIds);
 
+    // US-15-08: todos los BranchProduct de una sucursal (disponibles y no) con product y
+    // category cargados (open-in-view=false), ordenados para agrupar por categoría en el front.
+    @Query("SELECT bp FROM BranchProduct bp "
+        + "JOIN FETCH bp.product p JOIN FETCH p.category c "
+        + "WHERE bp.branch.id = :branchId "
+        + "ORDER BY c.name ASC, p.name ASC")
+    List<BranchProduct> findByBranchIdWithProductAndCategory(@Param("branchId") Integer branchId);
+
     List<BranchProduct> findByProductId(Integer productId);
 
     // Carga branch + product en la misma query: la config por sucursal se mapea fuera de

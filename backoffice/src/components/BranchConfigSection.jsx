@@ -4,6 +4,7 @@ import { useConfig } from '../context/ConfigContext'
 import { setBranchStatus } from '../services/branchService'
 import BranchScheduleEditor from './BranchScheduleEditor'
 import BranchDrawer from './BranchDrawer'
+import BranchProductsDrawer from './BranchProductsDrawer'
 
 function ChevronIcon() {
   return (
@@ -33,6 +34,7 @@ export default function BranchConfigSection() {
   const [menuId, setMenuId] = useState(null)     // branchId con menú de acciones abierto
   const [menuUp, setMenuUp] = useState(false)    // abre hacia arriba si no hay espacio abajo
   const [drawer, setDrawer] = useState(null)     // { mode, branch } | null
+  const [productsDrawer, setProductsDrawer] = useState(null) // branch | null — gestión de productos
   const [showArchived, setShowArchived] = useState(false)
   const [confirm, setConfirm] = useState(null)   // { branch, nextActive } | null
   const [confirmBusy, setConfirmBusy] = useState(false)
@@ -50,7 +52,7 @@ export default function BranchConfigSection() {
       return
     }
     const rect = e.currentTarget.getBoundingClientRect()
-    const MENU_HEIGHT = 110 // alto aproximado del dropdown (hasta 2 items + padding)
+    const MENU_HEIGHT = 150 // alto aproximado del dropdown (hasta 3 items + padding)
     const spaceBelow = window.innerHeight - rect.bottom
     setMenuUp(spaceBelow < MENU_HEIGHT)
     setMenuId(branchId)
@@ -64,6 +66,11 @@ export default function BranchConfigSection() {
   function openEdit(branch) {
     setMenuId(null)
     setDrawer({ mode: 'edit', branch })
+  }
+
+  function openProductsManager(branch) {
+    setMenuId(null)
+    setProductsDrawer(branch)
   }
 
   function openConfirmStatus(branch) {
@@ -136,6 +143,9 @@ export default function BranchConfigSection() {
                           <div className={`config-menu${menuUp ? ' config-menu--up' : ''}`} role="menu">
                             <button className="config-menu-item" onClick={() => openEdit(branch)}>
                               Editar
+                            </button>
+                            <button className="config-menu-item" onClick={() => openProductsManager(branch)}>
+                              Gestionar productos
                             </button>
                             <button className="config-menu-item config-menu-item--danger" onClick={() => openConfirmStatus(branch)}>
                               Desactivar
@@ -222,6 +232,13 @@ export default function BranchConfigSection() {
           branch={drawer.branch}
           onClose={() => setDrawer(null)}
           onSaved={reloadBranches}
+        />
+      )}
+
+      {productsDrawer && (
+        <BranchProductsDrawer
+          branch={productsDrawer}
+          onClose={() => setProductsDrawer(null)}
         />
       )}
 

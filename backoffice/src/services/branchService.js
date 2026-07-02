@@ -60,6 +60,27 @@ export async function setBranchStatus(branchId, active, token) {
   })
 }
 
+// Lista todos los productos con su disponibilidad para una sucursal (US-15-08).
+// Incluye disponibles y no disponibles, con categoría, para el checklist de gestión.
+export async function fetchBranchProducts(branchId, token) {
+  const res = await apiFetch(`${API_URL}/backoffice/branches/${branchId}/products`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  return res.json()
+}
+
+// Actualización masiva de disponibilidad (US-15-07). Setea `available` para todos los
+// productId de la lista en esa sucursal. Una sucursal desactivada responde 422; apiFetch
+// propaga ese mensaje en err.message. Retorna { updated }.
+export async function updateBranchProductsAvailability(branchId, productIds, available, token) {
+  const res = await apiFetch(`${API_URL}/backoffice/branches/${branchId}/products/availability`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ productIds, available }),
+  })
+  return res.json()
+}
+
 // Horario semanal de una sucursal (ADMIN). Siempre 7 días (MON..SUN).
 export async function fetchBranchSchedule(branchId, token) {
   const res = await apiFetch(`${API_URL}/backoffice/branches/${branchId}/schedule`, {
