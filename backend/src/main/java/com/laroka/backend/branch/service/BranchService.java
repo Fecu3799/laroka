@@ -1,5 +1,6 @@
 package com.laroka.backend.branch.service;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
@@ -7,6 +8,7 @@ import java.util.Optional;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.laroka.backend.branch.entity.Branch;
@@ -19,6 +21,11 @@ import com.laroka.backend.branch.repository.BranchQRRepository;
 import com.laroka.backend.branch.repository.BranchRepository;
 import com.laroka.backend.branch.repository.BranchScheduleOverrideRepository;
 import com.laroka.backend.branch.repository.BranchScheduleRepository;
+import com.laroka.backend.catalog.entity.BranchProduct;
+import com.laroka.backend.catalog.repository.BranchProductRepository;
+import com.laroka.backend.catalog.repository.ProductRepository;
+import com.laroka.backend.shift.entity.ShiftStatus;
+import com.laroka.backend.shift.repository.WorkShiftRepository;
 import com.laroka.backend.tenant.entity.Tenant;
 import com.laroka.backend.tenant.exception.TenantNotFoundException;
 import com.laroka.backend.tenant.repository.TenantRepository;
@@ -34,6 +41,9 @@ public class BranchService {
 	private final BranchQRRepository branchQrRepository;
 	private final BranchScheduleRepository branchScheduleRepository;
 	private final BranchScheduleOverrideRepository branchScheduleOverrideRepository;
+	private final WorkShiftRepository workShiftRepository;
+	private final ProductRepository productRepository;
+	private final BranchProductRepository branchProductRepository;
 
 	public Branch findById(Integer id) {
 		return repository.findById(id)
@@ -45,14 +55,44 @@ public class BranchService {
 		return repository.findByTenantId(tenantId);
 	}
 
+	// US-15-04: sólo sucursales activas (endpoint público del client). El backoffice
+	// sigue usando findByTenant/findAll para ver también las inactivas.
+	public List<Branch> findActiveByTenant(Integer tenantId) {
+		validateTenantExists(tenantId);
+		return repository.findByTenantIdAndActiveTrue(tenantId);
+	}
+
 	public List<Branch> findAll() {
 		return repository.findAll();
 	}
 
+	// @Transactional: la sucursal y sus branch_product se persisten atómicamente. Si
+	// falla la generación de branch_product, se hace rollback también de la sucursal
+	// en vez de dejar un estado parcial.
+	@Transactional
 	public Branch create(Branch branch) {
 		Tenant tenant = validateTenantExists(branch.getTenant().getId());
 		branch.setTenant(tenant);
-		return repository.save(branch);
+		Branch saved = repository.save(branch);
+		// US-15-05: inverso de US-14-04. Tras persistir la sucursal, se crea un
+		// BranchProduct por cada producto del tenant, disponible y sin override. Si el
+		// tenant no tiene productos, no genera nada. La selección de qué mostrar/ocultar
+		// se resuelve después desde la edición de la sucursal (US-15-F-08).
+		createBranchProductsForBranch(saved);
+		return saved;
+	}
+
+	private void createBranchProductsForBranch(Branch branch) {
+		List<BranchProduct> branchProducts = productRepository.findByTenantId(branch.getTenant().getId())
+			.stream()
+			.map(product -> BranchProduct.builder()
+				.branch(branch)
+				.product(product)
+				.available(true)
+				.priceOverride(null)
+				.build())
+			.toList();
+		branchProductRepository.saveAll(branchProducts);
 	}
 
 	public Branch update(Integer id, Branch updates) {
@@ -70,17 +110,59 @@ public class BranchService {
 		repository.delete(findById(id));
 	}
 
-	public Branch updateConfig(Integer id, Integer tenantId, Integer maxShiftDurationMinutes) {
+	public Branch updateConfig(Integer id, Integer tenantId, Integer maxShiftDurationMinutes,
+			String name, String address, String phone, String imageUrl, BigDecimal deliveryFee,
+			BigDecimal serviceFee, Integer estimatedDeliveryMinutes) {
 		if (!repository.existsByIdAndTenantId(id, tenantId)) {
 			throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Branch does not belong to your tenant");
 		}
 		Branch branch = findById(id);
 		branch.setMaxShiftDurationMinutes(maxShiftDurationMinutes);
+		// US-15-02 / US-15-F-01: patch parcial — solo se actualizan los campos que
+		// vienen en el body. Un null significa "omitido" y conserva el valor existente
+		// (las columnas son NOT NULL, así que nunca deben pisarse con null).
+		if (name != null) {
+			branch.setName(name);
+		}
+		if (address != null) {
+			branch.setAddress(address);
+		}
+		if (phone != null) {
+			branch.setPhone(phone);
+		}
+		if (imageUrl != null) {
+			branch.setImageUrl(imageUrl);
+		}
+		if (deliveryFee != null) {
+			branch.setDeliveryFee(deliveryFee);
+		}
+		if (serviceFee != null) {
+			branch.setServiceFee(serviceFee);
+		}
+		if (estimatedDeliveryMinutes != null) {
+			branch.setEstimatedDeliveryMinutes(estimatedDeliveryMinutes);
+		}
 		repository.save(branch);
 		// save() (merge) puede devolver el branch con el tenant como proxy lazy sin
 		// inicializar; releemos con findById (que trae el tenant vía @EntityGraph)
 		// para que BranchMapper.toResponseDTO no falle con LazyInitializationException.
 		return findById(id);
+	}
+
+	// US-15-04: activa/desactiva una sucursal (ADMIN). Al desactivar valida que no
+	// haya un turno abierto; reactivar no tiene esa restricción. No hay mínimo de
+	// sucursales activas ni auto-gestión de StaffUser asociados.
+	public void setStatus(Integer id, Integer tenantId, boolean active) {
+		if (!repository.existsByIdAndTenantId(id, tenantId)) {
+			throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Branch does not belong to your tenant");
+		}
+		if (!active && workShiftRepository.existsByBranchIdAndStatus(id, ShiftStatus.OPEN)) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+				"No se puede desactivar una sucursal con un turno abierto");
+		}
+		Branch branch = findById(id);
+		branch.setActive(active);
+		repository.save(branch);
 	}
 
 	public BranchQR saveQrConfig(Integer branchId, String mpPosId, String mpQrId) {

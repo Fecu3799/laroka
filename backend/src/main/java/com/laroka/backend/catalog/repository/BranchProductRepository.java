@@ -17,15 +17,28 @@ import com.laroka.backend.catalog.entity.BranchProductId;
 public interface BranchProductRepository extends JpaRepository<BranchProduct, BranchProductId> {
     List<BranchProduct> findByBranchId(Integer branchId);
 
-    // Carga product + category en la misma query: el menú se mapea fuera de la
-    // sesión (open-in-view=false) y se cachea, así que las asociaciones lazy
-    // deben venir inicializadas para evitar LazyInitializationException.
-    @EntityGraph(attributePaths = {"product", "product.category"})
-    List<BranchProduct> findByBranchIdAndAvailableTrue(Integer branchId);
-
+    // updateAvailability / updateBranchConfig retornan bp.getProduct() y el controller lo
+    // mapea a DTO fuera de la transacción (open-in-view=false). Sin inicializar product, el
+    // acceso a sus campos escalares en ProductMapper.toResponseDTO lanzaba
+    // LazyInitializationException. Solo se necesita product: el mapper lee category.id y
+    // tenant.id, y acceder al id de un proxy lazy no lo inicializa (mismo criterio que
+    // CategoryBackofficeIntegrationTest), así que no hace falta traer category ni tenant.
+    @EntityGraph(attributePaths = {"product"})
     Optional<BranchProduct> findByBranchIdAndProductId(Integer branchId, Integer productId);
 
     boolean existsByBranchIdAndProductId(Integer branchId, Integer productId);
+
+    // US-15-07: BranchProduct de una sucursal cuyos productId estén en la lista. Los
+    // productId sin BranchProduct para esa sucursal simplemente no vienen en el resultado.
+    List<BranchProduct> findByBranchIdAndProductIdIn(Integer branchId, List<Integer> productIds);
+
+    // US-15-08: todos los BranchProduct de una sucursal (disponibles y no) con product y
+    // category cargados (open-in-view=false), ordenados para agrupar por categoría en el front.
+    @Query("SELECT bp FROM BranchProduct bp "
+        + "JOIN FETCH bp.product p JOIN FETCH p.category c "
+        + "WHERE bp.branch.id = :branchId "
+        + "ORDER BY c.name ASC, p.name ASC")
+    List<BranchProduct> findByBranchIdWithProductAndCategory(@Param("branchId") Integer branchId);
 
     List<BranchProduct> findByProductId(Integer productId);
 

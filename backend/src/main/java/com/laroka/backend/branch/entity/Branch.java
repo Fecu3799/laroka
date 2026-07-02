@@ -51,8 +51,15 @@ public class Branch {
 	@Column(name = "phone", nullable = false)
 	private String phone;
 
+	@Column(name = "image_url")
+	private String imageUrl;
+
 	@Column(name = "accepting_orders", nullable = false)
 	private boolean acceptingOrders;
+
+	@Builder.Default
+	@Column(name = "active", nullable = false)
+	private boolean active = true;
 
 	@Builder.Default
 	@Column(name = "max_shift_duration_minutes", nullable = false)

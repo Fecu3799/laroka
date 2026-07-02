@@ -6,10 +6,10 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -31,7 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.laroka.backend.branch.entity.Branch;
 import com.laroka.backend.branch.exception.BranchNotFoundException;
 import com.laroka.backend.branch.repository.BranchRepository;
-import com.laroka.backend.branch.service.BranchService;
+import com.laroka.backend.catalog.entity.BranchProduct;
 import com.laroka.backend.catalog.entity.Product;
 import com.laroka.backend.catalog.exception.ProductNotFoundException;
 import com.laroka.backend.catalog.repository.BranchProductRepository;
@@ -39,11 +39,13 @@ import com.laroka.backend.catalog.repository.ProductRepository;
 import com.laroka.backend.order.domain.OrderStateMachine;
 import com.laroka.backend.order.entity.Order;
 import com.laroka.backend.order.entity.OrderItem;
+import com.laroka.backend.order.entity.OrderOrigin;
 import com.laroka.backend.order.entity.OrderStatus;
 import com.laroka.backend.order.entity.OrderStatusHistory;
 import com.laroka.backend.order.entity.OrderType;
 import com.laroka.backend.order.entity.PaymentMethod;
 import com.laroka.backend.order.exception.OrderNotFoundException;
+import com.laroka.backend.order.exception.ProductUnavailableException;
 import com.laroka.backend.order.repository.OrderItemRepository;
 import com.laroka.backend.order.repository.OrderRepository;
 import com.laroka.backend.order.repository.OrderStatusHistoryRepository;
@@ -60,14 +62,10 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class OrderService {
 
-    @Value("${order.bypass-branch-hours:false}")
-    private boolean bypassBranchHours;
-
     private final OrderRepository orderRepository;
     private final OrderStatusHistoryRepository historyRepository;
     private final OrderItemRepository orderItemRepository;
     private final BranchRepository branchRepository;
-    private final BranchService branchService;
     private final ProductRepository productRepository;
     private final BranchProductRepository branchProductRepository;
     private final IdempotencyStore idempotencyStore;
@@ -405,12 +403,9 @@ public class OrderService {
                     return new BranchNotFoundException(order.getBranch().getId());
                 });
 
-        if (!bypassBranchHours && !branchService.isOpen(branch.getId())) {
-            log.warn("Order rejected — branch closed | branchId={}", branch.getId());
-            throw new BusinessException("El local no está disponible en este momento");
-        }
-        if (bypassBranchHours) {
-            log.warn("Branch hours check bypassed — order.bypass-branch-hours=true | branchId={}", branch.getId());
+        if (!branch.isAcceptingOrders()) {
+            log.warn("Order rejected — branch not accepting orders | branchId={}", branch.getId());
+            throw new BusinessException("El local no está aceptando pedidos en este momento");
         }
 
         if (order.getOrderType() == OrderType.DELIVERY
@@ -425,8 +420,21 @@ public class OrderService {
             Product product = productRepository.findById(item.getProduct().getId())
                     .orElseThrow(() -> new ProductNotFoundException(item.getProduct().getId()));
 
-            BigDecimal unitPrice = branchProductRepository
-                    .findByBranchIdAndProductId(branch.getId(), product.getId())
+            Optional<BranchProduct> branchProduct =
+                    branchProductRepository.findByBranchIdAndProductId(branch.getId(), product.getId());
+
+            // US-15-09: pedidos del client rechazan productos no disponibles en la
+            // sucursal (BranchProduct inexistente o available=false). El backoffice
+            // (ADMIN/STAFF) puede forzar el pedido igual — ya fue advertido en el
+            // frontend (US-15-F-09). Rechaza el pedido completo antes de persistir nada.
+            if (order.getOrigin() == OrderOrigin.CLIENT
+                    && branchProduct.map(bp -> !Boolean.TRUE.equals(bp.getAvailable())).orElse(true)) {
+                log.warn("Order rejected — product not available | branchId={} productId={} productName={}",
+                        branch.getId(), product.getId(), product.getName());
+                throw new ProductUnavailableException(product.getId(), product.getName());
+            }
+
+            BigDecimal unitPrice = branchProduct
                     .map(bp -> bp.getPriceOverride() != null ? bp.getPriceOverride() : product.getPrice())
                     .orElse(product.getPrice());
 

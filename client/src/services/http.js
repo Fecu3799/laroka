@@ -15,13 +15,13 @@ export async function apiFetch(url, options = {}) {
 
   if (res.ok) return res;
 
-  let message = null;
+  let body = null;
   try {
-    const body = await res.json();
-    message = body?.message ?? null;
+    body = await res.json();
   } catch {
     /* empty */
   }
+  const message = body?.message ?? null;
 
   if (res.status >= 500) {
     dispatchToast("Ocurrió un error. Intentá de nuevo.");
@@ -31,5 +31,8 @@ export async function apiFetch(url, options = {}) {
 
   const err = new Error(message ?? `HTTP ${res.status}`);
   err.status = res.status;
+  // Body estructurado del error disponible para el caller (p. ej. productId en
+  // el 422 de producto no disponible, US-15-CF-05) — evita parsear el mensaje.
+  err.body = body;
   throw err;
 }

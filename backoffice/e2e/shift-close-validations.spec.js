@@ -5,7 +5,7 @@
 // no procede— y 200 con el resumen cuando el cierre procede (el turno pasa a
 // inactivo y el botón de cierre desaparece).
 
-import { test, expect } from '@playwright/test'
+import { test, expect } from './hermetic.js'
 
 const OPEN_SHIFT = {
   active: true,
@@ -88,7 +88,16 @@ test.describe('US-08 · validaciones de cierre de turno', () => {
     await page.route('**/branches/**', route =>
       route.fulfill({ json: { id: 1, name: 'Puerto Madryn', acceptingOrders: true } })
     )
-    await page.route('**/backoffice/orders', route => {
+    // ConfigProvider (rol MANAGER/ADMIN) precarga el catálogo del tenant al montar.
+    await page.route('**/backoffice/categories**', route =>
+      route.fulfill({ json: [] })
+    )
+    await page.route('**/backoffice/products**', route =>
+      route.fulfill({ json: [] })
+    )
+    // El glob con ** final captura también la variante con query (?shiftId=...),
+    // que la app pide al haber un turno activo.
+    await page.route('**/backoffice/orders**', route => {
       if (route.request().method() === 'GET') {
         route.fulfill({ json: [] })
       } else {

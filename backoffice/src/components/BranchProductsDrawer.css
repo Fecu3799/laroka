@@ -1,0 +1,115 @@
+/* ── Drawer "Gestionar productos" por sucursal (US-15-F-08) ──────── */
+
+.bpd-panel {
+  width: min(480px, 94vw);
+}
+
+.bpd-subtitle {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.bpd-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.bpd-state {
+  padding: 24px 0;
+  text-align: center;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.bpd-selectall {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  user-select: none;
+}
+
+.bpd-selectall input,
+.bpd-row input {
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.bpd-group {
+  border: 1px solid color-mix(in srgb, var(--border) 24%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--border) 5%, transparent);
+}
+
+.bpd-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 11px 13px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 18%, transparent);
+}
+
+.bpd-group-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.bpd-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.bpd-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 13px;
+  cursor: pointer;
+}
+
+.bpd-row:not(:last-child) {
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 12%, transparent);
+}
+
+.bpd-img {
+  width: 36px;
+  height: 36px;
+  border-radius: 7px;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: color-mix(in srgb, var(--border) 12%, transparent);
+}
+
+.bpd-img--empty {
+  border: 1px dashed color-mix(in srgb, var(--border) 28%, transparent);
+}
+
+.bpd-name {
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.bpd-footer {
+  padding: 16px 24px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 18%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.bpd-success {
+  font-size: 13px;
+  color: var(--color-success);
+}

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import useAuth from '../hooks/useAuth'
 import { saveTenantProfile } from '../services/tenantService'
 import { useConfig } from '../context/ConfigContext'
+import ImageUploader from './ui/ImageUploader'
 
 const EMPTY = {
   businessName: '',
@@ -154,14 +155,12 @@ export default function TenantProfileSection() {
           </div>
 
           <div className="config-profile-field">
-            <label className="config-profile-label" htmlFor="tp-logo">Logo URL</label>
-            <input
-              id="tp-logo"
-              className="config-profile-input"
-              type="text"
-              value={form.logoUrl}
-              onChange={e => handleChange('logoUrl', e.target.value)}
-              placeholder="https://…/logo.png"
+            <ImageUploader
+              label="Logo"
+              value={form.logoUrl || null}
+              onChange={url => handleChange('logoUrl', url)}
+              token={token}
+              helperText="Se admite cualquier proporción; el logo se muestra completo."
             />
           </div>
 

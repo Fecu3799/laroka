@@ -5,6 +5,18 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>backoffice</title>
+    <script>
+      // US-15-F-04: aplica el tema persistido antes del primer render para evitar
+      // flash de tema incorrecto. Default: dark (paleta actual).
+      (function () {
+        try {
+          var t = localStorage.getItem('laroka_backoffice_theme');
+          document.documentElement.setAttribute('data-theme', t === 'light' ? 'light' : 'dark');
+        } catch (e) {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

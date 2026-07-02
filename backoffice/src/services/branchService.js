@@ -27,12 +27,56 @@ export async function fetchBackofficeBranches(token, tenantId) {
   return res.json()
 }
 
-// Actualiza la configuración de una sucursal (ADMIN). maxShiftDurationMinutes en minutos.
-export async function updateBranchConfig(branchId, maxShiftDurationMinutes, token) {
+// Actualiza la configuración de una sucursal (ADMIN). config incluye
+// maxShiftDurationMinutes (minutos, obligatorio) y los campos opcionales de patch
+// parcial: name, address, phone, deliveryFee, serviceFee, estimatedDeliveryMinutes.
+export async function updateBranchConfig(branchId, config, token) {
   const res = await apiFetch(`${API_URL}/backoffice/branches/${branchId}/config`, {
     method: 'PATCH',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ maxShiftDurationMinutes }),
+    body: JSON.stringify(config),
+  })
+  return res.json()
+}
+
+// Crea una sucursal (ADMIN). payload: name, address, phone, deliveryFee, serviceFee,
+// estimatedDeliveryMinutes, tenantId. maxShiftDurationMinutes usa el default del backend.
+export async function createBranch(payload, token) {
+  const res = await apiFetch(`${API_URL}/backoffice/branches`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  return res.json()
+}
+
+// Activa/desactiva una sucursal (ADMIN, US-15-04). Al desactivar con un turno
+// abierto el backend responde 400; apiFetch propaga ese mensaje en err.message.
+export async function setBranchStatus(branchId, active, token) {
+  await apiFetch(`${API_URL}/backoffice/branches/${branchId}/status`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ active }),
+  })
+}
+
+// Lista todos los productos con su disponibilidad para una sucursal (US-15-08).
+// Incluye disponibles y no disponibles, con categoría, para el checklist de gestión.
+export async function fetchBranchProducts(branchId, token) {
+  const res = await apiFetch(`${API_URL}/backoffice/branches/${branchId}/products`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  return res.json()
+}
+
+// Actualización masiva de disponibilidad (US-15-07). Setea `available` para todos los
+// productId de la lista en esa sucursal. Una sucursal desactivada responde 422; apiFetch
+// propaga ese mensaje en err.message. Retorna { updated }.
+export async function updateBranchProductsAvailability(branchId, productIds, available, token) {
+  const res = await apiFetch(`${API_URL}/backoffice/branches/${branchId}/products/availability`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ productIds, available }),
   })
   return res.json()
 }

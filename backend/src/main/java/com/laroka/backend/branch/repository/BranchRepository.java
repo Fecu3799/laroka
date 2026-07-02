@@ -33,6 +33,10 @@ public interface BranchRepository extends JpaRepository<Branch, Integer> {
 	@EntityGraph(attributePaths = "tenant")
 	List<Branch> findByTenantId(Integer tenantId);
 
+	// US-15-04: el endpoint público del client excluye sucursales inactivas.
+	@EntityGraph(attributePaths = "tenant")
+	List<Branch> findByTenantIdAndActiveTrue(Integer tenantId);
+
 	Branch findByNameAndTenantId(String name, Integer tenantId);
 
 	boolean existsByIdAndTenantId(Integer id, Integer tenantId);

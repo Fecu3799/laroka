@@ -28,8 +28,12 @@ public class BranchMapper {
 			.id(branch.getId())
 			.name(branch.getName())
 			.address(branch.getAddress())
+			.deliveryFee(branch.getDeliveryFee())
+			.serviceFee(branch.getServiceFee())
 			.estimatedDeliveryMinutes(branch.getEstimatedDeliveryMinutes())
 			.phone(branch.getPhone())
+			.imageUrl(branch.getImageUrl())
+			.active(branch.isActive())
 			.maxShiftDurationMinutes(branch.getMaxShiftDurationMinutes())
 			.tenantId(branch.getTenant().getId())
 			.tenant(tenantMapper.toResponseDTO(branch.getTenant()))
@@ -50,6 +54,7 @@ public class BranchMapper {
 			.serviceFee(branch.getServiceFee())
 			.estimatedDeliveryMinutes(branch.getEstimatedDeliveryMinutes())
 			.phone(branch.getPhone())
+			.imageUrl(branch.getImageUrl())
 			.acceptingOrders(branch.isAcceptingOrders())
 			.schedule(branchScheduleMapper.toWeekResponse(
 				branchScheduleRepository.findByBranchId(branch.getId())))
@@ -63,8 +68,11 @@ public class BranchMapper {
 		return Branch.builder()
 			.name(dto.getName())
 			.address(dto.getAddress())
+			.deliveryFee(dto.getDeliveryFee())
+			.serviceFee(dto.getServiceFee())
 			.estimatedDeliveryMinutes(dto.getEstimatedDeliveryMinutes())
 			.phone(dto.getPhone())
+			.imageUrl(dto.getImageUrl())
 			.tenant(Tenant.builder().id(dto.getTenantId()).build())
 			.build();
 	}

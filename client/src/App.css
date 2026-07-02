@@ -577,6 +577,37 @@
   filter: brightness(1.12);
 }
 
+/* US-15-CF-05: producto no disponible — atenuado y no interactivo.
+   El precio sigue visible; se agrega un badge "No disponible". */
+.product-card--unavailable {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.product-card--unavailable:active {
+  filter: none;
+}
+
+.product-price-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.product-unavailable-badge {
+  font-family: 'Oswald', sans-serif;
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--text-primary) 18%, transparent);
+  border-radius: 999px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
 .product-image {
   width: 72px;
   height: 72px;
@@ -1883,10 +1914,10 @@
 }
 
 .welcome-logo {
-  width: 96px;
   height: 96px;
+  width: auto;
+  max-width: 100%;
   object-fit: contain;
-  border-radius: 16px;
 }
 
 .welcome-name {

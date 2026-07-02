@@ -44,14 +44,7 @@ import com.laroka.backend.order.entity.OrderStatusHistory;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 
-@SpringBootTest(
-    webEnvironment = SpringBootTest.WebEnvironment.MOCK,
-    // El chequeo de horarios de sucursal corre contra el reloj real; en CI esto
-    // rechaza la creación de pedidos (422). Lo deshabilitamos para este test de
-    // flujo. Se define acá (no en application-test.yml) porque ese archivo está
-    // gitignored y no llega a CI.
-    
-    properties = "order.bypass-branch-hours=true")
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
@@ -81,6 +74,9 @@ class OrderFlowsIntegrationTest {
 
         jdbcTemplate.update("INSERT INTO tenant (name, email_domain) VALUES (?, ?)", "Test Tenant", "laroka.com");
         jdbcTemplate.update("INSERT INTO branch (name, address, tenant_id) VALUES (?, ?, ?)", "Test Branch", "Test Address", 1);
+        // accepting_orders es el único gate de creación de pedidos; la sucursal de test
+        // debe aceptarlos (la columna default es false).
+        jdbcTemplate.update("UPDATE branch SET accepting_orders = true WHERE id = ?", BRANCH_ID);
         // Two staff users so that the second one (auto-id=2) matches STAFF_USER_ID=2
         jdbcTemplate.update(
             "INSERT INTO staff_user (name, email, password_hash, role, branch_id) VALUES (?, ?, ?, ?, ?)",
@@ -322,5 +318,37 @@ class OrderFlowsIntegrationTest {
 
         assertThat(orderRepository.findById(orderId).orElseThrow().getStatus())
             .isEqualTo(OrderStatus.DELIVERED);
+    }
+
+    // --- Flujo 4: producto no disponible (US-15-09 / US-15-CF-05) ---
+
+    @Test
+    @Order(4)
+    void createOrder_clientOrder_unavailableProduct_returns422WithProductId() throws Exception {
+        // El producto 1 se marca no disponible en la sucursal. Se restaura al final
+        // para no afectar el estado compartido entre tests ordenados.
+        jdbcTemplate.update("UPDATE branch_product SET available = false WHERE branch_id = ? AND product_id = ?",
+            BRANCH_ID, 1);
+        try {
+            String body = String.format("""
+                {
+                    "branchId": %d,
+                    "orderType": "TAKEAWAY",
+                    "paymentMethod": "CASH",
+                    "items": [{"productId": 1, "quantity": 1}]
+                }
+                """, BRANCH_ID);
+
+            mockMvc.perform(post("/orders")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(body))
+                .andExpect(status().isUnprocessableEntity())
+                // El productId viaja como campo estructurado del body, no solo en el string.
+                .andExpect(jsonPath("$.productId").value(1))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("no está disponible")));
+        } finally {
+            jdbcTemplate.update("UPDATE branch_product SET available = true WHERE branch_id = ? AND product_id = ?",
+                BRANCH_ID, 1);
+        }
     }
 }

@@ -145,4 +145,36 @@ class SecurityUtilsTest {
             .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode().value())
                 .isEqualTo(HttpStatus.BAD_REQUEST.value()));
     }
+
+    // --- validateBranchScope (US-15-07): scope de sucursal por path ---
+
+    @Test
+    void validateBranchScope_managerOwnBranch_passes() {
+        securityUtils.validateBranchScope(manager(7), 7); // no lanza
+    }
+
+    @Test
+    void validateBranchScope_managerOtherBranch_throws403() {
+        assertThatThrownBy(() -> securityUtils.validateBranchScope(manager(7), 8))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode().value())
+                .isEqualTo(HttpStatus.FORBIDDEN.value()));
+    }
+
+    @Test
+    void validateBranchScope_adminBranchInTenant_passes() {
+        when(branchRepository.existsByIdAndTenantId(3, 10)).thenReturn(true);
+
+        securityUtils.validateBranchScope(admin(), 3); // no lanza
+    }
+
+    @Test
+    void validateBranchScope_adminBranchOtherTenant_throws403() {
+        when(branchRepository.existsByIdAndTenantId(99, 10)).thenReturn(false);
+
+        assertThatThrownBy(() -> securityUtils.validateBranchScope(admin(), 99))
+            .isInstanceOf(ResponseStatusException.class)
+            .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode().value())
+                .isEqualTo(HttpStatus.FORBIDDEN.value()));
+    }
 }

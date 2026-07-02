@@ -17,11 +17,16 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.context.request.async.AsyncRequestTimeoutException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 
 import com.laroka.backend.auth.exception.InvalidCredentialsException;
 import com.laroka.backend.auth.exception.RefreshTokenInvalidException;
+import com.laroka.backend.media.exception.InvalidFileException;
+import com.laroka.backend.media.exception.StorageException;
+import com.laroka.backend.order.exception.ProductUnavailableException;
 
 @Slf4j
 @ControllerAdvice
@@ -51,11 +56,50 @@ public class GlobalExceptionHandler {
 		return buildResponse(HttpStatus.NOT_FOUND, "Recurso no encontrado: " + ex.getMessage(), null, request);
 	}
 
+	// Más específico que BusinessException: además del mensaje, expone productId
+	// como campo estructurado del body para que el cliente (US-15-CF-05) sepa qué
+	// producto remover del carrito sin parsear el string del mensaje.
+	@ExceptionHandler(ProductUnavailableException.class)
+	public ResponseEntity<Map<String, Object>> handleProductUnavailable(
+			ProductUnavailableException ex, HttpServletRequest request) {
+		log.warn("ProductUnavailableException en {} {}: productId={} {}",
+				request.getMethod(), request.getRequestURI(), ex.getProductId(), ex.getMessage());
+		Map<String, Object> extra = new LinkedHashMap<>();
+		extra.put("productId", ex.getProductId());
+		return buildResponse(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage(), null, extra, request);
+	}
+
 	@ExceptionHandler(BusinessException.class)
 	public ResponseEntity<Map<String, Object>> handleBusinessException(
 			BusinessException ex, HttpServletRequest request) {
 		log.warn("BusinessException en {} {}: {}", request.getMethod(), request.getRequestURI(), ex.getMessage());
 		return buildResponse(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage(), null, request);
+	}
+
+	@ExceptionHandler(InvalidFileException.class)
+	public ResponseEntity<Map<String, Object>> handleInvalidFile(
+			InvalidFileException ex, HttpServletRequest request) {
+		return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), null, request);
+	}
+
+	@ExceptionHandler(MaxUploadSizeExceededException.class)
+	public ResponseEntity<Map<String, Object>> handleMaxUploadSize(
+			MaxUploadSizeExceededException ex, HttpServletRequest request) {
+		return buildResponse(HttpStatus.BAD_REQUEST, "El archivo excede el tamaño máximo permitido", null, request);
+	}
+
+	@ExceptionHandler(MissingServletRequestPartException.class)
+	public ResponseEntity<Map<String, Object>> handleMissingPart(
+			MissingServletRequestPartException ex, HttpServletRequest request) {
+		String message = "Falta la parte requerida: " + ex.getRequestPartName();
+		return buildResponse(HttpStatus.BAD_REQUEST, message, null, request);
+	}
+
+	@ExceptionHandler(StorageException.class)
+	public ResponseEntity<Map<String, Object>> handleStorage(
+			StorageException ex, HttpServletRequest request) {
+		log.error("Fallo de almacenamiento en {} {}", request.getMethod(), request.getRequestURI(), ex);
+		return buildResponse(HttpStatus.BAD_GATEWAY, "Error al procesar el archivo", null, request);
 	}
 
 	@ExceptionHandler(MethodArgumentNotValidException.class)
@@ -118,10 +162,19 @@ public class GlobalExceptionHandler {
 
 	private ResponseEntity<Map<String, Object>> buildResponse(
 			HttpStatus status, String message, Map<String, String> errors, HttpServletRequest request) {
+		return buildResponse(status, message, errors, null, request);
+	}
+
+	private ResponseEntity<Map<String, Object>> buildResponse(
+			HttpStatus status, String message, Map<String, String> errors,
+			Map<String, Object> extra, HttpServletRequest request) {
 		Map<String, Object> body = new LinkedHashMap<>();
 		body.put("status", status.value());
 		body.put("error", status.getReasonPhrase());
 		body.put("message", message);
+		if (extra != null) {
+			extra.forEach(body::put);
+		}
 		if (errors != null && !errors.isEmpty()) {
 			body.put("errors", errors);
 		}

@@ -69,9 +69,10 @@ export default function Menu() {
   const [productConfirmError, setProductConfirmError] = useState(null)
 
   // ── Disponibilidad inline por sucursal (US-14-F-04, solo MANAGER) ───
-  // El menú de sucursal devuelve solo los productos disponibles: ese set
-  // permite derivar la disponibilidad de cada producto para la sucursal del token.
-  const [availableMenuIds, setAvailableMenuIds] = useState(null)   // Set | null
+  // { [productId]: boolean } para la sucursal del token. Se lee directamente del
+  // campo available de GET /branches/{id}/menu: desde US-15-11 ese endpoint devuelve
+  // TODOS los productos (disponibles y no) con el flag available explícito, así que
+  // la disponibilidad se toma del campo, no de la presencia del producto en la lista.
   const [availability, setAvailability] = useState({})            // { [productId]: boolean }
 
   // Disponibilidad por sucursal: solo MANAGER. branchId se resuelve del token.
@@ -80,23 +81,16 @@ export default function Menu() {
     if (role !== 'MANAGER' || !token || branchId == null) return
     fetchBranchMenu(branchId, token)
       .then(menu => {
-        const ids = new Set(menu.flatMap(c => (c.products ?? []).map(p => p.id)))
-        setAvailableMenuIds(ids)
+        const map = {}
+        for (const p of menu.flatMap(c => c.products ?? [])) map[p.id] = !!p.available
+        setAvailability(map)
       })
-      .catch(() => setAvailableMenuIds(new Set()))
+      .catch(() => setAvailability({}))
   }, [role, token, branchId])
 
   useEffect(() => {
     loadAvailability()
   }, [loadAvailability])
-
-  // Deriva el mapa de disponibilidad cuando hay productos y el menú de sucursal cargado.
-  useEffect(() => {
-    if (!isManager || availableMenuIds == null) return
-    const map = {}
-    for (const p of products) map[p.id] = availableMenuIds.has(p.id)
-    setAvailability(map)
-  }, [isManager, products, availableMenuIds])
 
   // ADMIN y MANAGER únicamente — STAFF no ve la pestaña. Guard sincrónico.
   if (role && role !== 'ADMIN' && role !== 'MANAGER') return <Navigate to="/orders" replace />

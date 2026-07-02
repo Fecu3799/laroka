@@ -31,7 +31,21 @@
 		<maven.compiler.source>21</maven.compiler.source>
 		<maven.compiler.target>21</maven.compiler.target>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<aws.sdk.version>2.46.19</aws.sdk.version>
 	</properties>
+	<dependencyManagement>
+		<dependencies>
+			<!-- AWS SDK for Java 2.x BOM — gestiona las versiones de los módulos
+			     del SDK usados para hablar con Cloudflare R2 (compatible S3). -->
+			<dependency>
+				<groupId>software.amazon.awssdk</groupId>
+				<artifactId>bom</artifactId>
+				<version>${aws.sdk.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
 	<dependencies>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -143,6 +157,21 @@
 			<groupId>org.bouncycastle</groupId>
 			<artifactId>bcprov-jdk18on</artifactId>
 			<version>1.84</version>
+		</dependency>
+
+		<!-- Cliente S3 v2 para subir objetos a Cloudflare R2 (US-15-01).
+		     R2 es compatible con la API de S3; se accede vía endpointOverride.
+		     Solo se usa el cliente síncrono (apache5-client), así que se excluye
+		     el cliente async basado en Netty para no arrastrarlo en runtime. -->
+		<dependency>
+			<groupId>software.amazon.awssdk</groupId>
+			<artifactId>s3</artifactId>
+			<exclusions>
+				<exclusion>
+					<groupId>software.amazon.awssdk</groupId>
+					<artifactId>netty-nio-client</artifactId>
+				</exclusion>
+			</exclusions>
 		</dependency>
 
 		<dependency>

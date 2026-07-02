@@ -45,7 +45,9 @@ public class ProductService {
 	@Cacheable(value = "menu", key = "#branchId")
 	public List<BranchProduct> getMenuForBranch(Integer branchId) {
 		validateBranchExists(branchId);
-		return branchProductRepository.findByBranchIdAndAvailableTrue(branchId);
+		// US-15-11: el menú retorna todos los productos de la sucursal (disponibles y no).
+		// El campo available viaja en el DTO; el mapper ordena disponibles primero.
+		return branchProductRepository.findByBranchIdWithProductAndCategory(branchId);
 	}
 
 	public List<Product> findByCategory(Integer categoryId) {
@@ -62,6 +64,10 @@ public class ProductService {
 		return repository.findAll();
 	}
 
+	// @Transactional: el producto y sus branch_product se persisten atómicamente. Si
+	// falla la generación de branch_product, se hace rollback también del producto en
+	// vez de dejar un producto sin sus branch_product correspondientes.
+	@Transactional
 	public Product create(Product product) {
 		Category category = validateCategoryExists(product.getCategory().getId());
 		Tenant tenant = validateTenantExists(product.getTenant().getId());
@@ -130,7 +136,12 @@ public class ProductService {
 	// branch y product cargados para resolver branchName y precio efectivo en el mapper.
 	public List<BranchProduct> getBranchProductConfig(Integer productId) {
 		findById(productId);
-		return branchProductRepository.findConfigByProductId(productId);
+		// US-15-06: se excluyen las sucursales inactivas de la config por sucursal. El
+		// BranchProduct NO se borra ni modifica: sigue en DB con su priceOverride/available;
+		// al reactivar la sucursal reaparece con esos mismos valores (solo se filtra al leer).
+		return branchProductRepository.findConfigByProductId(productId).stream()
+			.filter(bp -> bp.getBranch().isActive())
+			.toList();
 	}
 
 	@CacheEvict(value = "menu", key = "#branchId")
@@ -138,6 +149,14 @@ public class ProductService {
 			Boolean available) {
 		if (branchId == null) {
 			throw new BusinessException("Branch ID is required to update branch product config");
+		}
+		// US-15-06: guard de escritura. No se permite modificar la config de un producto
+		// para una sucursal desactivada (el GET ya la excluye; esto cierra el acceso directo
+		// vía API). La branch se carga aparte porque bp.getBranch() es lazy y open-in-view=false.
+		Branch branch = branchRepository.findById(branchId)
+			.orElseThrow(() -> new BranchNotFoundException(branchId));
+		if (!branch.isActive()) {
+			throw new BusinessException("No se puede modificar la configuración de una sucursal desactivada");
 		}
 		BranchProduct branchProduct = branchProductRepository.findByBranchIdAndProductId(branchId, productId)
 			.orElseThrow(() -> new BranchProductNotFoundException(branchId, productId));
@@ -148,6 +167,40 @@ public class ProductService {
 		}
 		branchProductRepository.save(branchProduct);
 		return branchProduct.getProduct();
+	}
+
+	// US-15-07: actualización masiva de disponibilidad de productos para una sucursal.
+	// El batch es atómico por la transacción propia de saveAll (criterio US-15-05).
+	// A propósito SIN @Transactional: combinar @Transactional + @CacheEvict en el mismo
+	// método deja el orden entre el advisor de transacción y el de cache sin garantía, y
+	// la evicción podría ejecutarse ANTES del commit → una lectura concurrente repuebla el
+	// cache con el dato viejo (bajo READ COMMITTED) y queda stale. Con @CacheEvict solo, la
+	// evicción corre después de que saveAll commitea (mismo criterio que updateBranchConfig).
+	// US-15-08: todos los productos de la sucursal con su disponibilidad (available true y
+	// false), para el checklist de "Gestionar productos". Incluye sucursales inactivas a
+	// propósito: la lectura NO aplica el guard de sucursal activa (solo la escritura lo hace).
+	public List<BranchProduct> getBranchProducts(Integer branchId) {
+		return branchProductRepository.findByBranchIdWithProductAndCategory(branchId);
+	}
+
+	@CacheEvict(value = "menu", key = "#branchId")
+	public int updateBranchProductsAvailability(Integer branchId, List<Integer> productIds, boolean available) {
+		// Mismo guard de escritura que updateBranchConfig (US-15-06): una sucursal
+		// desactivada se rechaza (422) sin tocar ningún BranchProduct.
+		Branch branch = branchRepository.findById(branchId)
+			.orElseThrow(() -> new BranchNotFoundException(branchId));
+		if (!branch.isActive()) {
+			throw new BusinessException("No se puede modificar la configuración de una sucursal desactivada");
+		}
+		if (productIds == null || productIds.isEmpty()) {
+			return 0;
+		}
+		// Los productId sin BranchProduct para esta sucursal no vienen en la query, así que
+		// se ignoran sin romper el resto del batch.
+		List<BranchProduct> toUpdate = branchProductRepository.findByBranchIdAndProductIdIn(branchId, productIds);
+		toUpdate.forEach(bp -> bp.setAvailable(available));
+		branchProductRepository.saveAll(toUpdate);
+		return toUpdate.size();
 	}
 
 	// applyToAllBranches afecta potencialmente todas las sucursales (override limpiado) y,

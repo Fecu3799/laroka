@@ -3,9 +3,11 @@ package com.laroka.backend.branch.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
@@ -13,6 +15,7 @@ import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -28,6 +31,12 @@ import com.laroka.backend.branch.repository.BranchQRRepository;
 import com.laroka.backend.branch.repository.BranchRepository;
 import com.laroka.backend.branch.repository.BranchScheduleOverrideRepository;
 import com.laroka.backend.branch.repository.BranchScheduleRepository;
+import com.laroka.backend.catalog.entity.BranchProduct;
+import com.laroka.backend.catalog.entity.Product;
+import com.laroka.backend.catalog.repository.BranchProductRepository;
+import com.laroka.backend.catalog.repository.ProductRepository;
+import com.laroka.backend.shift.entity.ShiftStatus;
+import com.laroka.backend.shift.repository.WorkShiftRepository;
 import com.laroka.backend.tenant.entity.Tenant;
 import com.laroka.backend.tenant.exception.TenantNotFoundException;
 import com.laroka.backend.tenant.repository.TenantRepository;
@@ -49,6 +58,15 @@ class BranchServiceTest {
 
 	@Mock
 	private BranchScheduleOverrideRepository branchScheduleOverrideRepository;
+
+	@Mock
+	private WorkShiftRepository workShiftRepository;
+
+	@Mock
+	private ProductRepository productRepository;
+
+	@Mock
+	private BranchProductRepository branchProductRepository;
 
 	@InjectMocks
 	private BranchService service;
@@ -116,6 +134,7 @@ class BranchServiceTest {
 		Branch branch = branch(p);
 		when(tenantRepository.findById(1)).thenReturn(Optional.of(p));
 		when(branchRepository.save(any(Branch.class))).thenReturn(branch);
+		when(productRepository.findByTenantId(1)).thenReturn(List.of());
 
 		Branch result = service.create(branch);
 
@@ -172,6 +191,205 @@ class BranchServiceTest {
 
 		assertThatThrownBy(() -> service.delete(99))
 			.isInstanceOf(BranchNotFoundException.class);
+	}
+
+	// --- US-15-02 / US-15-F-01: updateConfig (maxShiftDurationMinutes + patch parcial) ---
+
+	@Test
+	void updateConfig_updatesAllFields() {
+		Branch existing = branch(tenant());
+		when(branchRepository.existsByIdAndTenantId(1, 1)).thenReturn(true);
+		when(branchRepository.findById(1)).thenReturn(Optional.of(existing));
+		when(branchRepository.save(any(Branch.class))).thenAnswer(inv -> inv.getArgument(0));
+
+		Branch result = service.updateConfig(1, 1, 480, "Sucursal Centro", "Nueva Dirección 999",
+			"+542804999999", "https://cdn.laroka.com/branch-1.jpg", new BigDecimal("150.00"),
+			new BigDecimal("50.00"), 45);
+
+		assertThat(result.getName()).isEqualTo("Sucursal Centro");
+		assertThat(result.getAddress()).isEqualTo("Nueva Dirección 999");
+		assertThat(result.getPhone()).isEqualTo("+542804999999");
+		assertThat(result.getImageUrl()).isEqualTo("https://cdn.laroka.com/branch-1.jpg");
+		assertThat(result.getDeliveryFee()).isEqualByComparingTo("150.00");
+		assertThat(result.getServiceFee()).isEqualByComparingTo("50.00");
+		assertThat(result.getEstimatedDeliveryMinutes()).isEqualTo(45);
+		assertThat(result.getMaxShiftDurationMinutes()).isEqualTo(480);
+		verify(branchRepository).save(existing);
+	}
+
+	@Test
+	void updateConfig_nullOptionalFields_keepsExistingValues() {
+		Branch existing = branch(tenant()); // name "Playa Unión", address "Av. Principal 123", phone "+542804123456"
+		when(branchRepository.existsByIdAndTenantId(1, 1)).thenReturn(true);
+		when(branchRepository.findById(1)).thenReturn(Optional.of(existing));
+		when(branchRepository.save(any(Branch.class))).thenAnswer(inv -> inv.getArgument(0));
+
+		Branch result = service.updateConfig(1, 1, 480, null, null, null, null, null, null, null);
+
+		assertThat(result.getName()).isEqualTo("Playa Unión");
+		assertThat(result.getAddress()).isEqualTo("Av. Principal 123");
+		assertThat(result.getPhone()).isEqualTo("+542804123456");
+		assertThat(result.getEstimatedDeliveryMinutes()).isEqualTo(30);
+		assertThat(result.getMaxShiftDurationMinutes()).isEqualTo(480);
+	}
+
+	@Test
+	void updateConfig_otherTenant_throws403() {
+		when(branchRepository.existsByIdAndTenantId(1, 99)).thenReturn(false);
+
+		assertThatThrownBy(() -> service.updateConfig(1, 99, 480, "x", "x", "y", null, null, null, null))
+			.isInstanceOf(ResponseStatusException.class)
+			.satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
+	}
+
+	// --- US-15-03: imageUrl en creación y patch parcial ---
+
+	@Test
+	void create_withImageUrl_persistsImageUrl() {
+		Tenant p = tenant();
+		Branch branch = branch(p);
+		branch.setImageUrl("https://cdn.laroka.com/branch-1.jpg");
+		when(tenantRepository.findById(1)).thenReturn(Optional.of(p));
+		when(branchRepository.save(any(Branch.class))).thenAnswer(inv -> inv.getArgument(0));
+		when(productRepository.findByTenantId(1)).thenReturn(List.of());
+
+		Branch result = service.create(branch);
+
+		assertThat(result.getImageUrl()).isEqualTo("https://cdn.laroka.com/branch-1.jpg");
+	}
+
+	@Test
+	void create_withoutImageUrl_leavesImageUrlNull() {
+		Tenant p = tenant();
+		Branch branch = branch(p); // sin imageUrl
+		when(tenantRepository.findById(1)).thenReturn(Optional.of(p));
+		when(branchRepository.save(any(Branch.class))).thenAnswer(inv -> inv.getArgument(0));
+		when(productRepository.findByTenantId(1)).thenReturn(List.of());
+
+		Branch result = service.create(branch);
+
+		assertThat(result.getImageUrl()).isNull();
+	}
+
+	// --- US-15-05: alta automática de BranchProduct al crear la sucursal ---
+
+	@Test
+	@SuppressWarnings("unchecked")
+	void create_generatesBranchProductForEachTenantProduct() {
+		Tenant p = tenant();
+		Branch branch = branch(p);
+		when(tenantRepository.findById(1)).thenReturn(Optional.of(p));
+		when(branchRepository.save(any(Branch.class))).thenReturn(branch);
+		when(productRepository.findByTenantId(1))
+			.thenReturn(List.of(Product.builder().id(10).build(), Product.builder().id(11).build()));
+
+		service.create(branch);
+
+		// Una sola llamada a saveAll con la lista completa (available=true, sin override).
+		ArgumentCaptor<List<BranchProduct>> captor = ArgumentCaptor.forClass(List.class);
+		verify(branchProductRepository).saveAll(captor.capture());
+		assertThat(captor.getValue()).hasSize(2)
+			.allSatisfy(bp -> {
+				assertThat(bp.getAvailable()).isTrue();
+				assertThat(bp.getPriceOverride()).isNull();
+				assertThat(bp.getBranch()).isEqualTo(branch);
+			});
+		verify(branchProductRepository, never()).save(any());
+	}
+
+	@Test
+	@SuppressWarnings("unchecked")
+	void create_tenantWithoutProducts_generatesNoBranchProduct() {
+		Tenant p = tenant();
+		Branch branch = branch(p);
+		when(tenantRepository.findById(1)).thenReturn(Optional.of(p));
+		when(branchRepository.save(any(Branch.class))).thenReturn(branch);
+		when(productRepository.findByTenantId(1)).thenReturn(List.of());
+
+		service.create(branch);
+
+		ArgumentCaptor<List<BranchProduct>> captor = ArgumentCaptor.forClass(List.class);
+		verify(branchProductRepository).saveAll(captor.capture());
+		assertThat(captor.getValue()).isEmpty();
+		verify(branchProductRepository, never()).save(any());
+	}
+
+	@Test
+	void updateConfig_nullImageUrl_keepsExistingImageUrl() {
+		Branch existing = branch(tenant());
+		existing.setImageUrl("https://cdn.laroka.com/existing.jpg");
+		when(branchRepository.existsByIdAndTenantId(1, 1)).thenReturn(true);
+		when(branchRepository.findById(1)).thenReturn(Optional.of(existing));
+		when(branchRepository.save(any(Branch.class))).thenAnswer(inv -> inv.getArgument(0));
+
+		Branch result = service.updateConfig(1, 1, 480, null, null, null, null, null, null, null);
+
+		assertThat(result.getImageUrl()).isEqualTo("https://cdn.laroka.com/existing.jpg");
+	}
+
+	@Test
+	void updateConfig_withImageUrl_updatesImageUrl() {
+		Branch existing = branch(tenant());
+		existing.setImageUrl("https://cdn.laroka.com/old.jpg");
+		when(branchRepository.existsByIdAndTenantId(1, 1)).thenReturn(true);
+		when(branchRepository.findById(1)).thenReturn(Optional.of(existing));
+		when(branchRepository.save(any(Branch.class))).thenAnswer(inv -> inv.getArgument(0));
+
+		Branch result = service.updateConfig(1, 1, 480, null, null, null,
+			"https://cdn.laroka.com/new.jpg", null, null, null);
+
+		assertThat(result.getImageUrl()).isEqualTo("https://cdn.laroka.com/new.jpg");
+	}
+
+	// --- US-15-04: activar/desactivar sucursal ---
+
+	@Test
+	void setStatus_deactivate_noOpenShift_succeeds() {
+		Branch existing = branch(tenant());
+		when(branchRepository.existsByIdAndTenantId(1, 1)).thenReturn(true);
+		when(workShiftRepository.existsByBranchIdAndStatus(1, ShiftStatus.OPEN)).thenReturn(false);
+		when(branchRepository.findById(1)).thenReturn(Optional.of(existing));
+		when(branchRepository.save(any(Branch.class))).thenAnswer(inv -> inv.getArgument(0));
+
+		service.setStatus(1, 1, false);
+
+		assertThat(existing.isActive()).isFalse();
+		verify(branchRepository).save(existing);
+	}
+
+	@Test
+	void setStatus_deactivate_withOpenShift_throws400() {
+		when(branchRepository.existsByIdAndTenantId(1, 1)).thenReturn(true);
+		when(workShiftRepository.existsByBranchIdAndStatus(1, ShiftStatus.OPEN)).thenReturn(true);
+
+		assertThatThrownBy(() -> service.setStatus(1, 1, false))
+			.isInstanceOf(ResponseStatusException.class)
+			.satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
+		verify(branchRepository, never()).save(any());
+	}
+
+	@Test
+	void setStatus_reactivate_ignoresOpenShiftRestriction() {
+		Branch existing = branch(tenant());
+		existing.setActive(false);
+		when(branchRepository.existsByIdAndTenantId(1, 1)).thenReturn(true);
+		when(branchRepository.findById(1)).thenReturn(Optional.of(existing));
+		when(branchRepository.save(any(Branch.class))).thenAnswer(inv -> inv.getArgument(0));
+
+		service.setStatus(1, 1, true);
+
+		assertThat(existing.isActive()).isTrue();
+		// Reactivar no consulta turnos abiertos.
+		verify(workShiftRepository, never()).existsByBranchIdAndStatus(any(), any());
+	}
+
+	@Test
+	void setStatus_otherTenant_throws403() {
+		when(branchRepository.existsByIdAndTenantId(1, 99)).thenReturn(false);
+
+		assertThatThrownBy(() -> service.setStatus(1, 99, false))
+			.isInstanceOf(ResponseStatusException.class)
+			.satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
 	}
 
 	// --- US-13-07: schedule por sucursal (ADMIN) ---

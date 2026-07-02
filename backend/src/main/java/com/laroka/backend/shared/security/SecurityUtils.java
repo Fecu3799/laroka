@@ -55,4 +55,29 @@ public class SecurityUtils {
 
 		return principal.getBranchId();
 	}
+
+	/**
+	 * Valida que el usuario tenga alcance sobre la sucursal indicada por path (no por
+	 * header X-Branch-Id). MANAGER/STAFF: solo su propia sucursal (branchId del token) —
+	 * 403 si {@code branchId} no coincide. ADMIN: cualquier sucursal de su tenant — 403 si
+	 * la sucursal no pertenece a su tenant. Evita que un MANAGER de la sucursal A opere
+	 * sobre la sucursal B pasando su id en el path.
+	 */
+	public void validateBranchScope(CustomUserDetails principal, Integer branchId) {
+		boolean isAdmin = principal.getAuthorities().stream()
+			.anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
+
+		if (isAdmin) {
+			if (!branchRepository.existsByIdAndTenantId(branchId, principal.getTenantId())) {
+				throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+					"Branch does not belong to your tenant");
+			}
+			return;
+		}
+
+		if (!branchId.equals(principal.getBranchId())) {
+			throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+				"Branch is outside your scope");
+		}
+	}
 }

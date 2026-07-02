@@ -115,18 +115,25 @@ class ProductServiceTest {
 	}
 
 	@Test
-	void getMenuForBranch_returnsOnlyAvailableProducts() {
+	void getMenuForBranch_returnsAllProductsIncludingUnavailable() {
+		// US-15-11: el menú ya no filtra por available=true — retorna todos los
+		// productos de la sucursal, disponibles y no disponibles.
 		Tenant p = tenant();
 		Branch b = branch(p);
-		Product product = product(category(p), p);
-		BranchProduct bp = branchProduct(b, product, null);
+		Product available = product(category(p), p);
+		Product unavailable = product(category(p), p);
+		BranchProduct availableBp = branchProduct(b, available, null);
+		BranchProduct unavailableBp = branchProduct(b, unavailable, null);
+		unavailableBp.setAvailable(false);
 		when(branchRepository.findById(1)).thenReturn(Optional.of(b));
-		when(branchProductRepository.findByBranchIdAndAvailableTrue(1)).thenReturn(List.of(bp));
+		when(branchProductRepository.findByBranchIdWithProductAndCategory(1))
+			.thenReturn(List.of(availableBp, unavailableBp));
 
 		List<BranchProduct> result = service.getMenuForBranch(1);
 
-		assertThat(result).hasSize(1);
-		assertThat(result.get(0).getAvailable()).isTrue();
+		assertThat(result).hasSize(2);
+		assertThat(result).extracting(BranchProduct::getAvailable)
+			.containsExactlyInAnyOrder(true, false);
 	}
 
 	@Test
@@ -136,7 +143,7 @@ class ProductServiceTest {
 		Product product = product(category(p), p);
 		BranchProduct bp = branchProduct(b, product, null);
 		when(branchRepository.findById(1)).thenReturn(Optional.of(b));
-		when(branchProductRepository.findByBranchIdAndAvailableTrue(1)).thenReturn(List.of(bp));
+		when(branchProductRepository.findByBranchIdWithProductAndCategory(1)).thenReturn(List.of(bp));
 
 		List<BranchProduct> result = service.getMenuForBranch(1);
 
@@ -151,7 +158,7 @@ class ProductServiceTest {
 		Product product = product(category(p), p);
 		BranchProduct bp = branchProduct(b, product, new BigDecimal("3100.00"));
 		when(branchRepository.findById(1)).thenReturn(Optional.of(b));
-		when(branchProductRepository.findByBranchIdAndAvailableTrue(1)).thenReturn(List.of(bp));
+		when(branchProductRepository.findByBranchIdWithProductAndCategory(1)).thenReturn(List.of(bp));
 
 		List<BranchProduct> result = service.getMenuForBranch(1);
 
@@ -374,6 +381,48 @@ class ProductServiceTest {
 			.isInstanceOf(ProductNotFoundException.class);
 	}
 
+	// US-15-06: la config por sucursal excluye sucursales inactivas sin tocar el BranchProduct.
+
+	@Test
+	void getBranchProductConfig_excludesInactiveBranches() {
+		Tenant p = tenant();
+		Product product = product(category(p), p);
+		Branch active = Branch.builder().id(1).name("Playa Unión").tenant(p).active(true).build();
+		Branch inactive = Branch.builder().id(2).name("Trelew").tenant(p).active(false).build();
+		BranchProduct bpActive = branchProduct(active, product, new BigDecimal("3100.00"));
+		BranchProduct bpInactive = branchProduct(inactive, product, new BigDecimal("9999.00"));
+		when(productRepository.findById(1)).thenReturn(Optional.of(product));
+		when(branchProductRepository.findConfigByProductId(1)).thenReturn(List.of(bpActive, bpInactive));
+
+		List<BranchProduct> result = service.getBranchProductConfig(1);
+
+		assertThat(result).hasSize(1);
+		assertThat(result.get(0).getBranch().getId()).isEqualTo(1);
+	}
+
+	@Test
+	void getBranchProductConfig_reactivatedBranch_reappearsWithPreviousValues() {
+		Tenant p = tenant();
+		Product product = product(category(p), p);
+		Branch branch = Branch.builder().id(2).name("Trelew").tenant(p).active(false).build();
+		// BranchProduct con valores propios; nunca se modifica al filtrar.
+		BranchProduct bp = branchProduct(branch, product, new BigDecimal("4200.00"));
+		bp.setAvailable(false);
+		when(productRepository.findById(1)).thenReturn(Optional.of(product));
+		when(branchProductRepository.findConfigByProductId(1)).thenReturn(List.of(bp));
+
+		// Sucursal inactiva → no aparece.
+		assertThat(service.getBranchProductConfig(1)).isEmpty();
+
+		// Se reactiva la sucursal (el mismo BranchProduct, sin resetear valores).
+		branch.setActive(true);
+
+		List<BranchProduct> result = service.getBranchProductConfig(1);
+		assertThat(result).hasSize(1);
+		assertThat(result.get(0).getPriceOverride()).isEqualByComparingTo("4200.00");
+		assertThat(result.get(0).getAvailable()).isFalse();
+	}
+
 	// --- updateBranchConfig ---
 
 	@Test
@@ -382,6 +431,7 @@ class ProductServiceTest {
 		Branch b = branch(p);
 		Product product = product(category(p), p);
 		BranchProduct bp = branchProduct(b, product, new BigDecimal("3100.00"));
+		when(branchRepository.findById(1)).thenReturn(Optional.of(b));
 		when(branchProductRepository.findByBranchIdAndProductId(1, 1)).thenReturn(Optional.of(bp));
 		when(branchProductRepository.save(any(BranchProduct.class))).thenReturn(bp);
 
@@ -397,6 +447,7 @@ class ProductServiceTest {
 		Branch b = branch(p);
 		Product product = product(category(p), p);
 		BranchProduct bp = branchProduct(b, product, null);
+		when(branchRepository.findById(1)).thenReturn(Optional.of(b));
 		when(branchProductRepository.findByBranchIdAndProductId(1, 1)).thenReturn(Optional.of(bp));
 		when(branchProductRepository.save(any(BranchProduct.class))).thenReturn(bp);
 
@@ -408,10 +459,115 @@ class ProductServiceTest {
 
 	@Test
 	void updateBranchConfig_productNotInBranch_throwsBranchProductNotFoundException() {
+		when(branchRepository.findById(1)).thenReturn(Optional.of(branch(tenant())));
 		when(branchProductRepository.findByBranchIdAndProductId(1, 99)).thenReturn(Optional.empty());
 
 		assertThatThrownBy(() -> service.updateBranchConfig(99, 1, null, null))
 			.isInstanceOf(BranchProductNotFoundException.class);
+	}
+
+	@Test
+	void updateBranchConfig_inactiveBranch_rejectsUpdate() {
+		// US-15-06: guard de escritura — una sucursal desactivada no puede modificarse
+		// vía API directa aunque el frontend la oculte.
+		Branch inactive = Branch.builder().id(1).name("Trelew").tenant(tenant()).active(false).build();
+		when(branchRepository.findById(1)).thenReturn(Optional.of(inactive));
+
+		assertThatThrownBy(() -> service.updateBranchConfig(1, 1, new BigDecimal("3300.00"), true))
+			.isInstanceOf(BusinessException.class);
+		verify(branchProductRepository, never()).save(any());
+	}
+
+	// --- US-15-08: getBranchProducts (lista con disponibilidad, incluye inactivas) ---
+
+	@Test
+	void getBranchProducts_returnsProductsWithTheirAvailability() {
+		Tenant p = tenant();
+		Branch b = branch(p);
+		Product prodA = product(category(p), p);
+		Product prodB = product(category(p), p);
+		BranchProduct available = branchProduct(b, prodA, null);
+		BranchProduct hidden = branchProduct(b, prodB, null);
+		hidden.setAvailable(false);
+		when(branchProductRepository.findByBranchIdWithProductAndCategory(1))
+			.thenReturn(List.of(available, hidden));
+
+		List<BranchProduct> result = service.getBranchProducts(1);
+
+		assertThat(result).hasSize(2);
+		assertThat(result).extracting(BranchProduct::getAvailable).containsExactly(true, false);
+	}
+
+	@Test
+	void getBranchProducts_noActiveGuard_worksForInactiveBranch() {
+		// La lectura NO consulta branchRepository (no aplica guard de sucursal activa):
+		// una sucursal inactiva devuelve sus productos igual.
+		when(branchProductRepository.findByBranchIdWithProductAndCategory(2)).thenReturn(List.of());
+
+		List<BranchProduct> result = service.getBranchProducts(2);
+
+		assertThat(result).isEmpty();
+		verify(branchRepository, never()).findById(any());
+	}
+
+	// --- US-15-07: updateBranchProductsAvailability (bulk) ---
+
+	@Test
+	void updateBranchProductsAvailability_updatesMatchingBranchProducts() {
+		Tenant p = tenant();
+		Branch b = branch(p); // activa
+		BranchProduct bp1 = branchProduct(b, Product.builder().id(10).build(), null);
+		BranchProduct bp2 = branchProduct(b, Product.builder().id(11).build(), null);
+		when(branchRepository.findById(1)).thenReturn(Optional.of(b));
+		when(branchProductRepository.findByBranchIdAndProductIdIn(1, List.of(10, 11)))
+			.thenReturn(List.of(bp1, bp2));
+
+		int updated = service.updateBranchProductsAvailability(1, List.of(10, 11), false);
+
+		assertThat(updated).isEqualTo(2);
+		assertThat(bp1.getAvailable()).isFalse();
+		assertThat(bp2.getAvailable()).isFalse();
+		verify(branchProductRepository).saveAll(any());
+		verify(branchProductRepository, never()).save(any());
+	}
+
+	@Test
+	void updateBranchProductsAvailability_emptyList_returnsZeroWithoutQuery() {
+		when(branchRepository.findById(1)).thenReturn(Optional.of(branch(tenant())));
+
+		int updated = service.updateBranchProductsAvailability(1, List.of(), true);
+
+		assertThat(updated).isZero();
+		verify(branchProductRepository, never()).findByBranchIdAndProductIdIn(any(), any());
+		verify(branchProductRepository, never()).saveAll(any());
+	}
+
+	@Test
+	void updateBranchProductsAvailability_ignoresProductIdsWithoutBranchProduct() {
+		Tenant p = tenant();
+		Branch b = branch(p);
+		BranchProduct bp = branchProduct(b, Product.builder().id(10).build(), null);
+		when(branchRepository.findById(1)).thenReturn(Optional.of(b));
+		// productId 999 no tiene BranchProduct para esta sucursal → la query solo trae el de 10.
+		when(branchProductRepository.findByBranchIdAndProductIdIn(1, List.of(10, 999)))
+			.thenReturn(List.of(bp));
+
+		int updated = service.updateBranchProductsAvailability(1, List.of(10, 999), true);
+
+		assertThat(updated).isEqualTo(1);
+		assertThat(bp.getAvailable()).isTrue();
+		verify(branchProductRepository).saveAll(any());
+	}
+
+	@Test
+	void updateBranchProductsAvailability_inactiveBranch_rejectsWithoutTouchingData() {
+		Branch inactive = Branch.builder().id(1).name("Trelew").tenant(tenant()).active(false).build();
+		when(branchRepository.findById(1)).thenReturn(Optional.of(inactive));
+
+		assertThatThrownBy(() -> service.updateBranchProductsAvailability(1, List.of(10), true))
+			.isInstanceOf(BusinessException.class);
+		verify(branchProductRepository, never()).findByBranchIdAndProductIdIn(any(), any());
+		verify(branchProductRepository, never()).saveAll(any());
 	}
 
 	// --- updatePrice ---

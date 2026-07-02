@@ -270,7 +270,10 @@ export default function Layout() {
                  connectionStatus === 'reconnecting' ? 'Reconectando...' : 'Sin conexión'}
               </span>
             </div>
-            <span className="layout-header-theme">Verde oscuro</span>
+            {/* Toggle de tema oculto: diferido a US-EV (requiere tokenizar los
+                colores hardcodeados del backoffice antes de habilitar el tema claro).
+                La infra queda dormida: ThemeToggle.jsx, el script de index.html y la
+                paleta [data-theme="light"] en index.css. */}
             <span className="layout-header-clock" aria-live="polite">{formattedTime}</span>
           </div>
         </header>

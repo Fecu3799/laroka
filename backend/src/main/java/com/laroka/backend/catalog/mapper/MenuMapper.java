@@ -1,6 +1,7 @@
 package com.laroka.backend.catalog.mapper;
 
 import java.math.BigDecimal;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -24,6 +25,10 @@ public class MenuMapper {
 					.categoryId(category.getId())
 					.categoryName(category.getName())
 					.products(entry.getValue().stream()
+						// US-15-11: dentro de cada categoría, productos disponibles
+						// primero y no disponibles al final. Sort estable: preserva el
+						// orden por nombre que trae la query entre ítems con igual availability.
+						.sorted(Comparator.comparing(BranchProduct::getAvailable, Comparator.reverseOrder()))
 						.map(this::toMenuProductDTO)
 						.toList())
 					.build();
@@ -42,6 +47,7 @@ public class MenuMapper {
 			.description(product.getDescription())
 			.price(effectivePrice)
 			.imageUrl(product.getImageUrl())
+			.available(branchProduct.getAvailable())
 			.build();
 	}
 }

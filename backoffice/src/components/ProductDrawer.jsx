@@ -11,6 +11,7 @@ import {
 import { formatCurrency } from '../utils/shiftsUtils'
 import CustomSelect from './CustomSelect'
 import ToggleSwitch from './ToggleSwitch'
+import ImageUploader from './ui/ImageUploader'
 import './StaffUserDrawer.css'
 import './ProductDrawer.css'
 
@@ -300,14 +301,13 @@ export default function ProductDrawer({ open, mode, product, categories, onClose
           </div>
 
           <div className="sud-field">
-            <label className="sud-label" htmlFor="prod-image">URL de imagen</label>
-            <input
-              id="prod-image"
-              className="sud-input"
-              type="text"
-              placeholder="https://… (opcional)"
-              value={form.imageUrl}
-              onChange={e => setField('imageUrl', e.target.value)}
+            <ImageUploader
+              label="Imagen"
+              value={form.imageUrl || null}
+              onChange={url => setField('imageUrl', url)}
+              token={token}
+              aspectRatio={1}
+              helperText="Recomendado: imagen cuadrada"
             />
           </div>
 

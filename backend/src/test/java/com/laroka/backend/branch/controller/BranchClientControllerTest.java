@@ -72,12 +72,12 @@ class BranchClientControllerTest {
 		mockMvc.perform(get("/branches"))
 			.andExpect(status().isBadRequest());
 
-		verify(branchService, never()).findByTenant(any());
+		verify(branchService, never()).findActiveByTenant(any());
 	}
 
 	@Test
 	void findAll_withTenantId_returnsOnlyBranchesOfThatTenant() throws Exception {
-		when(branchService.findByTenant(eq(1))).thenReturn(List.of(branch(1)));
+		when(branchService.findActiveByTenant(eq(1))).thenReturn(List.of(branch(1)));
 		when(branchMapper.toPublicDTO(any(Branch.class)))
 			.thenReturn(BranchPublicDTO.builder().id(1).name("Playa Unión").build());
 
@@ -87,6 +87,6 @@ class BranchClientControllerTest {
 			.andExpect(jsonPath("$.length()").value(1))
 			.andExpect(jsonPath("$[0].name").value("Playa Unión"));
 
-		verify(branchService).findByTenant(1);
+		verify(branchService).findActiveByTenant(1);
 	}
 }

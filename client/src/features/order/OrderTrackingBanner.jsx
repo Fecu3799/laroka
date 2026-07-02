@@ -454,6 +454,25 @@ function OrderSlide({ orderId, order, estimatedDeliveryMinutes, onPhoneClick, on
     )
   }
 
+  // US-15-CF-02: pedido entregado — mismo patrón que CANCELLED. Permanece visible
+  // con su badge y un botón de descarte manual ("Listo") que recién ahí lo remueve.
+  if (order.status === 'DELIVERED') {
+    return (
+      <div className={styles.slideContent}>
+        <div className={styles.cancelledRow}>
+          <span className={styles.title} style={{ fontSize: '20px' }}>Pedido entregado</span>
+          <span className={styles.badge} data-status="DELIVERED">ENTREGADO</span>
+        </div>
+        <button
+          className={styles.acknowledgeBtn}
+          onClick={() => onDismiss(orderId)}
+        >
+          Listo
+        </button>
+      </div>
+    )
+  }
+
   const progress = PROGRESS[order.status] ?? 10
   const isPendingPayment = order.status === 'PENDING_PAYMENT'
   const isDelivery = order.orderType === 'DELIVERY'
@@ -611,27 +630,21 @@ export function OrderTrackingBanner({ branchId }) {
           const data = await res.json()
           if (!active) return
 
-          if (data.status === 'DELIVERED') {
-            removeActiveOrder(orderId)
-            setOrderEntries(prev => prev.filter(e => e.orderId !== orderId))
-            setOrdersData(prev => {
-              const next = { ...prev }
-              delete next[orderId]
-              return next
-            })
-          } else {
-            let cancellationReason = null
-            let cancelledByStaff = false
-            if (data.status === 'CANCELLED') {
-              const hasCancellationRequested = data.history?.some(
-                h => h.toStatus === 'CANCELLATION_REQUESTED'
-              )
-              const cancelledEntry = data.history?.find(h => h.toStatus === 'CANCELLED')
-              cancelledByStaff = !hasCancellationRequested && (cancelledEntry?.cancelledByStaff ?? false)
-              cancellationReason = cancelledByStaff ? (cancelledEntry?.cancellationReason ?? null) : null
-            }
-            setOrdersData(prev => ({ ...prev, [orderId]: { ...data, cancellationReason, cancelledByStaff } }))
+          // US-15-CF-02: DELIVERED ya no se remueve automáticamente — se trata como
+          // CANCELLED: persiste en laroka_active_orders con su estado y espera el
+          // descarte manual del usuario. El polling sigue corriendo mientras el
+          // pedido esté en localStorage, sin importar el estado.
+          let cancellationReason = null
+          let cancelledByStaff = false
+          if (data.status === 'CANCELLED') {
+            const hasCancellationRequested = data.history?.some(
+              h => h.toStatus === 'CANCELLATION_REQUESTED'
+            )
+            const cancelledEntry = data.history?.find(h => h.toStatus === 'CANCELLED')
+            cancelledByStaff = !hasCancellationRequested && (cancelledEntry?.cancelledByStaff ?? false)
+            cancellationReason = cancelledByStaff ? (cancelledEntry?.cancellationReason ?? null) : null
           }
+          setOrdersData(prev => ({ ...prev, [orderId]: { ...data, cancellationReason, cancelledByStaff } }))
         } catch {
           // ignore
         }
@@ -719,15 +732,10 @@ export function OrderTrackingBanner({ branchId }) {
   }, [])
 
   const handleOrderUpdate = useCallback((orderId, newStatus, reason = null) => {
-    if (newStatus === 'DELIVERED') {
-      removeActiveOrder(orderId)
-      setOrderEntries(prev => prev.filter(e => e.orderId !== orderId))
-      setOrdersData(prev => {
-        const next = { ...prev }
-        delete next[orderId]
-        return next
-      })
-    } else if (newStatus === 'CANCELLED') {
+    // Solo se invoca desde la acción de cancelar del cliente (CANCELLED /
+    // CANCELLATION_REQUESTED). DELIVERED llega por polling y persiste hasta el
+    // descarte manual, por eso ya no hay rama de removido acá.
+    if (newStatus === 'CANCELLED') {
       setOrdersData(prev => ({
         ...prev,
         [orderId]: { ...(prev[orderId] ?? {}), status: 'CANCELLED', cancellationReason: reason, cancelledByStaff: false },

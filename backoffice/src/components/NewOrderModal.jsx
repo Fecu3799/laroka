@@ -44,6 +44,9 @@ export default function NewOrderModal({ open, onClose }) {
   const [error,           setError]           = useState(null)
   const [branchDeliveryFee, setBranchDeliveryFee] = useState(0)
   const [branchServiceFee,  setBranchServiceFee]  = useState(0)
+  // US-15-F-09: confirmación explícita cuando el pedido manual incluye productos
+  // marcados como no disponibles en la sucursal (el backend BACKOFFICE no bloquea).
+  const [confirmUnavailable, setConfirmUnavailable] = useState(false)
 
   function resetState() {
     setMenuCategories([])
@@ -58,6 +61,7 @@ export default function NewOrderModal({ open, onClose }) {
     setError(null)
     setBranchDeliveryFee(0)
     setBranchServiceFee(0)
+    setConfirmUnavailable(false)
   }
 
   function handleClose() {
@@ -101,6 +105,8 @@ export default function NewOrderModal({ open, onClose }) {
   const total              = subtotal + computedDeliveryFee + branchServiceFee
   const itemCount          = cartItems.reduce((s, i) => s + i.quantity, 0)
   const canConfirm         = canConfirmOrder({ cartItems, orderType, deliveryAddress })
+  // Ítems del carrito marcados como no disponibles en la sucursal (available === false).
+  const unavailableItems   = cartItems.filter(i => i.available === false)
 
   const handleDebugFill = import.meta.env.DEV
     ? () => {
@@ -129,6 +135,7 @@ export default function NewOrderModal({ open, onClose }) {
         productName: product.name,
         unitPrice:   product.price,
         quantity:    1,
+        available:   product.available,
       }]
     })
   }
@@ -154,8 +161,19 @@ export default function NewOrderModal({ open, onClose }) {
 
   // ── Submit ───────────────────────────────────────────────────
 
-  async function handleConfirm() {
+  function handleConfirm() {
     if (!canConfirm || submitting) return
+    // US-15-F-09: si hay productos no disponibles, pedir confirmación explícita
+    // antes de disparar el POST. Cancelar vuelve al formulario sin perder datos.
+    if (unavailableItems.length > 0) {
+      setConfirmUnavailable(true)
+      return
+    }
+    submitOrder()
+  }
+
+  async function submitOrder() {
+    setConfirmUnavailable(false)
     setSubmitting(true)
     setError(null)
     try {
@@ -255,11 +273,22 @@ export default function NewOrderModal({ open, onClose }) {
                       return (
                         <div
                           key={product.id}
-                          className="nom-product-row"
+                          className={`nom-product-row${product.available === false ? ' nom-product-row--unavailable' : ''}`}
                           onClick={() => addToCart(product)}
                         >
                           <div className="nom-product-info">
-                            <span className="nom-product-name">{product.name}</span>
+                            <span className="nom-product-name">
+                              {product.name}
+                              {product.available === false && (
+                                <span className="nom-product-badge" title="Producto marcado como no disponible">
+                                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                    <path d="M12 9v4m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"
+                                      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                  </svg>
+                                  No disponible
+                                </span>
+                              )}
+                            </span>
                             {product.description && (
                               <span className="nom-product-desc">{product.description}</span>
                             )}
@@ -498,6 +527,47 @@ export default function NewOrderModal({ open, onClose }) {
           </div>
         </div>
       </div>
+
+      {/* US-15-F-09: confirmación explícita de productos no disponibles */}
+      {confirmUnavailable && (
+        <div className="nom-confirm-overlay" onClick={e => { e.stopPropagation(); setConfirmUnavailable(false) }}>
+          <div
+            className="nom-confirm-dialog"
+            onClick={e => e.stopPropagation()}
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="nom-confirm-title"
+          >
+            <h3 className="nom-confirm-title" id="nom-confirm-title">Productos no disponibles</h3>
+            <p className="nom-confirm-text">
+              Este pedido incluye productos marcados como no disponibles:
+            </p>
+            <ul className="nom-confirm-list">
+              {unavailableItems.map(i => (
+                <li key={i.productId}>{i.productName}</li>
+              ))}
+            </ul>
+            <p className="nom-confirm-text">¿Confirmar de todas formas?</p>
+            <div className="nom-confirm-actions">
+              <button
+                type="button"
+                className="nom-confirm-cancel-btn"
+                onClick={() => setConfirmUnavailable(false)}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="nom-confirm-force-btn"
+                onClick={submitOrder}
+                disabled={submitting}
+              >
+                Confirmar de todas formas
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 

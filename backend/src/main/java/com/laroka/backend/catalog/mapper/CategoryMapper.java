@@ -9,15 +9,9 @@ import com.laroka.backend.catalog.dto.CategoryRequestDTO;
 import com.laroka.backend.catalog.dto.CategoryResponseDTO;
 import com.laroka.backend.catalog.entity.Category;
 import com.laroka.backend.tenant.entity.Tenant;
-import com.laroka.backend.tenant.mapper.TenantMapper;
-
-import lombok.RequiredArgsConstructor;
 
 @Component
-@RequiredArgsConstructor
 public class CategoryMapper {
-
-	private final TenantMapper tenantMapper;
 
 	public CategoryResponseDTO toResponseDTO(Category category) {
 		return toResponseDTO(category, null);
@@ -31,7 +25,6 @@ public class CategoryMapper {
 			.id(category.getId())
 			.name(category.getName())
 			.tenantId(category.getTenant().getId())
-			.tenant(tenantMapper.toResponseDTO(category.getTenant()))
 			.productCount(productCount)
 			.createdAt(category.getCreatedAt())
 			.updatedAt(category.getUpdatedAt())

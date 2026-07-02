@@ -142,6 +142,67 @@ describe('CartScreen — paymentFailure recovery', () => {
   })
 })
 
+// US-15-CF-05 / US-15-09: si un producto del carrito se desactivó, el backend
+// rechaza la creación del pedido con 422 nombrando el producto. El carrito debe
+// removerlo automáticamente para que el reintento no vuelva a fallar por lo mismo.
+describe('CartScreen — producto no disponible al confirmar (US-15-CF-05)', () => {
+  beforeEach(() => {
+    sessionStorage.clear()
+    vi.mocked(fetch).mockReset()
+    delete globalThis.Notification
+  })
+  afterEach(() => sessionStorage.clear())
+
+  async function goToCheckoutAndConfirm() {
+    const user = userEvent.setup()
+    const props = renderCart(ITEMS)
+    // Ir al checkout desde el carrito.
+    await user.click(screen.getByRole('button', { name: /ir a pagar/i }))
+    // Retirar (takeaway) para no requerir dirección; efectivo es el default.
+    await user.click(screen.getByRole('button', { name: /retirar/i }))
+    await user.type(screen.getByPlaceholderText(/cómo te llamás/i), 'Juan')
+    await user.type(screen.getByPlaceholderText('11 0000-0000'), '1122334455')
+    await user.click(screen.getByRole('button', { name: /confirmar pedido/i }))
+    return props
+  }
+
+  it('remueve del carrito el producto nombrado en el 422 y no vacía el carrito', async () => {
+    // 1) verificación acceptingOrders del branch, 2) POST /orders → 422.
+    vi.mocked(fetch)
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ acceptingOrders: true }) })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 422,
+        json: () => Promise.resolve({
+          message: 'El producto no está disponible: Napolitana',
+          productId: 2,
+        }),
+      })
+
+    const props = await goToCheckoutAndConfirm()
+
+    // El productId (2) del body estructurado se remueve; el carrito NO se vacía.
+    await waitFor(() => expect(props.onRemove).toHaveBeenCalledWith(2))
+    expect(props.onClear).not.toHaveBeenCalled()
+  })
+
+  it('no remueve nada si el 422 es por otra regla de negocio', async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ acceptingOrders: true }) })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 422,
+        json: () => Promise.resolve({ message: 'No hay turno activo para esta sucursal' }),
+      })
+
+    const props = await goToCheckoutAndConfirm()
+
+    await waitFor(() => expect(vi.mocked(fetch)).toHaveBeenCalledTimes(2))
+    expect(props.onRemove).not.toHaveBeenCalled()
+    expect(props.onClear).not.toHaveBeenCalled()
+  })
+})
+
 // US-09-F-04: en iOS el Web Push solo funciona desde la PWA instalada. Al
 // confirmar el pedido sobre iOS Safari (no standalone), CartScreen debe mostrar
 // las instrucciones de instalación SIN llamar a requestPermission(), y no debe
