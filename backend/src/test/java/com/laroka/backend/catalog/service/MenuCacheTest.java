@@ -59,12 +59,12 @@ class MenuCacheTest {
 		productService.getMenuForBranch(1);
 		productService.getMenuForBranch(1);
 
-		verify(branchProductRepository, times(1)).findByBranchIdAndAvailableTrue(1);
+		verify(branchProductRepository, times(1)).findByBranchIdWithProductAndCategory(1);
 	}
 
 	@Test
 	void updateAvailability_evictsMenuCache() {
-		List<BranchProduct> initial = branchProductRepository.findByBranchIdAndAvailableTrue(1);
+		List<BranchProduct> initial = branchProductRepository.findByBranchIdWithProductAndCategory(1);
 		Assumptions.assumeTrue(!initial.isEmpty(), "Branch 1 must have at least one available product");
 		Integer productId = initial.get(0).getProduct().getId();
 		clearInvocations(branchProductRepository);
@@ -73,7 +73,7 @@ class MenuCacheTest {
 		productService.updateAvailability(productId, false, 1);
 		productService.getMenuForBranch(1);
 
-		verify(branchProductRepository, times(2)).findByBranchIdAndAvailableTrue(1);
+		verify(branchProductRepository, times(2)).findByBranchIdWithProductAndCategory(1);
 
 		productService.updateAvailability(productId, true, 1);
 	}

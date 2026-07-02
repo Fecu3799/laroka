@@ -115,18 +115,25 @@ class ProductServiceTest {
 	}
 
 	@Test
-	void getMenuForBranch_returnsOnlyAvailableProducts() {
+	void getMenuForBranch_returnsAllProductsIncludingUnavailable() {
+		// US-15-11: el menú ya no filtra por available=true — retorna todos los
+		// productos de la sucursal, disponibles y no disponibles.
 		Tenant p = tenant();
 		Branch b = branch(p);
-		Product product = product(category(p), p);
-		BranchProduct bp = branchProduct(b, product, null);
+		Product available = product(category(p), p);
+		Product unavailable = product(category(p), p);
+		BranchProduct availableBp = branchProduct(b, available, null);
+		BranchProduct unavailableBp = branchProduct(b, unavailable, null);
+		unavailableBp.setAvailable(false);
 		when(branchRepository.findById(1)).thenReturn(Optional.of(b));
-		when(branchProductRepository.findByBranchIdAndAvailableTrue(1)).thenReturn(List.of(bp));
+		when(branchProductRepository.findByBranchIdWithProductAndCategory(1))
+			.thenReturn(List.of(availableBp, unavailableBp));
 
 		List<BranchProduct> result = service.getMenuForBranch(1);
 
-		assertThat(result).hasSize(1);
-		assertThat(result.get(0).getAvailable()).isTrue();
+		assertThat(result).hasSize(2);
+		assertThat(result).extracting(BranchProduct::getAvailable)
+			.containsExactlyInAnyOrder(true, false);
 	}
 
 	@Test
@@ -136,7 +143,7 @@ class ProductServiceTest {
 		Product product = product(category(p), p);
 		BranchProduct bp = branchProduct(b, product, null);
 		when(branchRepository.findById(1)).thenReturn(Optional.of(b));
-		when(branchProductRepository.findByBranchIdAndAvailableTrue(1)).thenReturn(List.of(bp));
+		when(branchProductRepository.findByBranchIdWithProductAndCategory(1)).thenReturn(List.of(bp));
 
 		List<BranchProduct> result = service.getMenuForBranch(1);
 
@@ -151,7 +158,7 @@ class ProductServiceTest {
 		Product product = product(category(p), p);
 		BranchProduct bp = branchProduct(b, product, new BigDecimal("3100.00"));
 		when(branchRepository.findById(1)).thenReturn(Optional.of(b));
-		when(branchProductRepository.findByBranchIdAndAvailableTrue(1)).thenReturn(List.of(bp));
+		when(branchProductRepository.findByBranchIdWithProductAndCategory(1)).thenReturn(List.of(bp));
 
 		List<BranchProduct> result = service.getMenuForBranch(1);
 

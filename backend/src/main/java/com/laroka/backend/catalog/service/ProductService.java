@@ -45,7 +45,9 @@ public class ProductService {
 	@Cacheable(value = "menu", key = "#branchId")
 	public List<BranchProduct> getMenuForBranch(Integer branchId) {
 		validateBranchExists(branchId);
-		return branchProductRepository.findByBranchIdAndAvailableTrue(branchId);
+		// US-15-11: el menú retorna todos los productos de la sucursal (disponibles y no).
+		// El campo available viaja en el DTO; el mapper ordena disponibles primero.
+		return branchProductRepository.findByBranchIdWithProductAndCategory(branchId);
 	}
 
 	public List<Product> findByCategory(Integer categoryId) {
