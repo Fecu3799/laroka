@@ -4,7 +4,7 @@
 // El token se inyecta directamente en localStorage para omitir el login
 // y centrarse en el flujo de cancelación.
 
-import { test, expect } from '@playwright/test'
+import { test, expect } from './hermetic.js'
 
 const ORDER_UUID = 'ccddee00-2222-0000-0000-000000000002'
 
@@ -62,6 +62,12 @@ test.describe('US-06-F-05 · resolución de solicitud de cancelación', () => {
     )
     await page.route('**/backoffice/shifts/current', route =>
       route.fulfill({ json: { active: false } })
+    )
+    await page.route('**/backoffice/shifts/history**', route =>
+      route.fulfill({ json: { content: [] } })
+    )
+    await page.route('**/branches/**', route =>
+      route.fulfill({ json: { id: 1, name: 'Puerto Madryn', acceptingOrders: false } })
     )
   })
 
@@ -196,6 +202,12 @@ test.describe('US-06-F-05 · cancelación directa del operador con motivo', () =
     )
     await page.route('**/backoffice/shifts/current', route =>
       route.fulfill({ json: { active: false } })
+    )
+    await page.route('**/backoffice/shifts/history**', route =>
+      route.fulfill({ json: { content: [] } })
+    )
+    await page.route('**/branches/**', route =>
+      route.fulfill({ json: { id: 1, name: 'Puerto Madryn', acceptingOrders: false } })
     )
   })
 

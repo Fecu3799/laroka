@@ -3,7 +3,7 @@
 //
 // Todos los llamados a la API se interceptan con datos de demo.
 
-import { test, expect } from '@playwright/test'
+import { test, expect } from './hermetic.js'
 
 const ORDER_UUID = 'aabbccdd-1111-0000-0000-000000000001'
 
@@ -60,6 +60,9 @@ test.describe('US-06-F-05 · ciclo de vida del pedido', () => {
     // Hermético: turno y sucursal mockeados para no depender de un backend real.
     await page.route('**/backoffice/shifts/current', route =>
       route.fulfill({ json: { active: false } })
+    )
+    await page.route('**/backoffice/shifts/history**', route =>
+      route.fulfill({ json: { content: [] } })
     )
     await page.route('**/branches/**', route =>
       route.fulfill({ json: { id: 1, name: 'Puerto Madryn', acceptingOrders: false } })

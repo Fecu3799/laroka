@@ -2,7 +2,7 @@
 // entre navegaciones: ir a /shifts/summary y volver a /orders NO debe re-fetchear
 // la lista (Orders se desmonta/remonta pero el provider permanece montado).
 
-import { test, expect } from '@playwright/test'
+import { test, expect } from './hermetic.js'
 
 const ORDER_UUID = 'aabbccdd-3333-0000-0000-000000000003'
 
