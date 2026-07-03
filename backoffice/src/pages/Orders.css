@@ -531,6 +531,28 @@
 .col-action {
   display: flex;
   justify-content: center;
+  gap: 6px;
+}
+
+/* Íconos de ticket (US-16-03): mismas dimensiones que el botón de descartar,
+   color neutro como el de avanzar. */
+.action-icon-btn {
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(101, 163, 105, 0.15);
+  border-radius: 7px;
+  background: transparent;
+  color: #7a9b80;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.action-icon-btn:hover {
+  border-color: #65a369;
+  color: #e8f0ea;
 }
 
 .action-advance-btn {
