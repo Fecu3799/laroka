@@ -1,6 +1,4 @@
 import { createElement as h } from 'react'
-import { pdf } from '@react-pdf/renderer'
-import TicketDocument from '../components/TicketDocument'
 
 /**
  * Servicio de impresión y descarga de tickets de compra (US-16-01).
@@ -14,6 +12,11 @@ import TicketDocument from '../components/TicketDocument'
  * Ambos métodos generan el mismo contenido a partir de buildTicketModel(): el
  * camino de impresión lo renderiza como HTML y el de descarga como PDF vía el
  * componente TicketDocument (US-16-02).
+ *
+ * @react-pdf/renderer y TicketDocument se cargan con import() dinámico dentro de
+ * downloadTicket: la librería de PDF (pesada) queda fuera del bundle inicial y
+ * sólo se baja cuando el operador descarga un ticket. printTicket (HTML) no la
+ * necesita.
  */
 
 const PAYMENT_METHOD_LABELS = {
@@ -176,9 +179,16 @@ export function printTicket(order, branch) {
  * Descarga el ticket de un pedido como PDF (mismo contenido que printTicket). El
  * layout vive en TicketDocument; acá solo se resuelve el nombre de archivo y se
  * dispara la descarga.
+ *
+ * pdf() y TicketDocument se importan dinámicamente para mantener
+ * @react-pdf/renderer fuera del bundle inicial (se baja en el primer download).
  */
 export async function downloadTicket(order, branch) {
   const { fileName } = buildTicketModel(order, branch)
+  const [{ pdf }, { default: TicketDocument }] = await Promise.all([
+    import('@react-pdf/renderer'),
+    import('../components/TicketDocument'),
+  ])
   const blob = await pdf(h(TicketDocument, { order, branch })).toBlob()
   triggerDownload(blob, fileName)
 }
