@@ -192,3 +192,26 @@ export async function downloadTicket(order, branch) {
   const blob = await pdf(h(TicketDocument, { order, branch })).toBlob()
   triggerDownload(blob, fileName)
 }
+
+/**
+ * Descarga el resumen de un turno como PDF (US-16-05). Mismo patrón que
+ * downloadTicket: import() dinámico de pdf + ShiftSummaryDocument para no cargar
+ * @react-pdf/renderer en el bundle inicial.
+ *
+ * `shift` es el objeto de estado del turno (openedAt, closedAt, summary y, si está
+ * disponible, autoClose). Sirve tanto para un turno cerrado (Informe Z) como para
+ * uno en curso (Informe X): en ese caso closedAt es null y el documento lo indica.
+ * El id para el nombre de archivo sale del propio turno o de su summary; la fecha,
+ * del cierre si existe, o de la apertura si el turno sigue abierto.
+ */
+export async function downloadShiftSummary(shift, branch) {
+  const s = shift ?? {}
+  const sid = shortId(s.shiftId ?? s.summary?.shiftId)
+  const fileName = `resumen-turno-${sid}-${fileDate(s.closedAt ?? s.openedAt)}.pdf`
+  const [{ pdf }, { default: ShiftSummaryDocument }] = await Promise.all([
+    import('@react-pdf/renderer'),
+    import('../components/ShiftSummaryDocument'),
+  ])
+  const blob = await pdf(h(ShiftSummaryDocument, { shift, branch })).toBlob()
+  triggerDownload(blob, fileName)
+}

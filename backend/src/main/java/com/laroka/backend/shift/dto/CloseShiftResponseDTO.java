@@ -28,4 +28,7 @@ public class CloseShiftResponseDTO {
     private Integer takeawayOrders;
     private BigDecimal cancellationRate;
     private OffsetDateTime calculatedAt;
+    // true si el turno se cerró automáticamente (por duración máxima, sin cierre
+    // manual). Derivado de closedBy == null en un turno ya CLOSED (US-16-04).
+    private boolean autoClose;
 }

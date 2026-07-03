@@ -1,5 +1,6 @@
 import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer'
 import { buildTicketModel } from '../services/ticketService'
+import { sharedPdfStyles as base } from './pdfStyles'
 
 /**
  * Layout definitivo del ticket de compra en PDF (US-16-02).
@@ -9,16 +10,13 @@ import { buildTicketModel } from '../services/ticketService'
  * HTML del servicio) para no duplicar esa lógica acá. Solo describe la
  * presentación con primitivas de @react-pdf/renderer.
  *
- * Fuente Helvetica / Helvetica-Bold: incluidas en @react-pdf/renderer, sin carga
- * externa. Página A4.
+ * Página A4 y tipografía/separador vienen de sharedPdfStyles (US-16-04); acá solo
+ * quedan los estilos específicos del ticket. Fuente Helvetica / Helvetica-Bold:
+ * incluidas en @react-pdf/renderer, sin carga externa.
  */
 
 const styles = StyleSheet.create({
-  page: { fontFamily: 'Helvetica', fontSize: 11, paddingVertical: 40, paddingHorizontal: 48 },
   ticket: { width: 260, marginHorizontal: 'auto' },
-  tenant: { fontSize: 15, fontFamily: 'Helvetica-Bold', textAlign: 'center' },
-  branch: { fontSize: 11, textAlign: 'center' },
-  sep: { borderBottomWidth: 1, borderBottomStyle: 'dashed', borderBottomColor: '#000', marginVertical: 8 },
   meta: { fontSize: 11 },
   row: { flexDirection: 'row', paddingVertical: 1 },
   qty: { width: 24 },
@@ -34,18 +32,18 @@ export default function TicketDocument({ order, branch }) {
 
   return (
     <Document>
-      <Page size="A4" style={styles.page}>
+      <Page size="A4" style={base.page}>
         <View style={styles.ticket}>
-          <Text style={styles.tenant}>{model.tenantName}</Text>
-          <Text style={styles.branch}>{model.branchName}</Text>
-          <Text style={styles.branch}>{model.branchAddress}</Text>
+          <Text style={base.title}>{model.tenantName}</Text>
+          <Text style={base.subtitle}>{model.branchName}</Text>
+          <Text style={base.subtitle}>{model.branchAddress}</Text>
 
-          <View style={styles.sep} />
+          <View style={base.sep} />
 
           <Text style={styles.meta}>{model.orderNumber}</Text>
           <Text style={styles.meta}>{model.createdAt}</Text>
 
-          <View style={styles.sep} />
+          <View style={base.sep} />
 
           {model.items.map((it, i) => (
             <View style={styles.row} key={i}>
@@ -55,7 +53,7 @@ export default function TicketDocument({ order, branch }) {
             </View>
           ))}
 
-          <View style={styles.sep} />
+          <View style={base.sep} />
 
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>TOTAL</Text>

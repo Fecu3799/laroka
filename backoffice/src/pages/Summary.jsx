@@ -1,7 +1,10 @@
 import { useState } from 'react'
 import { useShift } from '../context/ShiftContext'
 import { useOrdersContext } from '../context/OrdersContext'
+import useAuth from '../hooks/useAuth'
+import useBranch from '../hooks/useBranch'
 import useOperatorMessages from '../hooks/useOperatorMessages'
+import { downloadShiftSummary } from '../services/ticketService'
 import {
   formatDuration,
   formatCurrency,
@@ -39,6 +42,13 @@ const ClockIcon = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
     <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" />
     <path d="M12 7v5l3 2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+  </svg>
+)
+const DownloadIcon = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    <polyline points="7 10 12 15 17 10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M12 15V3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 )
 
@@ -171,6 +181,8 @@ export default function Summary() {
   const { shift, closeShift, summary } = useShift()
   const { state, loading, error } = summary
   const { orders, clearOrders } = useOrdersContext()
+  const { tenantName } = useAuth()
+  const { activeBranchName } = useBranch()
   const { addMessage } = useOperatorMessages()
 
   const [confirmOpen, setConfirmOpen] = useState(false)
@@ -200,6 +212,17 @@ export default function Summary() {
     }
   }
 
+  // Descarga el resumen del turno mostrado (US-16-05). Sirve tanto para el turno
+  // en curso (Informe X: closedAt null → el PDF dice "En curso") como para el
+  // último turno cerrado (Informe Z). Usa el `state` ya cargado, sin fetch nuevo.
+  async function handleDownloadSummary() {
+    try {
+      await downloadShiftSummary(state, { name: activeBranchName, tenantName })
+    } catch {
+      /* silent — apiFetch/PDF ya no aplican acá; fallo de render se ignora */
+    }
+  }
+
   // Solo se puede limpiar la lista entre turnos (sin turno activo) y si hay algo
   // que limpiar.
   const clearDisabled = shift !== null || orders.length === 0
@@ -218,6 +241,17 @@ export default function Summary() {
           )}
         </div>
         <div className="summary-header-actions">
+          {hasData && (
+            <button
+              className="summary-download-btn"
+              type="button"
+              onClick={handleDownloadSummary}
+              aria-label="Descargar resumen del turno"
+              title="Descargar resumen (PDF)"
+            >
+              <DownloadIcon />
+            </button>
+          )}
           {shift && (
             <button
               className="summary-close-btn"

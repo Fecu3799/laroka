@@ -22,6 +22,7 @@ import com.laroka.backend.shift.dto.CurrentShiftResponseDTO;
 import com.laroka.backend.shift.dto.OpenShiftResponseDTO;
 import com.laroka.backend.shift.dto.ShiftHistoryItemDTO;
 import com.laroka.backend.shift.dto.TopProductDTO;
+import com.laroka.backend.shift.entity.ShiftStatus;
 import com.laroka.backend.shift.entity.WorkShift;
 import com.laroka.backend.shift.entity.WorkShiftSummary;
 import com.laroka.backend.shift.service.CloseShiftResult;
@@ -95,7 +96,7 @@ public class WorkShiftController {
                 .shiftId(ws.getId())
                 .openedAt(ws.getOpenedAt())
                 .openedBy(ws.getOpenedBy().getName())
-                .autoClose(ws.getClosedBy() == null)
+                .autoClose(isAutoClosed(ws))
                 .build())
             .orElse(CurrentShiftResponseDTO.builder().active(false).build());
 
@@ -121,7 +122,7 @@ public class WorkShiftController {
         }
 
         WorkShiftSummary summary = result.summary();
-        return ResponseEntity.ok(toCloseShiftResponse(summary.getShift().getId(), summary));
+        return ResponseEntity.ok(toCloseShiftResponse(summary.getShift(), summary));
     }
 
     @GetMapping("/current/summary")
@@ -135,7 +136,7 @@ public class WorkShiftController {
         Integer branchId = securityUtils.resolveBranchId(principal, request);
         try {
             WorkShiftSummary summary = workShiftService.getCurrentShiftSummary(branchId);
-            return ResponseEntity.ok(toCloseShiftResponse(summary.getShift().getId(), summary));
+            return ResponseEntity.ok(toCloseShiftResponse(summary.getShift(), summary));
         } catch (BusinessException e) {
             return ResponseEntity.notFound().build();
         }
@@ -162,13 +163,14 @@ public class WorkShiftController {
             .closedAt(ws.getClosedAt())
             .openedBy(ws.getOpenedBy().getName())
             .closedBy(ws.getClosedBy() != null ? ws.getClosedBy().getName() : null)
-            .summary(s != null ? toCloseShiftResponse(ws.getId(), s) : null)
+            .autoClose(isAutoClosed(ws))
+            .summary(s != null ? toCloseShiftResponse(ws, s) : null)
             .build();
     }
 
-    private CloseShiftResponseDTO toCloseShiftResponse(UUID shiftId, WorkShiftSummary s) {
+    private CloseShiftResponseDTO toCloseShiftResponse(WorkShift shift, WorkShiftSummary s) {
         return CloseShiftResponseDTO.builder()
-            .shiftId(shiftId)
+            .shiftId(shift.getId())
             .totalOrders(s.getTotalOrders())
             .deliveredOrders(s.getDeliveredOrders())
             .cancelledOrders(s.getCancelledOrders())
@@ -181,6 +183,18 @@ public class WorkShiftController {
             .takeawayOrders(s.getTakeawayOrders())
             .cancellationRate(s.getCancellationRate())
             .calculatedAt(s.getCalculatedAt())
+            .autoClose(isAutoClosed(shift))
             .build();
+    }
+
+    /**
+     * Un turno se considera auto-cerrado cuando ya está CLOSED y no tiene
+     * closedBy: el cierre por duración máxima (autoCloseShift) deja closedBy null,
+     * mientras que el cierre manual lo setea al usuario que cerró. La condición de
+     * estado evita que el resumen en vivo de un turno abierto (closedBy null por
+     * seguir abierto) se reporte como auto-cerrado.
+     */
+    private boolean isAutoClosed(WorkShift shift) {
+        return shift.getStatus() == ShiftStatus.CLOSED && shift.getClosedBy() == null;
     }
 }

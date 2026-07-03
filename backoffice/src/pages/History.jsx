@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import useAuth from '../hooks/useAuth'
+import useBranch from '../hooks/useBranch'
 import { getShiftHistory } from '../services/shiftsService'
+import { downloadShiftSummary } from '../services/ticketService'
 import { useHistory } from '../context/HistoryContext'
 import { formatShiftDate, formatShiftClock, formatCurrency } from '../utils/shiftsUtils'
 import ShiftDetailModal from './ShiftDetailModal'
@@ -8,8 +10,19 @@ import './History.css'
 
 const PAGE_SIZE = 6
 
+function DownloadIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <polyline points="7 10 12 15 17 10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M12 15V3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
 export default function History() {
-  const { token } = useAuth()
+  const { token, tenantName } = useAuth()
+  const { activeBranchName } = useBranch()
   // Cache por página en HistoryProvider: sobrevive al desmontaje de la pestaña,
   // así una página ya visitada se muestra al instante sin spinner ni refetch.
   const { getPage, putPage, activeBranchId } = useHistory()
@@ -29,6 +42,19 @@ export default function History() {
       .catch(() => { if (!cancelled) setError(true) })
     return () => { cancelled = true }
   }, [token, activeBranchId, page, data, putPage])
+
+  // Descarga el resumen (Informe Z) de un turno cerrado usando los datos ya
+  // cacheados por el provider — sin fetch nuevo. La fila del historial ya es un
+  // ShiftHistoryItemDTO { shiftId, openedAt, closedAt, summary }, la forma que
+  // ShiftSummaryDocument consume.
+  async function handleDownload(e, shift) {
+    e.stopPropagation()
+    try {
+      await downloadShiftSummary(shift, { name: activeBranchName, tenantName })
+    } catch {
+      /* silent */
+    }
+  }
 
   // Sin datos y sin error ⇒ cargando (incluye el primer render antes del fetch).
   const loading = !data && !error
@@ -67,6 +93,7 @@ export default function History() {
                   <th>ENCARGADO</th>
                   <th>ENTREGADOS</th>
                   <th>INGRESOS TOTALES</th>
+                  <th className="history-th-action" aria-label="Acciones"></th>
                 </tr>
               </thead>
               <tbody>
@@ -82,6 +109,17 @@ export default function History() {
                     <td>{shift.openedBy ?? '—'}</td>
                     <td className="history-delivered">{shift.summary?.deliveredOrders ?? 0}</td>
                     <td className="history-revenue">{formatCurrency(shift.summary?.totalRevenue)}</td>
+                    <td className="history-action-cell">
+                      <button
+                        className="history-download-btn"
+                        type="button"
+                        onClick={(e) => handleDownload(e, shift)}
+                        aria-label="Descargar resumen del turno"
+                        title="Descargar resumen (PDF)"
+                      >
+                        <DownloadIcon />
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
