@@ -1,5 +1,6 @@
 import { createElement as h } from 'react'
-import { Document, Page, Text, View, StyleSheet, pdf } from '@react-pdf/renderer'
+import { pdf } from '@react-pdf/renderer'
+import TicketDocument from '../components/TicketDocument'
 
 /**
  * Servicio de impresión y descarga de tickets de compra (US-16-01).
@@ -10,8 +11,9 @@ import { Document, Page, Text, View, StyleSheet, pdf } from '@react-pdf/renderer
  * se implemente impresión térmica ESC/POS en el futuro solo cambia la
  * implementación interna, no la interfaz que consumen los componentes.
  *
- * Hoy ambos métodos generan el mismo contenido a partir de buildTicketModel(); el
- * layout definitivo del documento se aborda en US-16-02.
+ * Ambos métodos generan el mismo contenido a partir de buildTicketModel(): el
+ * camino de impresión lo renderiza como HTML y el de descarga como PDF vía el
+ * componente TicketDocument (US-16-02).
  */
 
 const PAYMENT_METHOD_LABELS = {
@@ -59,10 +61,11 @@ function escapeHtml(value) {
 
 /**
  * Normaliza order + branch a un modelo plano y defensivo, única fuente de verdad
- * del contenido del ticket. Tanto el HTML de impresión como el PDF lo consumen,
- * garantizando que ambos rendericen exactamente lo mismo.
+ * del contenido del ticket. Tanto el HTML de impresión como el PDF (vía
+ * TicketDocument) lo consumen, garantizando que ambos rendericen exactamente lo
+ * mismo. Exportada para que TicketDocument reutilice el mismo formateo.
  */
-function buildTicketModel(order, branch) {
+export function buildTicketModel(order, branch) {
   const o = order ?? {}
   const b = branch ?? {}
   const items = Array.isArray(o.items) ? o.items : []
@@ -138,50 +141,6 @@ function renderTicketHtml(model) {
 
 // ── Camino de descarga (PDF @react-pdf/renderer) ───────────────────────────
 
-const pdfStyles = StyleSheet.create({
-  page: { fontFamily: 'Helvetica', fontSize: 11, paddingVertical: 40, paddingHorizontal: 48 },
-  ticket: { width: 260, marginHorizontal: 'auto' },
-  tenant: { fontSize: 15, fontFamily: 'Helvetica-Bold', textAlign: 'center' },
-  branch: { fontSize: 11, textAlign: 'center' },
-  sep: { borderBottomWidth: 1, borderBottomStyle: 'dashed', borderBottomColor: '#000', marginVertical: 8 },
-  meta: { fontSize: 11 },
-  row: { flexDirection: 'row', paddingVertical: 1 },
-  qty: { width: 24 },
-  name: { flex: 1 },
-  price: { width: 64, textAlign: 'right' },
-  totalRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  totalLabel: { fontSize: 12, fontFamily: 'Helvetica-Bold' },
-  method: { fontSize: 11, textAlign: 'right' },
-})
-
-function buildTicketPdfElement(model) {
-  return h(Document, null,
-    h(Page, { size: 'A4', style: pdfStyles.page },
-      h(View, { style: pdfStyles.ticket },
-        h(Text, { style: pdfStyles.tenant }, model.tenantName),
-        h(Text, { style: pdfStyles.branch }, model.branchName),
-        h(Text, { style: pdfStyles.branch }, model.branchAddress),
-        h(View, { style: pdfStyles.sep }),
-        h(Text, { style: pdfStyles.meta }, model.orderNumber),
-        h(Text, { style: pdfStyles.meta }, model.createdAt),
-        h(View, { style: pdfStyles.sep }),
-        ...model.items.map((it, i) =>
-          h(View, { style: pdfStyles.row, key: i },
-            h(Text, { style: pdfStyles.qty }, String(it.quantity)),
-            h(Text, { style: pdfStyles.name }, it.name),
-            h(Text, { style: pdfStyles.price }, it.unitPrice),
-          )),
-        h(View, { style: pdfStyles.sep }),
-        h(View, { style: pdfStyles.totalRow },
-          h(Text, { style: pdfStyles.totalLabel }, 'TOTAL'),
-          h(Text, { style: pdfStyles.totalLabel }, model.total),
-        ),
-        h(Text, { style: pdfStyles.method }, model.paymentMethod),
-      ),
-    ),
-  )
-}
-
 function triggerDownload(blob, fileName) {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
@@ -214,10 +173,12 @@ export function printTicket(order, branch) {
 }
 
 /**
- * Descarga el ticket de un pedido como PDF (mismo contenido que printTicket).
+ * Descarga el ticket de un pedido como PDF (mismo contenido que printTicket). El
+ * layout vive en TicketDocument; acá solo se resuelve el nombre de archivo y se
+ * dispara la descarga.
  */
 export async function downloadTicket(order, branch) {
-  const model = buildTicketModel(order, branch)
-  const blob = await pdf(buildTicketPdfElement(model)).toBlob()
-  triggerDownload(blob, model.fileName)
+  const { fileName } = buildTicketModel(order, branch)
+  const blob = await pdf(h(TicketDocument, { order, branch })).toBlob()
+  triggerDownload(blob, fileName)
 }
