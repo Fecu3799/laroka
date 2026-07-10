@@ -27,6 +27,18 @@ const API_URL = import.meta.env.VITE_API_URL ?? "";
 
 const TERMINAL = new Set(["DELIVERED", "CANCELLED"]);
 
+// Estados operativos en los que tiene sentido imprimir la comanda de cocina:
+// desde RECEIVED hasta DELIVERED inclusive. No depende del paymentStatus —
+// cocina prepara el pedido más allá de si ya se cobró. Excluye estados sin
+// sentido operativo (PENDING, CANCELLED, CANCELLATION_REQUESTED).
+const PRINTABLE_STATUSES = new Set([
+  "RECEIVED",
+  "IN_PREPARATION",
+  "ON_THE_WAY",
+  "READY_FOR_PICKUP",
+  "DELIVERED",
+]);
+
 const PAYMENT_STATUS_LABEL = {
   APPROVED: "Pagado",
   PENDING: "Pendiente",
@@ -446,6 +458,44 @@ function XCancelIcon() {
         stroke="currentColor"
         strokeWidth="1.8"
         strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function PrinterIcon() {
+  return (
+    <svg
+      width="13"
+      height="13"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
+      <path
+        d="M6 9V2h12v7"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <rect
+        x="6"
+        y="14"
+        width="12"
+        height="8"
+        rx="1"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
       />
     </svg>
   );
@@ -985,6 +1035,13 @@ function OrderDetail({
 
   const canGoBack = goBackAllowed(order.status);
   const canCancel = cancelAllowed(order.status);
+  const canPrint = PRINTABLE_STATUSES.has(order.status);
+
+  // TODO(US siguiente): conectar con la lógica real de impresión de comanda.
+  const handlePrintComanda = (e) => {
+    e.stopPropagation();
+    console.log("[comanda] imprimir pedido", order.id);
+  };
 
   const confirmPayment = async (e) => {
     e.stopPropagation();
@@ -1089,167 +1146,6 @@ function OrderDetail({
 
       {/* ── Body ─────────────────────────────────────────────── */}
       <div className="orders-detail-body">
-        <div className="detail-four-grid">
-          {/* Cliente — top left */}
-          <div className="detail-block">
-            <div className="detail-overline">CLIENTE</div>
-            <div className="detail-customer-row">
-              <div className="detail-customer-avatar">
-                {getInitials(order.customerName)}
-              </div>
-              <div className="detail-customer-info">
-                <div className="detail-customer-name">
-                  {order.customerName ?? "—"}
-                </div>
-                {order.customerPhone && (
-                  <div className="detail-customer-sub">
-                    <PhoneIcon size={12} />
-                    {order.customerPhone}
-                  </div>
-                )}
-                {order.orderType === "DELIVERY" && order.deliveryAddress && (
-                  <div className="detail-customer-sub">
-                    <PinIcon size={12} />
-                    {order.deliveryAddress}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Estado — top right */}
-          <div className="detail-block">
-            <div className="detail-overline">ESTADO DEL PEDIDO</div>
-            <span
-              className="status-badge"
-              style={{
-                backgroundColor: cfg.bg,
-                color: cfg.color,
-                borderColor: cfg.border,
-              }}
-            >
-              <span
-                className="status-dot"
-                style={{ backgroundColor: cfg.color }}
-              />
-              {cfg.label ?? order.status}
-            </span>
-            <div className="detail-type-label">
-              {order.orderType === "DELIVERY" ? (
-                <>
-                  <ScooterIcon size={11} /> Delivery
-                </>
-              ) : (
-                <>
-                  <StoreIcon size={11} /> Retiro en local
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Origen — bottom left */}
-          <div className="detail-block detail-block--origin">
-            <div className="detail-overline">ORIGEN</div>
-            <div className="detail-origin-name">
-              {order.origin === "CLIENT" ? "App Roka" : "Local"}
-            </div>
-            <div className="detail-origin-time">
-              {formatDateTime(order.createdAt)}
-            </div>
-          </div>
-
-          {/* Pago — bottom right */}
-          <div className="detail-block">
-            <div className="detail-overline">PAGO</div>
-            <span
-              className="status-badge"
-              style={{
-                backgroundColor: payCfg.bg,
-                color: payCfg.color,
-                borderColor: payCfg.border,
-              }}
-            >
-              <span
-                className="status-dot"
-                style={{ backgroundColor: payCfg.color }}
-              />
-              {PAYMENT_STATUS_LABEL[order.paymentStatus] ??
-                order.paymentStatus ??
-                "—"}
-            </span>
-            <div className="detail-payment-method">
-              {PAYMENT_METHOD_LABEL[order.paymentMethod] ??
-                order.paymentMethod ??
-                "—"}
-            </div>
-          </div>
-        </div>
-
-        {/* Productos */}
-        <div className="detail-block detail-block--full detail-products-block">
-          <div className="detail-products-head">
-            <span>CANT</span>
-            <span>PRODUCTO</span>
-            <span style={{ textAlign: "right" }}>P.UNIT</span>
-            <span style={{ textAlign: "right" }}>SUBTOTAL</span>
-          </div>
-          {order.items?.map((item, i) => (
-            <div
-              key={i}
-              className={`detail-product-row${i % 2 === 1 ? " detail-product-row--odd" : ""}`}
-            >
-              <span className="detail-prod-qty">x{item.quantity}</span>
-              <span className="detail-prod-name">{item.productName}</span>
-              <span className="detail-prod-price">
-                {formatPrice(item.unitPrice)}
-              </span>
-              <span className="detail-prod-subtotal">
-                {formatPrice(item.quantity * item.unitPrice)}
-              </span>
-            </div>
-          ))}
-          {order.subtotal != null && order.subtotal !== order.totalAmount && (
-            <div className="detail-subtotal-row">
-              <span>Subtotal</span>
-              <span>{formatPrice(order.subtotal)}</span>
-            </div>
-          )}
-          {order.deliveryFee > 0 && (
-            <div className="detail-subtotal-row">
-              <span>Envío</span>
-              <span>{formatPrice(order.deliveryFee)}</span>
-            </div>
-          )}
-          {order.serviceFee > 0 && (
-            <div className="detail-subtotal-row">
-              <span>Servicio</span>
-              <span>{formatPrice(order.serviceFee)}</span>
-            </div>
-          )}
-          <div className="detail-total-row">
-            <span className="detail-total-label">TOTAL</span>
-            <span className="detail-total-amount">
-              {formatPrice(order.totalAmount)}
-            </span>
-          </div>
-        </div>
-
-        {/* Notas */}
-        {order.notes && (
-          <div className="detail-notes-block detail-block--full">
-            <p className="detail-notes-text">"{order.notes}"</p>
-          </div>
-        )}
-
-        {/* Motivo de cancelación */}
-        {(order.status === "CANCELLED" || order.status === "CANCELLATION_REQUESTED") &&
-          order.cancellationReason && (
-            <div className="detail-cancel-reason-block">
-              <div className="detail-overline">MOTIVO DE CANCELACIÓN</div>
-              <p className="detail-cancel-reason-text">{order.cancellationReason}</p>
-            </div>
-          )}
-
         {/* Bottom row: Historial + Actions */}
         <div className="detail-bottom-row">
           {/* Left: Historial */}
@@ -1431,10 +1327,182 @@ function OrderDetail({
                     </button>
                   )
                 )}
+
+                {canPrint && (
+                  <button
+                    className="detail-action-btn detail-action-print"
+                    type="button"
+                    onClick={handlePrintComanda}
+                  >
+                    <PrinterIcon /> Imprimir comanda
+                  </button>
+                )}
               </>
             )}
           </div>
         </div>
+
+        <div className="detail-four-grid">
+          {/* Cliente — top left */}
+          <div className="detail-block">
+            <div className="detail-overline">CLIENTE</div>
+            <div className="detail-customer-row">
+              <div className="detail-customer-avatar">
+                {getInitials(order.customerName)}
+              </div>
+              <div className="detail-customer-info">
+                <div className="detail-customer-name">
+                  {order.customerName ?? "—"}
+                </div>
+                {order.customerPhone && (
+                  <div className="detail-customer-sub">
+                    <PhoneIcon size={12} />
+                    {order.customerPhone}
+                  </div>
+                )}
+                {order.orderType === "DELIVERY" && order.deliveryAddress && (
+                  <div className="detail-customer-sub">
+                    <PinIcon size={12} />
+                    {order.deliveryAddress}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Estado — top right */}
+          <div className="detail-block">
+            <div className="detail-overline">ESTADO DEL PEDIDO</div>
+            <span
+              className="status-badge"
+              style={{
+                backgroundColor: cfg.bg,
+                color: cfg.color,
+                borderColor: cfg.border,
+              }}
+            >
+              <span
+                className="status-dot"
+                style={{ backgroundColor: cfg.color }}
+              />
+              {cfg.label ?? order.status}
+            </span>
+            <div className="detail-type-label">
+              {order.orderType === "DELIVERY" ? (
+                <>
+                  <ScooterIcon size={11} /> Delivery
+                </>
+              ) : (
+                <>
+                  <StoreIcon size={11} /> Retiro en local
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Origen — bottom left */}
+          <div className="detail-block detail-block--origin">
+            <div className="detail-overline">ORIGEN</div>
+            <div className="detail-origin-name">
+              {order.origin === "CLIENT" ? "App Roka" : "Local"}
+            </div>
+            <div className="detail-origin-time">
+              {formatDateTime(order.createdAt)}
+            </div>
+          </div>
+
+          {/* Pago — bottom right */}
+          <div className="detail-block">
+            <div className="detail-overline">PAGO</div>
+            <span
+              className="status-badge"
+              style={{
+                backgroundColor: payCfg.bg,
+                color: payCfg.color,
+                borderColor: payCfg.border,
+              }}
+            >
+              <span
+                className="status-dot"
+                style={{ backgroundColor: payCfg.color }}
+              />
+              {PAYMENT_STATUS_LABEL[order.paymentStatus] ??
+                order.paymentStatus ??
+                "—"}
+            </span>
+            <div className="detail-payment-method">
+              {PAYMENT_METHOD_LABEL[order.paymentMethod] ??
+                order.paymentMethod ??
+                "—"}
+            </div>
+          </div>
+        </div>
+
+        {/* Productos */}
+        <div className="detail-block detail-block--full detail-products-block">
+          <div className="detail-products-head">
+            <span>CANT</span>
+            <span>PRODUCTO</span>
+            <span style={{ textAlign: "right" }}>P.UNIT</span>
+            <span style={{ textAlign: "right" }}>SUBTOTAL</span>
+          </div>
+          {order.items?.map((item, i) => (
+            <div
+              key={i}
+              className={`detail-product-row${i % 2 === 1 ? " detail-product-row--odd" : ""}`}
+            >
+              <span className="detail-prod-qty">x{item.quantity}</span>
+              <span className="detail-prod-name">{item.productName}</span>
+              <span className="detail-prod-price">
+                {formatPrice(item.unitPrice)}
+              </span>
+              <span className="detail-prod-subtotal">
+                {formatPrice(item.quantity * item.unitPrice)}
+              </span>
+            </div>
+          ))}
+          {order.subtotal != null && order.subtotal !== order.totalAmount && (
+            <div className="detail-subtotal-row">
+              <span>Subtotal</span>
+              <span>{formatPrice(order.subtotal)}</span>
+            </div>
+          )}
+          {order.deliveryFee > 0 && (
+            <div className="detail-subtotal-row">
+              <span>Envío</span>
+              <span>{formatPrice(order.deliveryFee)}</span>
+            </div>
+          )}
+          {order.serviceFee > 0 && (
+            <div className="detail-subtotal-row">
+              <span>Servicio</span>
+              <span>{formatPrice(order.serviceFee)}</span>
+            </div>
+          )}
+          <div className="detail-total-row">
+            <span className="detail-total-label">TOTAL</span>
+            <span className="detail-total-amount">
+              {formatPrice(order.totalAmount)}
+            </span>
+          </div>
+        </div>
+
+        {/* Notas */}
+        {order.notes && (
+          <div className="detail-notes-block detail-block--full">
+            <p className="detail-notes-text">"{order.notes}"</p>
+          </div>
+        )}
+
+        {/* Motivo de cancelación */}
+        {(order.status === "CANCELLED" || order.status === "CANCELLATION_REQUESTED") &&
+          order.cancellationReason && (
+            <div className="detail-cancel-reason-block">
+              <div className="detail-overline">MOTIVO DE CANCELACIÓN</div>
+              <p className="detail-cancel-reason-text">{order.cancellationReason}</p>
+            </div>
+          )}
+
       </div>
     </div>
   );
