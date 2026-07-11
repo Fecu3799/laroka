@@ -23,6 +23,7 @@ import lombok.NoArgsConstructor;
 public class BackofficeOrderDetailDTO {
 
     private UUID id;
+    private Long orderNumber;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private OrderStatus status;

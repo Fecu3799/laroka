@@ -108,6 +108,33 @@
   color: var(--color-success) !important;
 }
 
+/* Columna de acción con el botón de descarga del resumen (US-16-05). */
+.history-th-action,
+.history-action-cell {
+  width: 56px;
+  text-align: right;
+}
+
+.history-download-btn {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--border) 38%, transparent);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.history-download-btn:hover {
+  border-color: color-mix(in srgb, var(--border) 60%, transparent);
+  background: color-mix(in srgb, var(--border) 10%, transparent);
+  color: var(--text-primary);
+}
+
 .history-revenue {
   font-family: ui-monospace, 'SFMono-Regular', 'JetBrains Mono', Menlo, monospace;
   font-variant-numeric: tabular-nums;

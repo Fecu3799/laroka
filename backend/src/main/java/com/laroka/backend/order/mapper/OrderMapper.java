@@ -113,6 +113,7 @@ public class OrderMapper {
 
         return BackofficeOrderDetailDTO.builder()
                 .id(order.getId())
+                .orderNumber(order.getOrderNumber())
                 .createdAt(order.getCreatedAt())
                 .updatedAt(order.getUpdatedAt())
                 .status(order.getStatus())
@@ -139,6 +140,7 @@ public class OrderMapper {
     public BackofficeOrderResponseDTO toBackofficeResponseDTO(Order order, Payment payment) {
         return BackofficeOrderResponseDTO.builder()
                 .id(order.getId())
+                .orderNumber(order.getOrderNumber())
                 .createdAt(order.getCreatedAt())
                 .updatedAt(order.getUpdatedAt())
                 .status(order.getStatus())

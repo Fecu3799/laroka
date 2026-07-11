@@ -51,6 +51,8 @@ export default function useShiftSummary(activeShiftKey) {
           openedAt: current.openedAt,
           openedBy: current.openedBy,
           closedAt: null,
+          // Un turno en curso nunca está auto-cerrado (Informe X).
+          autoClose: false,
           summary,
         })
         return
@@ -68,6 +70,9 @@ export default function useShiftSummary(activeShiftKey) {
         openedAt: last.openedAt,
         openedBy: last.openedBy,
         closedAt: last.closedAt,
+        // Expuesto por el backend (US-16-04): true si el turno se auto-cerró.
+        // Lo consume ShiftSummaryDocument vía shift.autoClose.
+        autoClose: last.autoClose ?? false,
         summary: last.summary,
       })
     } catch {

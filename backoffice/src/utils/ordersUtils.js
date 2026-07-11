@@ -48,3 +48,15 @@ export function canConfirmOrder({ cartItems, orderType, deliveryAddress }) {
   return cartItems.length > 0 &&
     (orderType !== 'DELIVERY' || (deliveryAddress ?? '').trim().length > 0)
 }
+
+/**
+ * Número visible del pedido, secuencial y continuo por sucursal (US-16B-03):
+ * "Orden #47". Es sólo presentación — el id interno del pedido sigue siendo el
+ * UUID. Fallback al UUID truncado para pedidos legados sin orderNumber.
+ */
+export function formatOrderNumber(order) {
+  const n = order?.orderNumber
+  if (n != null) return `Orden #${n}`
+  const id = String(order?.id ?? '')
+  return id ? `#ORDER-${id.slice(0, 8)}` : ''
+}

@@ -40,6 +40,29 @@
   flex-shrink: 0;
 }
 
+/* Botón-ícono de descarga del resumen (US-16-05). Mismo lenguaje visual que los
+   íconos de acción de US-16-03: contorno neutro, cuadrado, con hover. */
+.summary-download-btn {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--border) 38%, transparent);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.summary-download-btn:hover {
+  border-color: color-mix(in srgb, var(--border) 60%, transparent);
+  background: color-mix(in srgb, var(--border) 10%, transparent);
+  color: var(--text-primary);
+}
+
 .summary-close-btn {
   flex-shrink: 0;
   padding: 9px 18px;

@@ -7,6 +7,7 @@ import {
   advanceOrderStatus,
   resolveCancelRequest,
 } from "../services/ordersService";
+import { printTicket, downloadTicket } from "../services/ticketService";
 import { apiFetch } from "../services/http";
 import {
   STATUS_CONFIG,
@@ -15,6 +16,7 @@ import {
   getNextStatus,
   canGoBack as goBackAllowed,
   canCancel as cancelAllowed,
+  formatOrderNumber,
 } from "../utils/ordersUtils";
 import NewOrderModal from "../components/NewOrderModal";
 import OperatorStatusBar from "../components/OperatorStatusBar";
@@ -188,6 +190,7 @@ function filterOrders(orders, activeTab, searchQuery, dismissedIds) {
     const q = searchQuery.toLowerCase();
     list = list.filter(
       (o) =>
+        formatOrderNumber(o).toLowerCase().includes(q) ||
         shortId(o.id).toLowerCase().includes(q) ||
         (o.customerName && o.customerName.toLowerCase().includes(q)),
     );
@@ -412,6 +415,77 @@ function CloseIcon() {
   );
 }
 
+function PrinterIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
+      <polyline
+        points="6 9 6 2 18 2 18 9"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <rect
+        x="6"
+        y="14"
+        width="12"
+        height="8"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function DownloadIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
+      <path
+        d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <polyline
+        points="7 10 12 15 17 10"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M12 15V3"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function ArrowLeftIcon() {
   return (
     <svg
@@ -458,44 +532,6 @@ function XCancelIcon() {
         stroke="currentColor"
         strokeWidth="1.8"
         strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
-function PrinterIcon() {
-  return (
-    <svg
-      width="13"
-      height="13"
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-    >
-      <path
-        d="M6 9V2h12v7"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <rect
-        x="6"
-        y="14"
-        width="12"
-        height="8"
-        rx="1"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
       />
     </svg>
   );
@@ -566,8 +602,8 @@ function PaymentStatusIcon({ status }) {
 // ── Main component ────────────────────────────────────────────
 
 export default function Orders() {
-  const { token } = useAuth();
-  const { activeBranchId: branchId } = useBranch();
+  const { token, tenantName } = useAuth();
+  const { activeBranchId: branchId, activeBranchName } = useBranch();
   const { resetCounts } = useOutletContext();
   const {
     orders,
@@ -617,6 +653,35 @@ export default function Orders() {
       }
     },
     [token, branchId, updateOrderInList, refetchDetail],
+  );
+
+  // ── Ticket: imprimir / descargar (US-16-03) ──────────────────
+  // El pedido de la fila ya trae items (BackofficeOrderResponseDTO los incluye),
+  // así que se pasa tal cual al servicio sin un fetch extra. branch sale de
+  // useBranch() (id + nombre de la sucursal activa) y el tenantName del JWT vía
+  // useAuth(): sin ese dato el encabezado del comprobante quedaría sin la pizzería.
+  const handlePrintTicket = useCallback(
+    (e, order) => {
+      e.stopPropagation();
+      try {
+        printTicket(order, { id: branchId, name: activeBranchName, tenantName });
+      } catch {
+        /* pop-up bloqueado u otro fallo — silencioso, como el resto de la tabla */
+      }
+    },
+    [branchId, activeBranchName, tenantName],
+  );
+
+  const handleDownloadTicket = useCallback(
+    async (e, order) => {
+      e.stopPropagation();
+      try {
+        await downloadTicket(order, { id: branchId, name: activeBranchName, tenantName });
+      } catch {
+        /* silent */
+      }
+    },
+    [branchId, activeBranchName, tenantName],
   );
 
   // ── Derived ──────────────────────────────────────────────────
@@ -783,6 +848,8 @@ export default function Orders() {
                         setSelectedId(order.id === selectedId ? null : order.id)
                       }
                       onAdvance={(e) => handleAdvance(e, order)}
+                      onPrintTicket={(e) => handlePrintTicket(e, order)}
+                      onDownloadTicket={(e) => handleDownloadTicket(e, order)}
                       onDismiss={(e) => {
                         e.stopPropagation();
                         dismissOrder(order.id);
@@ -847,6 +914,8 @@ function OrderRow({
   pendingColor,
   onSelect,
   onAdvance,
+  onPrintTicket,
+  onDownloadTicket,
   onDismiss,
 }) {
   const cfg = STATUS_CONFIG[order.status] ?? {};
@@ -875,7 +944,7 @@ function OrderRow({
     >
       {/* PEDIDO */}
       <div className="col-order">
-        <span className="order-id">{shortId(order.id)}</span>
+        <span className="order-id">{formatOrderNumber(order)}</span>
         {!contracted && (
           <span className="order-time">{formatTime(order.createdAt)}</span>
         )}
@@ -981,7 +1050,35 @@ function OrderRow({
       {/* ACCIÓN — hidden when contracted */}
       {!contracted && (
         <div className="col-action">
-          {isTerminal ? (
+          {order.status === "DELIVERED" ? (
+            <>
+              {/* US-16-03: sólo en DELIVERED, a la derecha del (ausente) Avanzar */}
+              <button
+                className="action-icon-btn"
+                type="button"
+                onClick={onPrintTicket}
+                aria-label="Imprimir ticket"
+              >
+                <PrinterIcon />
+              </button>
+              <button
+                className="action-icon-btn"
+                type="button"
+                onClick={onDownloadTicket}
+                aria-label="Descargar ticket"
+              >
+                <DownloadIcon />
+              </button>
+              <button
+                className="action-dismiss-btn"
+                type="button"
+                onClick={onDismiss}
+                aria-label="Descartar pedido"
+              >
+                <TrashIcon />
+              </button>
+            </>
+          ) : isTerminal ? (
             <button
               className="action-dismiss-btn"
               type="button"
@@ -1131,7 +1228,7 @@ function OrderDetail({
     <div className="orders-detail-col">
       {/* ── Header ──────────────────────────────────────────── */}
       <div className="orders-detail-header">
-        <span className="detail-order-id">{shortId(order.id)}</span>
+        <span className="detail-order-id">{formatOrderNumber(order)}</span>
         <span className="detail-order-time">{formatTime(order.createdAt)}</span>
         <div style={{ flex: 1 }} />
         <button

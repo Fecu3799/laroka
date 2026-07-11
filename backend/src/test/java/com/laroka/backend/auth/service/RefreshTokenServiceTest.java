@@ -63,6 +63,7 @@ class RefreshTokenServiceTest {
 		jdbcTemplate.update("DELETE FROM branch_qr WHERE branch_id IN (SELECT id FROM branch WHERE name = ?)", "Test Branch");
 		jdbcTemplate.update("DELETE FROM branch_product WHERE branch_id IN (SELECT id FROM branch WHERE name = ?)", "Test Branch");
 		jdbcTemplate.update("DELETE FROM staff_user WHERE branch_id IN (SELECT id FROM branch WHERE name = ?)", "Test Branch");
+		jdbcTemplate.update("DELETE FROM branch_order_sequence WHERE branch_id IN (SELECT id FROM branch WHERE name = ?)", "Test Branch");
 		jdbcTemplate.update("DELETE FROM branch WHERE name = ?", "Test Branch");
 		jdbcTemplate.update("DELETE FROM product WHERE tenant_id IN (SELECT id FROM tenant WHERE name = ?)", "Test Tenant");
 		jdbcTemplate.update("DELETE FROM category WHERE tenant_id IN (SELECT id FROM tenant WHERE name = ?)", "Test Tenant");
