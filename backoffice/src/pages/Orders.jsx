@@ -7,7 +7,7 @@ import {
   advanceOrderStatus,
   resolveCancelRequest,
 } from "../services/ordersService";
-import { printTicket, downloadTicket } from "../services/ticketService";
+import { printTicket, downloadTicket, printComanda } from "../services/ticketService";
 import { apiFetch } from "../services/http";
 import {
   STATUS_CONFIG,
@@ -1134,10 +1134,13 @@ function OrderDetail({
   const canCancel = cancelAllowed(order.status);
   const canPrint = PRINTABLE_STATUSES.has(order.status);
 
-  // TODO(US siguiente): conectar con la lógica real de impresión de comanda.
   const handlePrintComanda = (e) => {
     e.stopPropagation();
-    console.log("[comanda] imprimir pedido", order.id);
+    try {
+      printComanda(order);
+    } catch {
+      /* pop-up bloqueado u otro fallo — silencioso, como el resto de la tabla */
+    }
   };
 
   const confirmPayment = async (e) => {

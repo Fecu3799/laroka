@@ -47,6 +47,13 @@ function formatDateTime(value) {
     + `${pad2(d.getHours())}:${pad2(d.getMinutes())}`
 }
 
+// Hora sola, para lectura rápida en cocina: HH:MM.
+function formatTime(value) {
+  const d = value ? new Date(value) : new Date()
+  if (Number.isNaN(d.getTime())) return ''
+  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`
+}
+
 // Fecha para el nombre de archivo: YYYY-MM-DD.
 function fileDate(value) {
   const d = value ? new Date(value) : new Date()
@@ -103,6 +110,49 @@ export function buildTicketModel(order, branch) {
     paymentMethod: PAYMENT_METHOD_LABELS[o.paymentMethod] ?? o.paymentMethod ?? '',
     fileName: `ticket-${sid}-${fileDate(o.createdAt)}.pdf`,
   }
+}
+
+// ── Impresión no bloqueante (compartido por ticket y comanda) ──────────────
+//
+// El opener (la pestaña del backoffice) NO llama a print() ni close(). Abre la
+// ventana hija con `noopener`, lo que fuerza a Chrome a ponerla en un proceso de
+// renderizado separado: así el diálogo nativo de impresión —modal a nivel de
+// proceso— no congela la pestaña del backoffice. (Verificado en Chrome real con
+// el diálogo nativo: sin noopener el opener se congela; con noopener responde.)
+//
+// `noopener` hace que window.open() devuelva null, por eso el contenido no se
+// puede escribir con document.write y viaja por un blob URL. Y como la ventana
+// hija (documento blob:) hereda la CSP del backoffice (`script-src 'self'`, sin
+// unsafe-inline), el disparo de print/close no puede ir inline: vive en el script
+// externo same-origin /print-child.js (permitido por 'self'). Estas piezas son
+// idénticas para el ticket y la comanda; se centralizan para que no diverjan.
+
+// Botón de cierre manual: fallback por si onafterprint no dispara al cancelar
+// (comportamiento inconsistente entre navegadores). Oculto en la impresión.
+const CLOSE_BUTTON_CSS = `.close-btn { position: fixed; top: 12px; right: 12px; padding: 8px 14px;
+      font: 600 13px Helvetica, Arial, sans-serif; color: #fff; background: #333;
+      border: none; border-radius: 6px; cursor: pointer; }
+    @media print { .no-print { display: none !important; } }`
+
+const CLOSE_BUTTON_HTML = '<button type="button" id="ticket-close" class="close-btn no-print">Cerrar</button>'
+
+// Referencia al bootstrap de impresión. URL absoluta del propio origen: en un
+// documento blob: las rutas relativas resuelven contra el blob:, no contra el
+// origen, así que hay que dar el origin explícito (que además es el que matchea
+// `script-src 'self'`).
+function printScriptTag() {
+  return `<script src="${window.location.origin}/print-child.js"></script>`
+}
+
+// Abre la ventana hija con el HTML dado. noopener → proceso separado → el diálogo
+// nativo no congela el opener. window.open devuelve null (esperado con noopener):
+// no se puede distinguir "pop-up bloqueado", pero los handlers ya lo toleran.
+function openPrintWindow(html) {
+  const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }))
+  window.open(url, '_blank', 'noopener')
+  // Revocar tras dar tiempo a que la hija cargue el blob (no hay handle para
+  // saber cuándo cargó, por el noopener).
+  setTimeout(() => URL.revokeObjectURL(url), 60000)
 }
 
 // ── Camino de impresión (HTML + window.print) ──────────────────────────────
@@ -164,16 +214,11 @@ function renderTicketHtml(model) {
     /* Total: el elemento más destacado */
     .total { display: flex; justify-content: space-between; align-items: baseline; font-size: 26px; font-weight: bold; }
     .total .label { letter-spacing: 1px; }
-    /* Botón de cierre manual: fallback por si onafterprint no dispara al cancelar
-       (comportamiento inconsistente entre navegadores). Oculto en la impresión. */
-    .close-btn { position: fixed; top: 12px; right: 12px; padding: 8px 14px;
-      font: 600 13px Helvetica, Arial, sans-serif; color: #fff; background: #333;
-      border: none; border-radius: 6px; cursor: pointer; }
-    @media print { .no-print { display: none !important; } }
+    ${CLOSE_BUTTON_CSS}
   </style>
 </head>
 <body>
-  <button type="button" id="ticket-close" class="close-btn no-print">Cerrar</button>
+  ${CLOSE_BUTTON_HTML}
   <div class="ticket">
     <div class="center tenant">${escapeHtml(model.tenantName)}</div>
     <div class="center branch">${escapeHtml(model.branchName)}</div>
@@ -190,14 +235,7 @@ function renderTicketHtml(model) {
     <hr class="sep" />
     <div class="total"><span class="label">TOTAL</span><span>${escapeHtml(model.total)}</span></div>
   </div>
-  <script>
-    // Impresión y cierre corren en el hilo de ESTA ventana hija, no en el del
-    // backoffice que la abrió: así la pestaña original nunca queda bloqueada.
-    window.onafterprint = function () { window.close(); };
-    document.getElementById('ticket-close').addEventListener('click', function () { window.close(); });
-    // onload asegura que el layout ya esté renderizado antes de abrir el diálogo.
-    window.onload = function () { window.print(); };
-  </script>
+  ${printScriptTag()}
 </body>
 </html>`
 }
@@ -230,15 +268,105 @@ function triggerDownload(blob, fileName) {
  * opener sigue respondiendo con normalidad.
  */
 export function printTicket(order, branch) {
-  const model = buildTicketModel(order, branch)
-  const win = window.open('', '_blank')
-  if (!win) {
-    throw new Error('No se pudo abrir la ventana de impresión. Habilitá los pop-ups.')
+  openPrintWindow(renderTicketHtml(buildTicketModel(order, branch)))
+}
+
+// ── Camino de comanda (cocina) ─────────────────────────────────────────────
+//
+// La comanda es un documento distinto del ticket (US-16B-03): pensado para
+// lectura rápida en cocina, no como comprobante de venta. Por eso tiene su
+// propio modelo y render — mismo criterio que separa TicketDocument de
+// ShiftSummaryDocument — reutilizando sólo los helpers de bajo nivel y el
+// mecanismo de impresión no bloqueante. Contenido mínimo: número de orden
+// grande, tipo de entrega (sin dirección), hora de recepción, ítems (cantidad +
+// nombre, sin precios) y notas destacadas. Sin pago, sin totales.
+
+/**
+ * Normaliza un pedido al contenido mínimo de la comanda de cocina. No necesita
+ * `branch`: la cocina imprime para su propia sucursal. Exportada para testear el
+ * formateo sin pasar por el DOM.
+ */
+export function buildComandaModel(order) {
+  const o = order ?? {}
+  const items = Array.isArray(o.items) ? o.items : []
+  return {
+    orderNumber: formatOrderNumber(o),
+    orderTypeLabel: ORDER_TYPE_LABELS[o.orderType] ?? o.orderType ?? '',
+    receivedAt: formatTime(o.createdAt),
+    items: items.map(it => ({
+      quantity: it.quantity ?? 0,
+      name: it.productName ?? '',
+    })),
+    notes: (o.notes ?? '').trim(),
   }
-  win.document.open()
-  win.document.write(renderTicketHtml(model))
-  win.document.close()
-  win.focus()
+}
+
+function renderComandaHtml(model) {
+  const rows = model.items.map(it => `
+      <div class="item">
+        <span class="item-qty">${escapeHtml(it.quantity)}</span>
+        <span class="item-name">${escapeHtml(it.name)}</span>
+      </div>`).join('')
+
+  // Notas: sólo si existen, en un recuadro destacado. print-color-adjust mantiene
+  // el fondo al imprimir; el borde grueso asegura visibilidad aunque el navegador
+  // descarte el color de fondo.
+  const notesBlock = model.notes
+    ? `<div class="notes">
+        <div class="notes-label">NOTAS</div>
+        <div class="notes-text">${escapeHtml(model.notes).replaceAll('\n', '<br>')}</div>
+      </div>`
+    : ''
+
+  return `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>Comanda ${escapeHtml(model.orderNumber)}</title>
+  <style>
+    @page { size: A4; margin: 14mm; }
+    * { box-sizing: border-box; }
+    body { font-family: Helvetica, Arial, sans-serif; color: #000; margin: 0; }
+    .comanda { width: 100%; max-width: 420px; margin: 0 auto; }
+    /* Encabezado: número de orden enorme + tipo de entrega + hora */
+    .order-number { font-size: 46px; font-weight: bold; letter-spacing: 0.5px; line-height: 1.05; }
+    .order-type { font-size: 26px; font-weight: bold; text-transform: uppercase; margin-top: 4px; }
+    .received { font-size: 15px; color: #444; margin-top: 4px; }
+    .sep { border: none; border-top: 2px solid #000; margin: 14px 0; }
+    /* Ítems: cantidad y nombre grandes, sin precios */
+    .item { display: flex; align-items: baseline; padding: 6px 0; }
+    .item-qty { font-size: 30px; font-weight: bold; width: 56px; flex-shrink: 0; }
+    .item-name { font-size: 26px; }
+    /* Notas destacadas */
+    .notes { margin-top: 14px; border: 3px solid #000; border-radius: 8px; padding: 10px 12px;
+      background: #ffe9a8; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .notes-label { font-size: 14px; font-weight: bold; letter-spacing: 1px; margin-bottom: 4px; }
+    .notes-text { font-size: 20px; font-weight: bold; line-height: 1.3; }
+    ${CLOSE_BUTTON_CSS}
+  </style>
+</head>
+<body>
+  ${CLOSE_BUTTON_HTML}
+  <div class="comanda">
+    <div class="order-number">${escapeHtml(model.orderNumber)}</div>
+    <div class="order-type">${escapeHtml(model.orderTypeLabel)}</div>
+    <div class="received">Recibido ${escapeHtml(model.receivedAt)}</div>
+    <hr class="sep" />
+    ${rows}
+    ${notesBlock}
+  </div>
+  ${printScriptTag()}
+</body>
+</html>`
+}
+
+/**
+ * Imprime la comanda de cocina de un pedido. Mismo mecanismo no bloqueante que
+ * printTicket: el opener sólo abre la ventana y le escribe el HTML; el propio
+ * documento hijo dispara la impresión y se cierra.
+ */
+export function printComanda(order) {
+  openPrintWindow(renderComandaHtml(buildComandaModel(order)))
 }
 
 /**
