@@ -77,4 +77,30 @@ class MenuCacheTest {
 
 		productService.updateAvailability(productId, true, 1);
 	}
+
+	@Test
+	void update_evictsMenuCache() {
+		List<BranchProduct> initial = branchProductRepository.findByBranchIdWithProductAndCategory(1);
+		Assumptions.assumeTrue(!initial.isEmpty(), "Branch 1 must have at least one product");
+		com.laroka.backend.catalog.entity.Product existing = initial.get(0).getProduct();
+		clearInvocations(branchProductRepository);
+
+		productService.getMenuForBranch(1);
+
+		// Un update general del producto (aquí, cambio de imageUrl) debe invalidar el menú
+		// completo (allEntries=true), no una sola sucursal.
+		com.laroka.backend.catalog.entity.Product updates = com.laroka.backend.catalog.entity.Product.builder()
+			.name(existing.getName())
+			.description(existing.getDescription())
+			.price(existing.getPrice())
+			.imageUrl("https://cdn.r2.dev/1/products/updated.png")
+			.category(com.laroka.backend.catalog.entity.Category.builder().id(1).build())
+			.tenant(com.laroka.backend.tenant.entity.Tenant.builder().id(1).build())
+			.build();
+		productService.update(existing.getId(), updates);
+
+		productService.getMenuForBranch(1);
+
+		verify(branchProductRepository, times(2)).findByBranchIdWithProductAndCategory(1);
+	}
 }

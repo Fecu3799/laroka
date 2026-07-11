@@ -61,6 +61,7 @@ import com.laroka.backend.order.entity.OrderStatusHistory;
 class OrderServiceTest {
 
     @Mock private OrderRepository orderRepository;
+    @Mock private com.laroka.backend.order.repository.BranchOrderSequenceRepository branchOrderSequenceRepository;
     @Mock private OrderStatusHistoryRepository historyRepository;
     @Mock private BranchRepository branchRepository;
     @Mock private ProductRepository productRepository;

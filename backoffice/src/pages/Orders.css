@@ -1201,6 +1201,17 @@
 
 .detail-action-cancel:hover { border-color: rgba(248, 113, 113, 0.45); }
 
+.detail-action-print {
+  background: transparent;
+  border: 1px solid rgba(144, 189, 249, 0.3);
+  color: #90bdf9;
+  transition: border-color 0.15s;
+}
+
+.detail-action-print:hover:not(:disabled) {
+  border-color: rgba(144, 189, 249, 0.55);
+}
+
 /* ── Cancellation request row indicator ──────────────────────── */
 
 .action-cancel-request-badge {

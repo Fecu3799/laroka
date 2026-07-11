@@ -1,8 +1,11 @@
-function dispatchToast(message) {
+export function showToast(message) {
   window.dispatchEvent(
     new CustomEvent("laroka:toast", { detail: { message } }),
   );
 }
+
+// Alias interno histórico; showToast es el contrato reutilizable del toast global.
+const dispatchToast = showToast;
 
 export async function apiFetch(url, options = {}) {
   let res;

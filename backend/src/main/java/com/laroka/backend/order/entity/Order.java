@@ -39,6 +39,12 @@ public class Order {
     @Id
     private UUID id;
 
+    // Número visible del pedido, secuencial y continuo por sucursal (US-16B-03).
+    // Se asigna atómicamente al crear el pedido y no cambia después. El id (UUID)
+    // sigue siendo el identificador interno; esto es sólo para mostrar.
+    @Column(name = "order_number", nullable = false, updatable = false)
+    private Long orderNumber;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 30)
     private OrderStatus status;

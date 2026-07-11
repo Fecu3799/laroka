@@ -46,6 +46,7 @@ import com.laroka.backend.order.entity.OrderType;
 import com.laroka.backend.order.entity.PaymentMethod;
 import com.laroka.backend.order.exception.OrderNotFoundException;
 import com.laroka.backend.order.exception.ProductUnavailableException;
+import com.laroka.backend.order.repository.BranchOrderSequenceRepository;
 import com.laroka.backend.order.repository.OrderItemRepository;
 import com.laroka.backend.order.repository.OrderRepository;
 import com.laroka.backend.order.repository.OrderStatusHistoryRepository;
@@ -63,6 +64,7 @@ import lombok.extern.slf4j.Slf4j;
 public class OrderService {
 
     private final OrderRepository orderRepository;
+    private final BranchOrderSequenceRepository branchOrderSequenceRepository;
     private final OrderStatusHistoryRepository historyRepository;
     private final OrderItemRepository orderItemRepository;
     private final BranchRepository branchRepository;
@@ -487,6 +489,11 @@ public class OrderService {
                     order.getPushSubscriptionId());
             order.setPushSubscriptionId(null);
         }
+
+        // Número de orden secuencial por sucursal (US-16B-03). Se asigna lo más
+        // tarde posible dentro de la transacción para acotar la ventana del lock de
+        // fila del contador; queda serializado con los demás pedidos de la sucursal.
+        order.setOrderNumber(branchOrderSequenceRepository.nextOrderNumber(branch.getId()));
 
         Order saved = orderRepository.save(order);
         recordHistory(saved, null, OrderStatus.PENDING_PAYMENT);

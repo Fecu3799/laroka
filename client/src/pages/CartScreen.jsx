@@ -7,9 +7,29 @@ import { usePushSubscription } from '../hooks/usePushSubscription'
 import { PushPermissionSheet } from '../components/PushPermissionSheet'
 import { addActiveOrder } from '../utils/activeOrders'
 import { initiatePayment } from '../services/paymentsService'
-import { apiFetch } from '../services/http'
+import { apiFetch, showToast } from '../services/http'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+
+// Timeout de seguridad de la resolución de suscripción push. La resolución hace
+// awaits sobre el Service Worker / pushManager / red que, en estados transitorios,
+// pueden no resolver nunca y trabar la creación del pedido. Si se cumple el
+// timeout seguimos con pushSubscriptionId = null: el push es best-effort y jamás
+// debe bloquear ni revertir el POST /orders (aplica a efectivo y MercadoPago).
+const PUSH_RESOLVE_TIMEOUT_MS = 3000
+
+// Corre `promise` con un límite de tiempo. Nunca lanza ni deja rejections colgadas:
+// resuelve { timedOut, value }. Si gana el timeout, el settle posterior de la
+// promesa original se ignora (el fetch de push ya se autocancela por su AbortController).
+function resolveWithTimeout(promise, ms) {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve({ timedOut: true, value: null }), ms)
+    promise.then(
+      (value) => { clearTimeout(timer); resolve({ timedOut: false, value }) },
+      () => { clearTimeout(timer); resolve({ timedOut: false, value: null }) },
+    )
+  })
+}
 
 function formatPrice(price) {
   return `$${Number(price).toLocaleString('es-AR')}`
@@ -215,7 +235,17 @@ export function CartScreen({ items, extras = [], onBack, onRemove, onUpdateQty, 
   }
 
   const handleConfirm = async (formData) => {
-    const pushSubscriptionId = await resolvePushSubscriptionId()
+    // La resolución de push corre con un timeout de seguridad: si tarda más de
+    // PUSH_RESOLVE_TIMEOUT_MS seguimos el flujo con pushSubscriptionId = null y
+    // avisamos por toast, sin bloquear ni revertir la creación del pedido.
+    const { timedOut, value } = await resolveWithTimeout(
+      resolvePushSubscriptionId(),
+      PUSH_RESOLVE_TIMEOUT_MS,
+    )
+    if (timedOut) {
+      showToast('Hubo un problema con las notificaciones. Tu pedido se está creando igual.')
+    }
+    const pushSubscriptionId = timedOut ? null : value
     const payload = {
       branchId: preferredBranchId,
       orderType: formData.orderType === 'delivery' ? 'DELIVERY' : 'TAKEAWAY',

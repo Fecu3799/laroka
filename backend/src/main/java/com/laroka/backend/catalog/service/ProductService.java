@@ -95,6 +95,12 @@ public class ProductService {
 		}
 	}
 
+	// Un update de producto no está scopeado a una sucursal: cambia atributos del Product
+	// (name, description, price, imageUrl, category) que se reflejan en el menú de TODAS las
+	// sucursales del tenant. Por eso el evict es total (allEntries=true), mismo criterio que
+	// updatePrice y delete. Sin @Transactional (igual que updatePrice): con @CacheEvict solo,
+	// la evicción corre después del save y no hay riesgo de repoblar el cache antes del commit.
+	@CacheEvict(value = "menu", allEntries = true)
 	public Product update(Integer id, Product updates) {
 		Product product = findById(id);
 		Category category = validateCategoryExists(updates.getCategory().getId());
