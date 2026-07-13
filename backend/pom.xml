@@ -156,7 +156,7 @@
 		<dependency>
 			<groupId>org.bouncycastle</groupId>
 			<artifactId>bcprov-jdk18on</artifactId>
-			<version>1.84</version>
+			<version>1.85</version>
 		</dependency>
 
 		<!-- Cliente S3 v2 para subir objetos a Cloudflare R2 (US-15-01).
