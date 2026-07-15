@@ -27,6 +27,7 @@ import com.laroka.backend.order.entity.OrderType;
 import com.laroka.backend.order.entity.PaymentMethod;
 import com.laroka.backend.order.repository.OrderItemRepository;
 import com.laroka.backend.order.repository.OrderRepository;
+import com.laroka.backend.order.service.OrderService;
 import com.laroka.backend.payment.entity.Payment;
 import com.laroka.backend.payment.repository.PaymentRepository;
 import com.laroka.backend.shift.dto.TopProductDTO;
@@ -52,6 +53,7 @@ public class WorkShiftService {
     private final PaymentRepository paymentRepository;
     private final StaffUserRepository staffUserRepository;
     private final BranchRepository branchRepository;
+    private final OrderService orderService;
 
     @Transactional
     public OpenShiftResult openShift(Integer branchId, Integer userId) {
@@ -251,10 +253,19 @@ public class WorkShiftService {
             return;
         }
 
+        // Política de auto-cierre: a diferencia del cierre manual —que bloquea si
+        // hay pedidos activos sin resolver— el auto-cierre cancela automáticamente
+        // todo pedido activo del turno antes de cerrarlo. Así ninguno queda
+        // huérfano referenciando un turno CLOSED ni atrasado e invisible al abrir
+        // el turno siguiente. Los pagos MercadoPago aprobados se reembolsan en su
+        // totalidad. El summary se calcula recién después, con estos pedidos ya
+        // contabilizados como cancelados. Ver docs/KNOWN_ISSUES.md.
+        orderService.cancelActiveOrdersForShiftAutoClose(shiftId);
+
         // Nunca eliminar el turno en cierre automático — pueden existir pedidos
-        // activos referenciando este turno. closeShiftInternal elimina el turno
-        // cuando totalOrders == 0, lo cual viola shift_id NOT NULL en orders.
-        // El auto-cierre siempre persiste el turno como CLOSED.
+        // (ahora cancelados) referenciando este turno. closeShiftInternal elimina
+        // el turno cuando totalOrders == 0, lo cual viola shift_id NOT NULL en
+        // orders. El auto-cierre siempre persiste el turno como CLOSED.
         WorkShiftSummary summary = calculateSummary(shift);
         if (summary.getTotalOrders() > 0) {
             workShiftSummaryRepository.save(summary);

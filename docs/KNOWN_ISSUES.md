@@ -11,3 +11,16 @@
 **Workaround manual:** Llamar a `POST /auth/logout` con el JWT del usuario afectado (si se conoce el token) para agregarlo a la blacklist. Alternativamente, esperar la expiración natural.
 
 **Resolución planificada:** Implementar revocación por userId en una historia posterior si el negocio lo requiere, usando persistencia de tokens activos en DB o migrando la blacklist a Redis.
+
+## Auto-cierre de turno con pedidos activos: cancelación automática + reembolso total
+
+**Contexto:** El auto-cierre de turno (`ShiftAutoCloseJob` → `WorkShiftService.autoCloseShift`) se dispara cuando un turno supera `max_shift_duration_minutes` sin cerrarse manualmente. A diferencia del cierre manual —que **bloquea** si hay pedidos activos sin resolver— el auto-cierre no puede pedirle nada al operador: corre desatendido.
+
+**Política:** Al momento del auto-cierre, todo pedido en estado activo del turno (`RECEIVED`, `IN_PREPARATION`, `ON_THE_WAY`, `READY_FOR_PICKUP`) se **cancela automáticamente antes de cerrar el turno**. Así ningún pedido queda huérfano referenciando un turno `CLOSED` ni atrasado e invisible para el staff al abrirse el turno siguiente. El turno se cierra recién después de resolver todos los pedidos activos, y su `WorkShiftSummary` se calcula incluyéndolos como cancelados.
+
+- **Motivo de cancelación:** se registra `"No se pudo procesar a tiempo"` (constante `OrderService.SHIFT_AUTO_CLOSE_CANCELLATION_REASON`), distinguible de una cancelación normal en el historial (`order_status_history`). Se notifica al cliente por el mismo canal que cualquier otra cancelación.
+- **Reembolso TOTAL sin excepción:** si el pedido tenía un `Payment` con `status = APPROVED` y `method = MERCADOPAGO`, se dispara un reembolso **total** vía `PaymentGateway.refundPayment` (sin monto → reembolso completo) y el pago queda `REFUNDED`. La responsabilidad de no procesar a tiempo es **operativa** (del local), no del cliente; por eso el reembolso es del 100%.
+- Un pago en **efectivo** no dispara reembolso (no hubo cobro electrónico que revertir).
+- Si el gateway falla, el reembolso se loguea para acción manual y **no** aborta el cierre del turno (mismo patrón que el reembolso por race-condition del webhook de MercadoPago).
+
+**Diferencia con Sprint 17:** esta política difiere del **reembolso parcial (85%)** que se implementará en Sprint 17 para **cancelaciones tardías iniciadas por el cliente**. En ese caso la responsabilidad es del cliente y el local retiene una fracción; acá, al ser responsabilidad operativa, el reembolso es total.

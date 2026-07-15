@@ -3,6 +3,7 @@ package com.laroka.backend.order.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -73,6 +74,7 @@ class OrderServiceTest {
     @Mock private WorkShiftRepository workShiftRepository;
     @Mock private com.laroka.backend.notification.repository.PushSubscriptionRepository pushSubscriptionRepository;
     @Mock private com.laroka.backend.notification.service.PushNotificationService pushNotificationService;
+    @Mock private com.laroka.backend.payment.gateway.PaymentGateway paymentGateway;
 
     @InjectMocks
     private OrderService service;
@@ -1415,5 +1417,113 @@ class OrderServiceTest {
         Order result = service.transitionStatusForBackoffice(orderId, OrderStatus.IN_PREPARATION, null, branch.getId(), 5);
 
         assertThat(result.getStatus()).isEqualTo(OrderStatus.IN_PREPARATION);
+    }
+
+    // --- cancelActiveOrdersForShiftAutoClose (auto-cierre de turno) ---
+
+    private Order activeOrder(OrderStatus status) {
+        return Order.builder()
+                .id(UUID.randomUUID())
+                .status(status)
+                .orderType(OrderType.DELIVERY)
+                .totalAmount(new BigDecimal("1500.00"))
+                .branch(branch(tenant()))
+                .build();
+    }
+
+    @Test
+    void cancelActiveOrdersForShiftAutoClose_cancelsAllActiveOrdersWithOperationalReason() {
+        UUID shiftId = UUID.randomUUID();
+        Order received = activeOrder(OrderStatus.RECEIVED);
+        Order inPrep = activeOrder(OrderStatus.IN_PREPARATION);
+        Order onTheWay = activeOrder(OrderStatus.ON_THE_WAY);
+
+        when(orderRepository.findByShiftIdAndStatusIn(eq(shiftId), any()))
+                .thenReturn(List.of(received, inPrep, onTheWay));
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+        // Sin pago asociado → no hay reembolso que disparar.
+        when(paymentRepository.findByOrderId(any())).thenReturn(Optional.empty());
+
+        service.cancelActiveOrdersForShiftAutoClose(shiftId);
+
+        // Los tres pedidos activos quedan en estado terminal CANCELLED.
+        ArgumentCaptor<Order> orderCaptor = ArgumentCaptor.forClass(Order.class);
+        verify(orderRepository, org.mockito.Mockito.times(3)).save(orderCaptor.capture());
+        assertThat(orderCaptor.getAllValues())
+                .extracting(Order::getStatus)
+                .containsOnly(OrderStatus.CANCELLED);
+
+        // Cada cancelación registra el motivo operativo distinguible.
+        ArgumentCaptor<OrderStatusHistory> historyCaptor = ArgumentCaptor.forClass(OrderStatusHistory.class);
+        verify(historyRepository, org.mockito.Mockito.times(3)).save(historyCaptor.capture());
+        assertThat(historyCaptor.getAllValues())
+                .allSatisfy(h -> {
+                    assertThat(h.getToStatus()).isEqualTo(OrderStatus.CANCELLED);
+                    assertThat(h.getCancellationReason())
+                            .isEqualTo(OrderService.SHIFT_AUTO_CLOSE_CANCELLATION_REASON);
+                });
+
+        // Sin pagos aprobados → no se dispara ningún reembolso.
+        verify(paymentGateway, never()).refundPayment(any());
+    }
+
+    @Test
+    void cancelActiveOrdersForShiftAutoClose_mercadoPagoApproved_triggersFullRefund() {
+        UUID shiftId = UUID.randomUUID();
+        Order order = activeOrder(OrderStatus.IN_PREPARATION);
+        Payment payment = Payment.builder()
+                .id(UUID.randomUUID())
+                .order(order)
+                .status(PaymentStatus.APPROVED)
+                .method(PaymentMethod.MERCADOPAGO)
+                .mercadopagoPaymentId("mp-payment-123")
+                .build();
+
+        when(orderRepository.findByShiftIdAndStatusIn(eq(shiftId), any()))
+                .thenReturn(List.of(order));
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(paymentRepository.findByOrderId(order.getId())).thenReturn(Optional.of(payment));
+
+        service.cancelActiveOrdersForShiftAutoClose(shiftId);
+
+        // Reembolso TOTAL vía gateway (sin monto) y pago marcado REFUNDED.
+        verify(paymentGateway).refundPayment("mp-payment-123");
+        ArgumentCaptor<Payment> paymentCaptor = ArgumentCaptor.forClass(Payment.class);
+        verify(paymentRepository).save(paymentCaptor.capture());
+        assertThat(paymentCaptor.getValue().getStatus()).isEqualTo(PaymentStatus.REFUNDED);
+    }
+
+    @Test
+    void cancelActiveOrdersForShiftAutoClose_cashPayment_doesNotTriggerRefund() {
+        UUID shiftId = UUID.randomUUID();
+        Order order = activeOrder(OrderStatus.RECEIVED);
+        Payment payment = Payment.builder()
+                .id(UUID.randomUUID())
+                .order(order)
+                .status(PaymentStatus.APPROVED)
+                .method(PaymentMethod.CASH)
+                .build();
+
+        when(orderRepository.findByShiftIdAndStatusIn(eq(shiftId), any()))
+                .thenReturn(List.of(order));
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(paymentRepository.findByOrderId(order.getId())).thenReturn(Optional.of(payment));
+
+        service.cancelActiveOrdersForShiftAutoClose(shiftId);
+
+        // El pedido se cancela igual, pero el efectivo no dispara reembolso.
+        verify(paymentGateway, never()).refundPayment(any());
+        verify(paymentRepository, never()).save(any(Payment.class));
+    }
+
+    @Test
+    void cancelActiveOrdersForShiftAutoClose_noActiveOrders_doesNothing() {
+        UUID shiftId = UUID.randomUUID();
+        when(orderRepository.findByShiftIdAndStatusIn(eq(shiftId), any())).thenReturn(List.of());
+
+        service.cancelActiveOrdersForShiftAutoClose(shiftId);
+
+        verify(orderRepository, never()).save(any(Order.class));
+        verify(paymentGateway, never()).refundPayment(any());
     }
 }
