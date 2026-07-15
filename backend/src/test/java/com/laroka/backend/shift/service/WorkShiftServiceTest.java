@@ -61,6 +61,7 @@ class WorkShiftServiceTest {
     @Mock private PaymentRepository paymentRepository;
     @Mock private StaffUserRepository staffUserRepository;
     @Mock private BranchRepository branchRepository;
+    @Mock private com.laroka.backend.order.service.OrderService orderService;
 
     @InjectMocks
     private WorkShiftService workShiftService;
@@ -597,6 +598,52 @@ class WorkShiftServiceTest {
 
         verify(workShiftSummaryRepository).save(any(WorkShiftSummary.class));
         verify(workShiftRepository).save(any(WorkShift.class));
+        verify(workShiftRepository, never()).delete(any(WorkShift.class));
+        verify(branchRepository).updateAcceptingOrders(1, false);
+    }
+
+    @Test
+    void autoCloseShift_withActiveOrders_cancelsThemBeforeClosingAndSummaryReflectsThem() {
+        // Nueva política: el auto-cierre cancela todos los pedidos activos del turno
+        // (delegando en OrderService) ANTES de calcular el summary y cerrar. El
+        // summary debe reflejar esos pedidos ya como cancelados.
+        Branch branch = branch();
+        WorkShift shift = openShift(branch, staffUser());
+        UUID shiftId = shift.getId();
+
+        Order cancelled1 = Order.builder().id(UUID.randomUUID()).status(OrderStatus.CANCELLED)
+            .orderType(OrderType.DELIVERY).totalAmount(new BigDecimal("1500.00")).build();
+        Order cancelled2 = Order.builder().id(UUID.randomUUID()).status(OrderStatus.CANCELLED)
+            .orderType(OrderType.TAKEAWAY).totalAmount(new BigDecimal("800.00")).build();
+
+        when(workShiftRepository.findById(shiftId)).thenReturn(Optional.of(shift));
+        // calculateSummary corre DESPUÉS de la cancelación: devuelve los pedidos
+        // recién cancelados como CANCELLED terminales.
+        when(orderRepository.findByShiftIdAndStatusIn(eq(shiftId), anyCollection()))
+            .thenReturn(List.of(cancelled1, cancelled2));
+        when(workShiftRepository.save(any(WorkShift.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(workShiftSummaryRepository.save(any(WorkShiftSummary.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        workShiftService.autoCloseShift(shiftId);
+
+        // La cancelación de pedidos activos ocurre ANTES de persistir el turno cerrado.
+        org.mockito.InOrder inOrder = org.mockito.Mockito.inOrder(orderService, workShiftRepository);
+        inOrder.verify(orderService).cancelActiveOrdersForShiftAutoClose(shiftId);
+        inOrder.verify(workShiftRepository).save(any(WorkShift.class));
+
+        // El summary refleja los pedidos recién cancelados.
+        ArgumentCaptor<WorkShiftSummary> summaryCaptor = ArgumentCaptor.forClass(WorkShiftSummary.class);
+        verify(workShiftSummaryRepository).save(summaryCaptor.capture());
+        WorkShiftSummary summary = summaryCaptor.getValue();
+        assertThat(summary.getTotalOrders()).isEqualTo(2);
+        assertThat(summary.getCancelledOrders()).isEqualTo(2);
+        assertThat(summary.getDeliveredOrders()).isZero();
+        assertThat(summary.getCancellationRate()).isEqualByComparingTo("100.00");
+
+        // El turno queda CLOSED y la recepción de pedidos deshabilitada.
+        ArgumentCaptor<WorkShift> shiftCaptor = ArgumentCaptor.forClass(WorkShift.class);
+        verify(workShiftRepository).save(shiftCaptor.capture());
+        assertThat(shiftCaptor.getValue().getStatus()).isEqualTo(ShiftStatus.CLOSED);
         verify(workShiftRepository, never()).delete(any(WorkShift.class));
         verify(branchRepository).updateAcceptingOrders(1, false);
     }

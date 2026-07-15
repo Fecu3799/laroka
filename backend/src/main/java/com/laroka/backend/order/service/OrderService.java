@@ -22,6 +22,7 @@ import com.laroka.backend.order.dto.OrderFilterParams;
 import com.laroka.backend.order.repository.OrderSpecification;
 import com.laroka.backend.payment.entity.Payment;
 import com.laroka.backend.payment.entity.PaymentStatus;
+import com.laroka.backend.payment.gateway.PaymentGateway;
 import com.laroka.backend.payment.repository.PaymentRepository;
 
 import org.springframework.security.access.AccessDeniedException;
@@ -75,6 +76,20 @@ public class OrderService {
     private final WorkShiftRepository workShiftRepository;
     private final PushSubscriptionRepository pushSubscriptionRepository;
     private final PushNotificationService pushNotificationService;
+    private final PaymentGateway paymentGateway;
+
+    /**
+     * Motivo registrado cuando el auto-cierre de turno cancela un pedido activo.
+     * Se distingue deliberadamente de una cancelación normal: la responsabilidad
+     * es operativa (el local no llegó a procesar el pedido antes de cerrar el
+     * turno), no del cliente.
+     */
+    public static final String SHIFT_AUTO_CLOSE_CANCELLATION_REASON = "No se pudo procesar a tiempo";
+
+    /** Estados en los que un pedido sigue activo (no terminal) dentro de un turno. */
+    private static final List<OrderStatus> ACTIVE_ORDER_STATUSES = List.of(
+            OrderStatus.RECEIVED, OrderStatus.IN_PREPARATION,
+            OrderStatus.ON_THE_WAY, OrderStatus.READY_FOR_PICKUP);
 
     @Transactional
     public OrderCreationResult createOrder(Order order, List<OrderItem> items,
@@ -203,6 +218,64 @@ public class OrderService {
         // emitter.send() dentro de la transacción retenía la conexión JDBC mientras se
         // escribía a un socket potencialmente lento/muerto, agotando el pool de Hikari;
         // además evita notificar al cliente un cambio que luego haga rollback.
+    }
+
+    /**
+     * Cancela todos los pedidos activos (RECEIVED, IN_PREPARATION, ON_THE_WAY,
+     * READY_FOR_PICKUP) de un turno durante su cierre automático.
+     *
+     * A diferencia del cierre manual —que bloquea cuando hay pedidos activos sin
+     * resolver— el auto-cierre los resuelve cancelándolos: así ningún pedido queda
+     * huérfano referenciando un turno CLOSED ni atrasado e invisible al abrir el
+     * turno siguiente. Cada cancelación registra el motivo operativo
+     * {@link #SHIFT_AUTO_CLOSE_CANCELLATION_REASON} (distinto de una cancelación
+     * normal, visible en el historial) y notifica al cliente por el mismo canal
+     * que cualquier otra cancelación (vía {@code recordHistory}).
+     *
+     * Si el pedido tenía un pago MercadoPago aprobado, se dispara un reembolso
+     * TOTAL: la responsabilidad es del local, no del cliente, por lo que no aplica
+     * el reembolso parcial de cancelaciones tardías iniciadas por el cliente
+     * (Sprint 17). Ver docs/KNOWN_ISSUES.md.
+     */
+    @Transactional
+    public void cancelActiveOrdersForShiftAutoClose(UUID shiftId) {
+        List<Order> activeOrders = orderRepository.findByShiftIdAndStatusIn(shiftId, ACTIVE_ORDER_STATUSES);
+        for (Order order : activeOrders) {
+            OrderStatus previous = order.getStatus();
+            order.setStatus(OrderStatus.CANCELLED);
+            Order saved = orderRepository.save(order);
+            recordHistory(saved, previous, OrderStatus.CANCELLED, null, SHIFT_AUTO_CLOSE_CANCELLATION_REASON);
+            refundIfMercadoPagoApproved(saved);
+            log.info("Order cancelled by shift auto-close | orderId={} from={} shiftId={}",
+                    saved.getId(), previous, shiftId);
+        }
+    }
+
+    /**
+     * Reembolso TOTAL del pago del pedido si —y solo si— existe un {@link Payment}
+     * APPROVED de método MERCADOPAGO. Usa {@code PaymentGateway.refundPayment} (sin
+     * monto → reembolso completo). Un pago en efectivo no dispara reembolso: no
+     * hubo cobro electrónico que revertir. El fallo del gateway se loguea para
+     * acción manual y no aborta el cierre del turno (mismo patrón que el reembolso
+     * por race-condition del webhook).
+     */
+    private void refundIfMercadoPagoApproved(Order order) {
+        Payment payment = paymentRepository.findByOrderId(order.getId()).orElse(null);
+        if (payment == null
+                || payment.getStatus() != PaymentStatus.APPROVED
+                || payment.getMethod() != PaymentMethod.MERCADOPAGO) {
+            return;
+        }
+        try {
+            paymentGateway.refundPayment(payment.getMercadopagoPaymentId());
+            payment.setStatus(PaymentStatus.REFUNDED);
+            paymentRepository.save(payment);
+            log.info("Full refund issued by shift auto-close | orderId={} mpPaymentId={}",
+                    order.getId(), payment.getMercadopagoPaymentId());
+        } catch (Exception e) {
+            log.error("Shift auto-close refund FAILED — manual action required | orderId={} mpPaymentId={} error={}",
+                    order.getId(), payment.getMercadopagoPaymentId(), e.getMessage());
+        }
     }
 
     @Transactional
