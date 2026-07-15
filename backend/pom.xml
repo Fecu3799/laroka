@@ -31,7 +31,7 @@
 		<maven.compiler.source>21</maven.compiler.source>
 		<maven.compiler.target>21</maven.compiler.target>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<aws.sdk.version>2.46.19</aws.sdk.version>
+		<aws.sdk.version>2.47.5</aws.sdk.version>
 	</properties>
 	<dependencyManagement>
 		<dependencies>
