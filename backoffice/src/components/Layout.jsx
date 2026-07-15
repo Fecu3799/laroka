@@ -5,6 +5,7 @@ import useAuth from '../hooks/useAuth'
 import useBranch from '../hooks/useBranch'
 import { logout } from '../services/authService'
 import SubHeader from './SubHeader'
+import ErrorBoundary from './ErrorBoundary'
 import { Toast } from './Toast'
 import { OrdersProvider } from '../context/OrdersContext'
 import { ShiftProvider } from '../context/ShiftContext'
@@ -286,7 +287,13 @@ export default function Layout() {
               <ConfigProvider>
                 <HistoryProvider>
                   <OrdersProvider setOpenOrderId={setOpenOrderId}>
-                    <Outlet context={{ newOrderCount, cancelCount, resetCounts, setOpenOrderId }} />
+                    {/* Un error de render en cualquier pantalla queda contenido
+                        acá (con el sidebar/header intactos) en vez de dejar la
+                        app en negro. resetKey=ruta: el boundary se limpia al
+                        navegar a otra pantalla. */}
+                    <ErrorBoundary resetKey={location.pathname}>
+                      <Outlet context={{ newOrderCount, cancelCount, resetCounts, setOpenOrderId }} />
+                    </ErrorBoundary>
                   </OrdersProvider>
                 </HistoryProvider>
               </ConfigProvider>

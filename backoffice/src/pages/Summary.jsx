@@ -226,7 +226,12 @@ export default function Summary() {
   // Solo se puede limpiar la lista entre turnos (sin turno activo) y si hay algo
   // que limpiar.
   const clearDisabled = shift !== null || orders.length === 0
-  const hasData = state && state.mode !== 'empty'
+  // Además de descartar el empty state, exigimos que `summary` esté presente:
+  // un turno CLOSED sin summary persistido (histórico de auto-cierres viejos)
+  // llegaba con mode='closed' pero summary null y hacía crashear SummaryContent
+  // al leer summary.deliveredOrders → pantalla en negro. Con esta guarda cae al
+  // empty state en su lugar.
+  const hasData = state && state.mode !== 'empty' && state.summary != null
 
   return (
     <div className="summary-page">
