@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -24,13 +25,20 @@ public class MercadoPagoAdapter implements PaymentGateway {
     private final String notificationUrl;
     private final RestClient restClient;
 
+    @Autowired
     public MercadoPagoAdapter(
-        @Value("${mercadopago.key:}") String accessToken, 
+        @Value("${mercadopago.key:}") String accessToken,
         @Value("${mercadopago.notifications-url:}") String notificationUrl
         ) {
+        this(accessToken, notificationUrl, RestClient.builder());
+    }
+
+    // Constructor de test: permite inyectar un RestClient.Builder ligado a un
+    // MockRestServiceServer para verificar el body de las requests sin HTTP real.
+    MercadoPagoAdapter(String accessToken, String notificationUrl, RestClient.Builder restClientBuilder) {
         this.accessToken = accessToken;
         this.notificationUrl = notificationUrl;
-        this.restClient = RestClient.builder().build();
+        this.restClient = restClientBuilder.build();
     }
 
     @Override
@@ -171,13 +179,18 @@ public class MercadoPagoAdapter implements PaymentGateway {
     }
 
     @Override
-    public void refundPayment(String paymentId) {
-        log.info("refundPayment: paymentId={}", paymentId);
+    public void refundPayment(String paymentId, BigDecimal amount) {
+        boolean partial = amount != null;
+        log.info("refundPayment: paymentId={}, partial={}, amount={}", paymentId, partial, amount);
 
         if (accessToken == null || accessToken.isBlank()) {
             log.warn("refundPayment: accessToken not configured, skipping refund — paymentId={}", paymentId);
             return;
         }
+
+        // amount null → body vacío = reembolso total. amount presente → body con el
+        // monto = reembolso parcial. (POST /v1/payments/{id}/refunds)
+        Map<String, Object> body = partial ? Map.of("amount", amount) : Map.of();
 
         String url = MP_PAYMENTS_URL + paymentId + "/refunds";
         try {
@@ -185,10 +198,10 @@ public class MercadoPagoAdapter implements PaymentGateway {
                     .uri(url)
                     .header("Authorization", "Bearer " + accessToken)
                     .header("Content-Type", "application/json")
-                    .body(Map.of())
+                    .body(body)
                     .retrieve()
                     .toBodilessEntity();
-            log.info("refundPayment: refund accepted by MercadoPago — paymentId={}", paymentId);
+            log.info("refundPayment: refund accepted by MercadoPago — paymentId={}, partial={}", paymentId, partial);
         } catch (Exception e) {
             log.error("refundPayment: error calling MercadoPago refund API — paymentId={}, error={}", paymentId, e.getMessage());
             throw new BusinessException("Error al solicitar el reembolso en MercadoPago: " + e.getMessage());
