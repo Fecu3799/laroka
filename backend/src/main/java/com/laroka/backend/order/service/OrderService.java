@@ -372,6 +372,47 @@ public class OrderService {
         }
     }
 
+    /**
+     * Reintento manual de un reembolso que falló automáticamente (US-17-05, ADMIN).
+     * Válido solo si el pago está en {@link PaymentStatus#REFUND_FAILED}. Reintenta con
+     * el mismo monto persistido en {@code refundedAmount} (total o parcial, según el
+     * camino original de cancelación — para un total, ese monto es el cargo completo,
+     * equivalente a un reembolso total). Si tiene éxito, pasa a REFUNDED. Si vuelve a
+     * fallar, mantiene REFUND_FAILED sin cambios y propaga el error para dar feedback.
+     */
+    @Transactional
+    public void retryRefund(UUID orderId, Integer branchId) {
+        Order order = orderRepository.findByIdWithBranch(orderId)
+                .orElseThrow(() -> {
+                    log.warn("Order not found | orderId={}", orderId);
+                    return new OrderNotFoundException(orderId);
+                });
+
+        if (!order.getBranch().getId().equals(branchId)) {
+            log.warn("Branch mismatch on retry-refund | orderId={} orderBranch={} userBranch={}",
+                    orderId, order.getBranch().getId(), branchId);
+            throw new AccessDeniedException("El pedido no pertenece a la sucursal del usuario");
+        }
+
+        Payment payment = paymentRepository.findByOrderId(orderId).orElse(null);
+        if (payment == null || payment.getStatus() != PaymentStatus.REFUND_FAILED) {
+            throw new BusinessException("El pedido no tiene un reembolso fallido pendiente de reintento");
+        }
+
+        try {
+            paymentGateway.refundPayment(payment.getMercadopagoPaymentId(), payment.getRefundedAmount());
+            payment.setStatus(PaymentStatus.REFUNDED);
+            paymentRepository.save(payment);
+            log.info("Refund retry succeeded | orderId={} mpPaymentId={} amount={}",
+                    orderId, payment.getMercadopagoPaymentId(), payment.getRefundedAmount());
+        } catch (Exception e) {
+            // Se mantiene REFUND_FAILED sin cambios; el reintento puede repetirse.
+            log.error("Refund retry FAILED — stays REFUND_FAILED | orderId={} mpPaymentId={} amount={} error={}",
+                    orderId, payment.getMercadopagoPaymentId(), payment.getRefundedAmount(), e.getMessage());
+            throw new BusinessException("El reintento de reembolso falló: " + e.getMessage());
+        }
+    }
+
     @Transactional(readOnly = true)
     public Order findById(UUID id) {
         return orderRepository.findByIdWithBranch(id)

@@ -1807,4 +1807,74 @@ class OrderServiceTest {
         verify(paymentRepository, never()).findByOrderId(any());
         verify(paymentGateway, never()).refundPayment(any(), any());
     }
+
+    // --- US-17-05: reintento manual de un reembolso fallido (ADMIN) ---
+
+    private Payment refundFailedPayment(Order order, BigDecimal refundedAmount) {
+        return Payment.builder()
+                .id(UUID.randomUUID())
+                .order(order)
+                .status(PaymentStatus.REFUND_FAILED)
+                .method(PaymentMethod.MERCADOPAGO)
+                .mercadopagoPaymentId("mp-payment-17-05")
+                .refundedAmount(refundedAmount)
+                .build();
+    }
+
+    @Test
+    void retryRefund_paymentInRefundFailed_retriesWithSameAmountAndMarksRefunded() {
+        UUID orderId = UUID.randomUUID();
+        Order order = activeOrder(OrderStatus.CANCELLED); // branch id=1
+        Payment payment = refundFailedPayment(order, new BigDecimal("1700.00"));
+
+        when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
+        when(paymentRepository.findByOrderId(orderId)).thenReturn(Optional.of(payment));
+
+        service.retryRefund(orderId, 1);
+
+        // Reintenta con el MISMO monto persistido (total o parcial).
+        verify(paymentGateway).refundPayment("mp-payment-17-05", new BigDecimal("1700.00"));
+        ArgumentCaptor<Payment> paymentCaptor = ArgumentCaptor.forClass(Payment.class);
+        verify(paymentRepository).save(paymentCaptor.capture());
+        assertThat(paymentCaptor.getValue().getStatus()).isEqualTo(PaymentStatus.REFUNDED);
+        assertThat(paymentCaptor.getValue().getRefundedAmount()).isEqualByComparingTo("1700.00");
+    }
+
+    @Test
+    void retryRefund_gatewayFailsAgain_staysRefundFailedAndThrows() {
+        UUID orderId = UUID.randomUUID();
+        Order order = activeOrder(OrderStatus.CANCELLED);
+        Payment payment = refundFailedPayment(order, new BigDecimal("1700.00"));
+
+        when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
+        when(paymentRepository.findByOrderId(orderId)).thenReturn(Optional.of(payment));
+        doThrow(new RuntimeException("MP gateway caído"))
+                .when(paymentGateway).refundPayment("mp-payment-17-05", new BigDecimal("1700.00"));
+
+        assertThatThrownBy(() -> service.retryRefund(orderId, 1))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("reembolso falló");
+
+        // Se mantiene REFUND_FAILED sin cambios: no se persiste ningún cambio de estado.
+        verify(paymentRepository, never()).save(any(Payment.class));
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.REFUND_FAILED);
+    }
+
+    @Test
+    void retryRefund_paymentNotInRefundFailed_throwsBusinessException() {
+        UUID orderId = UUID.randomUUID();
+        Order order = activeOrder(OrderStatus.CANCELLED);
+        // Pago APPROVED normal: no hay reembolso fallido pendiente.
+        Payment payment = mercadoPagoPayment(order, PaymentStatus.APPROVED);
+
+        when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
+        when(paymentRepository.findByOrderId(orderId)).thenReturn(Optional.of(payment));
+
+        assertThatThrownBy(() -> service.retryRefund(orderId, 1))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("reembolso fallido pendiente");
+
+        verify(paymentGateway, never()).refundPayment(any(), any());
+        verify(paymentRepository, never()).save(any(Payment.class));
+    }
 }
