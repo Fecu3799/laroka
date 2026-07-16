@@ -1,6 +1,7 @@
 package com.laroka.backend.order.service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -95,6 +96,13 @@ public class OrderService {
     private static final List<OrderStatus> TERMINAL_ORDER_STATUSES = List.of(
             OrderStatus.DELIVERED, OrderStatus.CANCELLED);
 
+    /**
+     * Proporción del subtotal que se reembolsa al aprobar una cancelación tardía
+     * (pedido ya en preparación, US-17-03): 85%. El 15% restante es la comisión por
+     * cancelación tardía. Constante de clase para poder ajustarla sin tocar la lógica.
+     */
+    private static final BigDecimal CANCELLATION_REFUND_RATE = new BigDecimal("0.85");
+
     @Transactional
     public OrderCreationResult createOrder(Order order, List<OrderItem> items,
                                            PaymentMethod paymentMethod, String idempotencyKey) {
@@ -168,7 +176,7 @@ public class OrderService {
         // (IN_PREPARATION → CANCELLATION_REQUESTED → CANCELLED) va por otro camino con
         // reembolso parcial (US-17-03), no por acá.
         if (newStatus == OrderStatus.CANCELLED && previous == OrderStatus.RECEIVED) {
-            refundIfMercadoPagoApproved(saved);
+            refundIfMercadoPagoApproved(saved, null);
         }
         return saved;
     }
@@ -233,7 +241,7 @@ public class OrderService {
         // el pago y mueve el pedido a RECEIVED en la misma transacción), así que ahí no
         // hay cobro que revertir.
         if (previous == OrderStatus.RECEIVED) {
-            refundIfMercadoPagoApproved(saved);
+            refundIfMercadoPagoApproved(saved, null);
         }
 
         // La emisión del evento SSE se hace en OrderController, después de que esta
@@ -268,17 +276,18 @@ public class OrderService {
             order.setStatus(OrderStatus.CANCELLED);
             Order saved = orderRepository.save(order);
             recordHistory(saved, previous, OrderStatus.CANCELLED, null, SHIFT_AUTO_CLOSE_CANCELLATION_REASON);
-            refundIfMercadoPagoApproved(saved);
+            refundIfMercadoPagoApproved(saved, null);
             log.info("Order cancelled by shift auto-close | orderId={} from={} shiftId={}",
                     saved.getId(), previous, shiftId);
         }
     }
 
     /**
-     * Reembolso TOTAL del pago del pedido si —y solo si— existe un {@link Payment}
-     * APPROVED de método MERCADOPAGO. Invoca {@code refundPayment(paymentId, null)}
-     * (monto null → reembolso completo). Un pago en efectivo no dispara reembolso: no
-     * hubo cobro electrónico que revertir; un pago no aprobado (PENDING) tampoco.
+     * Reembolsa el pago del pedido si —y solo si— existe un {@link Payment} APPROVED
+     * de método MERCADOPAGO. {@code amount} null → reembolso TOTAL (cancelación
+     * temprana / auto-cierre); {@code amount} con valor → reembolso PARCIAL de ese
+     * monto (cancelación tardía, US-17-03). Un pago en efectivo no dispara reembolso:
+     * no hubo cobro electrónico que revertir; un pago no aprobado (PENDING) tampoco.
      *
      * El fallo del gateway se loguea para acción manual y NO aborta la cancelación
      * del pedido (best-effort, no bloqueante): el cliente/operador no debe quedar
@@ -286,25 +295,27 @@ public class OrderService {
      * fallo queda pendiente de US-17-04 (modelo de tracking de reembolsos); hoy el
      * pago queda en APPROVED y el reembolso pendiente de reintento manual.
      *
-     * Usado tanto por el auto-cierre de turno como por la cancelación directa de
-     * pedidos previos a IN_PREPARATION (US-17-02).
+     * Usado por el auto-cierre de turno y la cancelación directa previa a
+     * IN_PREPARATION (US-17-02, monto null) y por la cancelación tardía aprobada
+     * (US-17-03, monto parcial).
      */
-    private void refundIfMercadoPagoApproved(Order order) {
+    private void refundIfMercadoPagoApproved(Order order, BigDecimal amount) {
         Payment payment = paymentRepository.findByOrderId(order.getId()).orElse(null);
         if (payment == null
                 || payment.getStatus() != PaymentStatus.APPROVED
                 || payment.getMethod() != PaymentMethod.MERCADOPAGO) {
             return;
         }
+        boolean partial = amount != null;
         try {
-            paymentGateway.refundPayment(payment.getMercadopagoPaymentId(), null);
+            paymentGateway.refundPayment(payment.getMercadopagoPaymentId(), amount);
             payment.setStatus(PaymentStatus.REFUNDED);
             paymentRepository.save(payment);
-            log.info("Full refund issued | orderId={} mpPaymentId={}",
-                    order.getId(), payment.getMercadopagoPaymentId());
+            log.info("Refund issued | orderId={} mpPaymentId={} partial={} amount={}",
+                    order.getId(), payment.getMercadopagoPaymentId(), partial, amount);
         } catch (Exception e) {
-            log.error("Full refund FAILED — manual action required | orderId={} mpPaymentId={} error={}",
-                    order.getId(), payment.getMercadopagoPaymentId(), e.getMessage());
+            log.error("Refund FAILED — manual action required | orderId={} mpPaymentId={} partial={} amount={} error={}",
+                    order.getId(), payment.getMercadopagoPaymentId(), partial, amount, e.getMessage());
         }
     }
 
@@ -338,6 +349,18 @@ public class OrderService {
         recordHistory(saved, previous, next, staffUserId);
         log.info("Cancellation request resolved | orderId={} action={} to={} staffUserId={}",
                 saved.getId(), action, next, staffUserId);
+
+        // US-17-03: aprobar una cancelación tardía (pedido en preparación) dispara un
+        // reembolso PARCIAL del 85% del subtotal si el pago fue MercadoPago aprobado.
+        // El 15% restante es la comisión por cancelación tardía. REJECT (vuelve a
+        // IN_PREPARATION) no toca el pago. No bloquea si el gateway falla (mismo
+        // criterio que US-17-02).
+        if (next == OrderStatus.CANCELLED) {
+            BigDecimal refundAmount = saved.getSubtotal()
+                    .multiply(CANCELLATION_REFUND_RATE)
+                    .setScale(2, RoundingMode.HALF_UP);
+            refundIfMercadoPagoApproved(saved, refundAmount);
+        }
     }
 
     @Transactional(readOnly = true)

@@ -1150,6 +1150,7 @@ class OrderServiceTest {
                 .status(OrderStatus.CANCELLATION_REQUESTED)
                 .orderType(OrderType.DELIVERY)
                 .branch(branch)
+                .subtotal(new BigDecimal("1000.00"))
                 .build();
 
         when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
@@ -1701,5 +1702,100 @@ class OrderServiceTest {
         ArgumentCaptor<Payment> paymentCaptor = ArgumentCaptor.forClass(Payment.class);
         verify(paymentRepository).save(paymentCaptor.capture());
         assertThat(paymentCaptor.getValue().getStatus()).isEqualTo(PaymentStatus.REFUNDED);
+    }
+
+    // --- US-17-03: reembolso parcial (85% del subtotal) al aprobar cancelación tardía ---
+
+    private Order cancellationRequestedOrder(UUID orderId, Branch branch, BigDecimal subtotal) {
+        return Order.builder()
+                .id(orderId)
+                .status(OrderStatus.CANCELLATION_REQUESTED)
+                .orderType(OrderType.DELIVERY)
+                .branch(branch)
+                .subtotal(subtotal)
+                .build();
+    }
+
+    @Test
+    void resolveCancellationRequest_approveWithApprovedMercadoPago_triggersPartialRefund() {
+        UUID orderId = UUID.randomUUID();
+        Branch branch = branch(tenant());
+        Order order = cancellationRequestedOrder(orderId, branch, new BigDecimal("2000.00"));
+        Payment payment = mercadoPagoPayment(order, PaymentStatus.APPROVED);
+
+        when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(paymentRepository.findByOrderId(order.getId())).thenReturn(Optional.of(payment));
+
+        service.resolveCancellationRequest(orderId, "APPROVE", branch.getId(), 10);
+
+        // 85% de 2000.00 = 1700.00 (reembolso PARCIAL).
+        verify(paymentGateway).refundPayment("mp-payment-17-02", new BigDecimal("1700.00"));
+        ArgumentCaptor<Payment> paymentCaptor = ArgumentCaptor.forClass(Payment.class);
+        verify(paymentRepository).save(paymentCaptor.capture());
+        assertThat(paymentCaptor.getValue().getStatus()).isEqualTo(PaymentStatus.REFUNDED);
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+    }
+
+    @Test
+    void resolveCancellationRequest_approveRefundFails_cancellationProceeds() {
+        UUID orderId = UUID.randomUUID();
+        Branch branch = branch(tenant());
+        Order order = cancellationRequestedOrder(orderId, branch, new BigDecimal("2000.00"));
+        Payment payment = mercadoPagoPayment(order, PaymentStatus.APPROVED);
+
+        when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(paymentRepository.findByOrderId(order.getId())).thenReturn(Optional.of(payment));
+        doThrow(new RuntimeException("MP gateway caído"))
+                .when(paymentGateway).refundPayment("mp-payment-17-02", new BigDecimal("1700.00"));
+
+        // El fallo del gateway no se propaga ni bloquea la cancelación.
+        service.resolveCancellationRequest(orderId, "APPROVE", branch.getId(), 10);
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+        // El pago no se marca REFUNDED ante el fallo (persistencia del fallo → US-17-04).
+        verify(paymentRepository, never()).save(any(Payment.class));
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.APPROVED);
+    }
+
+    @Test
+    void resolveCancellationRequest_approveWithCashPayment_doesNotTriggerRefund() {
+        UUID orderId = UUID.randomUUID();
+        Branch branch = branch(tenant());
+        Order order = cancellationRequestedOrder(orderId, branch, new BigDecimal("2000.00"));
+        Payment payment = Payment.builder()
+                .id(UUID.randomUUID())
+                .order(order)
+                .status(PaymentStatus.APPROVED)
+                .method(PaymentMethod.CASH)
+                .build();
+
+        when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(paymentRepository.findByOrderId(order.getId())).thenReturn(Optional.of(payment));
+
+        service.resolveCancellationRequest(orderId, "APPROVE", branch.getId(), 10);
+
+        verify(paymentGateway, never()).refundPayment(any(), any());
+        verify(paymentRepository, never()).save(any(Payment.class));
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+    }
+
+    @Test
+    void resolveCancellationRequest_reject_doesNotTriggerRefund() {
+        UUID orderId = UUID.randomUUID();
+        Branch branch = branch(tenant());
+        Order order = cancellationRequestedOrder(orderId, branch, new BigDecimal("2000.00"));
+
+        when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.resolveCancellationRequest(orderId, "REJECT", branch.getId(), 10);
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.IN_PREPARATION);
+        // REJECT no toca el pago: ni se consulta ni se reembolsa.
+        verify(paymentRepository, never()).findByOrderId(any());
+        verify(paymentGateway, never()).refundPayment(any(), any());
     }
 }
