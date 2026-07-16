@@ -86,7 +86,7 @@ const NAV = [
 export default function Layout() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { token, tenantName, role } = useAuth()
+  const { token, tenantName, name, role } = useAuth()
   const { activeBranchId, setActiveBranch } = useBranch()
   const [time, setTime] = useState(new Date())
   const [connectionStatus, setConnectionStatus] = useState('disconnected')
@@ -230,6 +230,11 @@ export default function Layout() {
             </NavLink>
           ))}
         </nav>
+
+        <div className="layout-sidebar-user">
+          <span className="layout-sidebar-user-name">{name ?? '—'}</span>
+          <span className="layout-sidebar-user-role">{role ?? '—'}</span>
+        </div>
 
         <button className="layout-logout-btn" onClick={handleLogout} aria-label="Cerrar sesión">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
