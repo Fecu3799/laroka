@@ -1590,11 +1590,13 @@ class OrderServiceTest {
 
         service.cancelOrder(orderId, "cliente se arrepintió");
 
-        // Reembolso TOTAL (monto null) y pago marcado REFUNDED.
+        // Reembolso TOTAL (monto null) y pago marcado REFUNDED con el monto total.
         verify(paymentGateway).refundPayment("mp-payment-17-02", null);
         ArgumentCaptor<Payment> paymentCaptor = ArgumentCaptor.forClass(Payment.class);
         verify(paymentRepository).save(paymentCaptor.capture());
         assertThat(paymentCaptor.getValue().getStatus()).isEqualTo(PaymentStatus.REFUNDED);
+        // US-17-04: refundedAmount = totalAmount del pedido (1500.00) en reembolso total.
+        assertThat(paymentCaptor.getValue().getRefundedAmount()).isEqualByComparingTo("1500.00");
         // El pedido queda CANCELLED.
         ArgumentCaptor<Order> orderCaptor = ArgumentCaptor.forClass(Order.class);
         verify(orderRepository).save(orderCaptor.capture());
@@ -1620,10 +1622,12 @@ class OrderServiceTest {
         ArgumentCaptor<Order> orderCaptor = ArgumentCaptor.forClass(Order.class);
         verify(orderRepository).save(orderCaptor.capture());
         assertThat(orderCaptor.getValue().getStatus()).isEqualTo(OrderStatus.CANCELLED);
-        // El pago NO se marca REFUNDED ante el fallo (no se persiste como reembolsado).
-        // La persistencia explícita del estado de fallo queda para US-17-04.
-        verify(paymentRepository, never()).save(any(Payment.class));
-        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.APPROVED);
+        // US-17-04: el fallo se persiste como REFUND_FAILED con el monto pendiente
+        // (totalAmount = 1500.00), no se enmascara como REFUNDED ni queda en APPROVED.
+        ArgumentCaptor<Payment> paymentCaptor = ArgumentCaptor.forClass(Payment.class);
+        verify(paymentRepository).save(paymentCaptor.capture());
+        assertThat(paymentCaptor.getValue().getStatus()).isEqualTo(PaymentStatus.REFUND_FAILED);
+        assertThat(paymentCaptor.getValue().getRefundedAmount()).isEqualByComparingTo("1500.00");
     }
 
     @Test
@@ -1734,6 +1738,8 @@ class OrderServiceTest {
         ArgumentCaptor<Payment> paymentCaptor = ArgumentCaptor.forClass(Payment.class);
         verify(paymentRepository).save(paymentCaptor.capture());
         assertThat(paymentCaptor.getValue().getStatus()).isEqualTo(PaymentStatus.REFUNDED);
+        // US-17-04: refundedAmount = monto parcial reembolsado (1700.00).
+        assertThat(paymentCaptor.getValue().getRefundedAmount()).isEqualByComparingTo("1700.00");
         assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
     }
 
@@ -1754,9 +1760,12 @@ class OrderServiceTest {
         service.resolveCancellationRequest(orderId, "APPROVE", branch.getId(), 10);
 
         assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
-        // El pago no se marca REFUNDED ante el fallo (persistencia del fallo → US-17-04).
-        verify(paymentRepository, never()).save(any(Payment.class));
-        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.APPROVED);
+        // US-17-04: el fallo se persiste como REFUND_FAILED con el monto parcial
+        // pendiente (1700.00), habilitando el reintento manual (US-17-05).
+        ArgumentCaptor<Payment> paymentCaptor = ArgumentCaptor.forClass(Payment.class);
+        verify(paymentRepository).save(paymentCaptor.capture());
+        assertThat(paymentCaptor.getValue().getStatus()).isEqualTo(PaymentStatus.REFUND_FAILED);
+        assertThat(paymentCaptor.getValue().getRefundedAmount()).isEqualByComparingTo("1700.00");
     }
 
     @Test

@@ -289,11 +289,11 @@ public class OrderService {
      * monto (cancelación tardía, US-17-03). Un pago en efectivo no dispara reembolso:
      * no hubo cobro electrónico que revertir; un pago no aprobado (PENDING) tampoco.
      *
-     * El fallo del gateway se loguea para acción manual y NO aborta la cancelación
-     * del pedido (best-effort, no bloqueante): el cliente/operador no debe quedar
-     * bloqueado por un fallo del gateway. La persistencia explícita del estado de
-     * fallo queda pendiente de US-17-04 (modelo de tracking de reembolsos); hoy el
-     * pago queda en APPROVED y el reembolso pendiente de reintento manual.
+     * El fallo del gateway NO aborta la cancelación del pedido (best-effort, no
+     * bloqueante): el cliente/operador no debe quedar bloqueado por un fallo del
+     * gateway. En su lugar el pago se marca {@link PaymentStatus#REFUND_FAILED} con
+     * el monto pendiente (US-17-04), dándole visibilidad al operador y habilitando el
+     * reintento manual (US-17-05).
      *
      * Usado por el auto-cierre de turno y la cancelación directa previa a
      * IN_PREPARATION (US-17-02, monto null) y por la cancelación tardía aprobada
@@ -307,15 +307,24 @@ public class OrderService {
             return;
         }
         boolean partial = amount != null;
+        // Monto a registrar (US-17-04): parcial = el monto pasado; total = el cargo
+        // completo del pedido. Nunca null, para que el operador vea siempre la cifra.
+        BigDecimal refundedAmount = partial ? amount : order.getTotalAmount();
         try {
             paymentGateway.refundPayment(payment.getMercadopagoPaymentId(), amount);
             payment.setStatus(PaymentStatus.REFUNDED);
+            payment.setRefundedAmount(refundedAmount);
             paymentRepository.save(payment);
             log.info("Refund issued | orderId={} mpPaymentId={} partial={} amount={}",
-                    order.getId(), payment.getMercadopagoPaymentId(), partial, amount);
+                    order.getId(), payment.getMercadopagoPaymentId(), partial, refundedAmount);
         } catch (Exception e) {
-            log.error("Refund FAILED — manual action required | orderId={} mpPaymentId={} partial={} amount={} error={}",
-                    order.getId(), payment.getMercadopagoPaymentId(), partial, amount, e.getMessage());
+            // US-17-04: persistir el fallo de forma explícita (REFUND_FAILED + monto
+            // pendiente) en lugar de solo loguear, para visibilidad y reintento.
+            payment.setStatus(PaymentStatus.REFUND_FAILED);
+            payment.setRefundedAmount(refundedAmount);
+            paymentRepository.save(payment);
+            log.error("Refund FAILED — marked REFUND_FAILED for manual retry | orderId={} mpPaymentId={} partial={} amount={} error={}",
+                    order.getId(), payment.getMercadopagoPaymentId(), partial, refundedAmount, e.getMessage());
         }
     }
 

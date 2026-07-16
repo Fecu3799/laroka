@@ -132,6 +132,7 @@ public class OrderMapper {
                 .paymentStatus(payment != null ? payment.getStatus() : null)
                 .paymentMethod(payment != null ? payment.getMethod() : null)
                 .paidAt(payment != null ? payment.getPaidAt() : null)
+                .refundedAmount(payment != null ? payment.getRefundedAmount() : null)
                 .statusHistory(detail.history().stream().map(this::toHistoryDTO).toList())
                 .cancellationReason(cancellationReason)
                 .build();

@@ -42,6 +42,10 @@ public class BackofficeOrderDetailDTO {
     private PaymentStatus paymentStatus;
     private PaymentMethod paymentMethod;
     private LocalDateTime paidAt;
+    // US-17-04: monto reembolsado (total o parcial). null = sin reembolso. Combinado
+    // con paymentStatus (REFUNDED / REFUND_FAILED) le da al operador el estado del
+    // reembolso sin inferir nada. Total vs parcial es derivable contra totalAmount.
+    private BigDecimal refundedAmount;
     private List<OrderStatusHistoryDTO> statusHistory;
     private String cancellationReason;
 }
