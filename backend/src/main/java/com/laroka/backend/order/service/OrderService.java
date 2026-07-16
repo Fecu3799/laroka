@@ -91,6 +91,10 @@ public class OrderService {
             OrderStatus.RECEIVED, OrderStatus.IN_PREPARATION,
             OrderStatus.ON_THE_WAY, OrderStatus.READY_FOR_PICKUP);
 
+    /** Estados terminales (no reversibles): un pedido acá ya no está activo. */
+    private static final List<OrderStatus> TERMINAL_ORDER_STATUSES = List.of(
+            OrderStatus.DELIVERED, OrderStatus.CANCELLED);
+
     @Transactional
     public OrderCreationResult createOrder(Order order, List<OrderItem> items,
                                            PaymentMethod paymentMethod, String idempotencyKey) {
@@ -363,13 +367,11 @@ public class OrderService {
     public Page<BackofficeOrderRow> findOrderHistoryByBranch(Integer branchId, OrderStatus statusFilter,
                                                               LocalDateTime dateFrom, LocalDateTime dateTo,
                                                               int page, int size) {
-        List<OrderStatus> terminalStatuses = List.of(OrderStatus.DELIVERED, OrderStatus.CANCELLED);
-
         Specification<Order> spec = Specification
                 .where(OrderSpecification.branchIs(branchId))
-                .and(OrderSpecification.statusIn(terminalStatuses));
+                .and(OrderSpecification.statusIn(TERMINAL_ORDER_STATUSES));
 
-        if (statusFilter != null && terminalStatuses.contains(statusFilter)) {
+        if (statusFilter != null && TERMINAL_ORDER_STATUSES.contains(statusFilter)) {
             spec = spec.and(OrderSpecification.statusIs(statusFilter));
         }
         if (dateFrom != null) {
@@ -415,7 +417,7 @@ public class OrderService {
         boolean byShift = shiftId != null;
         List<Order> orders = byShift
                 ? orderRepository.findByBranchIdAndShiftId(branchId, shiftId)
-                : orderRepository.findActiveByBranchId(branchId, List.of());
+                : orderRepository.findActiveByBranchId(branchId, TERMINAL_ORDER_STATUSES);
 
         if (orders.isEmpty()) {
             return List.of();

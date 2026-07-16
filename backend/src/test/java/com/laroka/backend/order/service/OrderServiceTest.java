@@ -1526,4 +1526,41 @@ class OrderServiceTest {
         verify(orderRepository, never()).save(any(Order.class));
         verify(paymentGateway, never()).refundPayment(any());
     }
+
+    // --- findActiveOrdersByBranch: exclusión de estados terminales sin turno ---
+
+    @Test
+    void findActiveOrdersByBranch_noShiftId_excludesTerminalOrders() {
+        // Regresión: sin shiftId, la lista "activa" de la sucursal NO debe incluir
+        // pedidos terminales (DELIVERED/CANCELLED). El bug pasaba List.of() como
+        // estados excluidos y NOT IN (∅) no filtraba nada → devolvía el historial
+        // completo. El mock emula la semántica real del repositorio (NOT IN
+        // :excluded) según el argumento recibido: con lista vacía (código viejo) no
+        // filtra y el assert falla; con [DELIVERED, CANCELLED] (fix) filtra y pasa.
+        Integer branchId = 1;
+
+        Order received = activeOrder(OrderStatus.RECEIVED);
+        Order inPrep = activeOrder(OrderStatus.IN_PREPARATION);
+        Order onTheWay = activeOrder(OrderStatus.ON_THE_WAY);
+        Order delivered = activeOrder(OrderStatus.DELIVERED);
+        Order cancelled = activeOrder(OrderStatus.CANCELLED);
+        List<Order> allBranchOrders = List.of(received, inPrep, onTheWay, delivered, cancelled);
+
+        when(orderRepository.findActiveByBranchId(eq(branchId), any()))
+                .thenAnswer(inv -> {
+                    Collection<OrderStatus> excluded = inv.getArgument(1);
+                    return allBranchOrders.stream()
+                            .filter(o -> !excluded.contains(o.getStatus()))
+                            .toList();
+                });
+        when(paymentRepository.findByOrderIdIn(any())).thenReturn(List.of());
+
+        List<BackofficeOrderRow> rows =
+                service.findActiveOrdersByBranch(branchId, null, OrderFilterParams.defaults());
+
+        assertThat(rows).extracting(row -> row.order().getStatus())
+                .containsExactlyInAnyOrder(
+                        OrderStatus.RECEIVED, OrderStatus.IN_PREPARATION, OrderStatus.ON_THE_WAY)
+                .doesNotContain(OrderStatus.DELIVERED, OrderStatus.CANCELLED);
+    }
 }
