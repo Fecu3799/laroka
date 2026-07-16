@@ -44,6 +44,22 @@ function formatPrice(amount) {
   return `$${Number(amount).toLocaleString('es-AR')}`
 }
 
+// US-17-CF-02: el reembolso por cancelación tardía (85% del subtotal) y la comisión
+// (15%) deben coincidir EXACTAMENTE con el backend (CANCELLATION_REFUND_RATE, US-17-03):
+// mismo factor 0.85 y mismo redondeo HALF_UP a 2 decimales, para mostrarle al cliente
+// la cifra que el backend efectivamente va a reembolsar, no una aproximación.
+const CANCELLATION_REFUND_RATE = 0.85
+const REFUND_PERCENT = Math.round(CANCELLATION_REFUND_RATE * 100) // 85, para aritmética exacta en centavos
+
+// Reembolso = subtotal * 0.85 con HALF_UP a 2 decimales. Se opera en centavos enteros
+// (subtotalCents * 85 es exacto) y se divide por 100 con Math.round (HALF_UP para
+// montos positivos), replicando setScale(2, RoundingMode.HALF_UP) del backend.
+function lateCancellationRefund(subtotal) {
+  const subtotalCents = Math.round(Number(subtotal) * 100)
+  const refundCents = Math.round((subtotalCents * REFUND_PERCENT) / 100)
+  return refundCents / 100
+}
+
 function formatTime(isoString) {
   return new Date(isoString).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
 }
@@ -240,6 +256,22 @@ function OrderDetailModal({
           }}>
             {confirmingCancel ? (
               <>
+                {/* US-17-CF-02: el aviso de comisión/monto a devolver solo aplica a
+                    pagos MercadoPago (hay reembolso automático parcial). En efectivo no
+                    hay reembolso automático que anunciar: la cancelación queda 100% a
+                    criterio del local, así que el modal se muestra sin este bloque. */}
+                {canRequestCancel && order.paymentMethod === 'MERCADOPAGO' && (
+                  <p style={{
+                    fontSize: '13px',
+                    color: 'var(--color-accent, #f5c518)',
+                    margin: '0 0 10px',
+                    lineHeight: 1.45,
+                  }}>
+                    El pedido ya está en preparación: se aplica una comisión por
+                    cancelación tardía del 15% sobre el subtotal ({formatPrice(order.subtotal)}).
+                    Se te devolverán <strong>{formatPrice(lateCancellationRefund(order.subtotal))}</strong>.
+                  </p>
+                )}
                 <p style={{
                   fontSize: '13px',
                   color: 'rgba(255,255,255,0.7)',

@@ -174,6 +174,86 @@ describe('OrderTrackingBanner', () => {
     })
   })
 
+  it('en IN_PREPARATION, al solicitar cancelación muestra la comisión del 15% y el reembolso exacto del 85% (US-17-CF-02)', async () => {
+    const user = userEvent.setup()
+    seedOrder('order-ip', 1)
+    mockStatus('order-ip', {
+      status: 'IN_PREPARATION',
+      orderType: 'DELIVERY',
+      history: [],
+      paymentMethod: 'MERCADOPAGO',
+      subtotal: 2000,
+      deliveryFee: 500,
+      serviceFee: 100,
+      totalAmount: 2600,
+    })
+
+    render(<OrderTrackingBanner branchId={1} />)
+    await waitFor(() => screen.getByText('EN PREPARACIÓN'))
+
+    await user.click(screen.getByRole('button', { name: /ver detalle/i }))
+    await screen.findByRole('button', { name: /cerrar/i })
+    await user.click(screen.getByRole('button', { name: /solicitar cancelación/i }))
+
+    // Mensaje explícito de comisión por cancelación tardía + cifra exacta a devolver:
+    // 85% de 2000 = 1700 (mismo cálculo/redondeo que el backend, US-17-03).
+    expect(screen.getByText(/comisión por cancelación tardía del 15%/i)).toBeInTheDocument()
+    expect(screen.getByText('$1.700')).toBeInTheDocument()
+  })
+
+  it('el reembolso del 85% usa redondeo HALF_UP como el backend (subtotal 10.10 → $8,59)', async () => {
+    const user = userEvent.setup()
+    seedOrder('order-ip2', 1)
+    mockStatus('order-ip2', {
+      status: 'IN_PREPARATION',
+      orderType: 'TAKEAWAY',
+      history: [],
+      paymentMethod: 'MERCADOPAGO',
+      subtotal: 10.10,      // 10.10 * 0.85 = 8.585 → HALF_UP a 2 decimales = 8.59
+      deliveryFee: 0,
+      serviceFee: 0,
+      totalAmount: 10.10,
+    })
+
+    render(<OrderTrackingBanner branchId={1} />)
+    await waitFor(() => screen.getByText('EN PREPARACIÓN'))
+
+    await user.click(screen.getByRole('button', { name: /ver detalle/i }))
+    await screen.findByRole('button', { name: /cerrar/i })
+    await user.click(screen.getByRole('button', { name: /solicitar cancelación/i }))
+
+    // 8.585 redondea hacia arriba (HALF_UP), no hacia abajo → $8,59.
+    expect(screen.getByText('$8,59')).toBeInTheDocument()
+  })
+
+  it('en IN_PREPARATION con pago en EFECTIVO no muestra el bloque de comisión (US-17-CF-02)', async () => {
+    const user = userEvent.setup()
+    seedOrder('order-cash', 1)
+    mockStatus('order-cash', {
+      status: 'IN_PREPARATION',
+      orderType: 'TAKEAWAY',
+      history: [],
+      paymentMethod: 'CASH',
+      subtotal: 2000,
+      deliveryFee: 0,
+      serviceFee: 0,
+      totalAmount: 2000,
+    })
+
+    render(<OrderTrackingBanner branchId={1} />)
+    await waitFor(() => screen.getByText('EN PREPARACIÓN'))
+
+    await user.click(screen.getByRole('button', { name: /ver detalle/i }))
+    await screen.findByRole('button', { name: /cerrar/i })
+    await user.click(screen.getByRole('button', { name: /solicitar cancelación/i }))
+
+    // El modal de confirmación se muestra (nota de solicitud al local + botón),
+    // pero SIN el bloque de comisión/monto a devolver (no hay reembolso automático).
+    expect(screen.getByText(/la decisión final queda a cargo del local/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /confirmar solicitud/i })).toBeInTheDocument()
+    expect(screen.queryByText(/comisión por cancelación tardía/i)).not.toBeInTheDocument()
+  })
+
   it('shows skeleton while order data is loading', () => {
     seedOrder('order-1', 1)
     vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {}))) // never resolves

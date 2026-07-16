@@ -413,6 +413,18 @@ public class OrderService {
         }
     }
 
+    /**
+     * Método de pago del pedido (o null si aún no hay Payment). Lo usa el endpoint
+     * público de estado para que el client sepa si mostrar el aviso de comisión por
+     * cancelación tardía (solo MERCADOPAGO; US-17-CF-02).
+     */
+    @Transactional(readOnly = true)
+    public PaymentMethod findPaymentMethod(UUID orderId) {
+        return paymentRepository.findByOrderId(orderId)
+                .map(Payment::getMethod)
+                .orElse(null);
+    }
+
     @Transactional(readOnly = true)
     public Order findById(UUID id) {
         return orderRepository.findByIdWithBranch(id)
