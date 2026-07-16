@@ -160,6 +160,16 @@ public class OrderService {
                 newStatus == OrderStatus.CANCELLED ? reason : null);
         log.info("Backoffice status transition | orderId={} from={} to={} staffUserId={}",
                 saved.getId(), previous, newStatus, staffUserId);
+
+        // US-17-02: cancelación directa desde RECEIVED → reembolso TOTAL automático si
+        // el pago fue MercadoPago aprobado. No bloquea si el gateway falla. Solo RECEIVED:
+        // un pedido PENDING_PAYMENT no puede tener un pago MP aprobado (el webhook aprueba
+        // el pago y lo mueve a RECEIVED en la misma transacción). La cancelación tardía
+        // (IN_PREPARATION → CANCELLATION_REQUESTED → CANCELLED) va por otro camino con
+        // reembolso parcial (US-17-03), no por acá.
+        if (newStatus == OrderStatus.CANCELLED && previous == OrderStatus.RECEIVED) {
+            refundIfMercadoPagoApproved(saved);
+        }
         return saved;
     }
 
@@ -217,6 +227,15 @@ public class OrderService {
         recordHistory(saved, previous, next, null, reason);
         log.info("Order cancel flow | orderId={} from={} to={}", saved.getId(), previous, next);
 
+        // US-17-02: cancelación directa desde RECEIVED → reembolso TOTAL automático si
+        // el pago fue MercadoPago aprobado. No bloquea si el gateway falla. Solo RECEIVED:
+        // un pedido PENDING_PAYMENT no puede tener un pago MP aprobado (el webhook aprueba
+        // el pago y mueve el pedido a RECEIVED en la misma transacción), así que ahí no
+        // hay cobro que revertir.
+        if (previous == OrderStatus.RECEIVED) {
+            refundIfMercadoPagoApproved(saved);
+        }
+
         // La emisión del evento SSE se hace en OrderController, después de que esta
         // transacción commitea (mismo patrón que BackofficeOrderController). Hacer el
         // emitter.send() dentro de la transacción retenía la conexión JDBC mientras se
@@ -257,11 +276,18 @@ public class OrderService {
 
     /**
      * Reembolso TOTAL del pago del pedido si —y solo si— existe un {@link Payment}
-     * APPROVED de método MERCADOPAGO. Usa {@code PaymentGateway.refundPayment} (sin
-     * monto → reembolso completo). Un pago en efectivo no dispara reembolso: no
-     * hubo cobro electrónico que revertir. El fallo del gateway se loguea para
-     * acción manual y no aborta el cierre del turno (mismo patrón que el reembolso
-     * por race-condition del webhook).
+     * APPROVED de método MERCADOPAGO. Invoca {@code refundPayment(paymentId, null)}
+     * (monto null → reembolso completo). Un pago en efectivo no dispara reembolso: no
+     * hubo cobro electrónico que revertir; un pago no aprobado (PENDING) tampoco.
+     *
+     * El fallo del gateway se loguea para acción manual y NO aborta la cancelación
+     * del pedido (best-effort, no bloqueante): el cliente/operador no debe quedar
+     * bloqueado por un fallo del gateway. La persistencia explícita del estado de
+     * fallo queda pendiente de US-17-04 (modelo de tracking de reembolsos); hoy el
+     * pago queda en APPROVED y el reembolso pendiente de reintento manual.
+     *
+     * Usado tanto por el auto-cierre de turno como por la cancelación directa de
+     * pedidos previos a IN_PREPARATION (US-17-02).
      */
     private void refundIfMercadoPagoApproved(Order order) {
         Payment payment = paymentRepository.findByOrderId(order.getId()).orElse(null);
@@ -271,13 +297,13 @@ public class OrderService {
             return;
         }
         try {
-            paymentGateway.refundPayment(payment.getMercadopagoPaymentId());
+            paymentGateway.refundPayment(payment.getMercadopagoPaymentId(), null);
             payment.setStatus(PaymentStatus.REFUNDED);
             paymentRepository.save(payment);
-            log.info("Full refund issued by shift auto-close | orderId={} mpPaymentId={}",
+            log.info("Full refund issued | orderId={} mpPaymentId={}",
                     order.getId(), payment.getMercadopagoPaymentId());
         } catch (Exception e) {
-            log.error("Shift auto-close refund FAILED — manual action required | orderId={} mpPaymentId={} error={}",
+            log.error("Full refund FAILED — manual action required | orderId={} mpPaymentId={} error={}",
                     order.getId(), payment.getMercadopagoPaymentId(), e.getMessage());
         }
     }

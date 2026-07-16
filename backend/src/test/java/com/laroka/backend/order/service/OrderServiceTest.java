@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -1464,7 +1465,7 @@ class OrderServiceTest {
                 });
 
         // Sin pagos aprobados → no se dispara ningún reembolso.
-        verify(paymentGateway, never()).refundPayment(any());
+        verify(paymentGateway, never()).refundPayment(any(), any());
     }
 
     @Test
@@ -1486,8 +1487,8 @@ class OrderServiceTest {
 
         service.cancelActiveOrdersForShiftAutoClose(shiftId);
 
-        // Reembolso TOTAL vía gateway (sin monto) y pago marcado REFUNDED.
-        verify(paymentGateway).refundPayment("mp-payment-123");
+        // Reembolso TOTAL vía gateway (monto null) y pago marcado REFUNDED.
+        verify(paymentGateway).refundPayment("mp-payment-123", null);
         ArgumentCaptor<Payment> paymentCaptor = ArgumentCaptor.forClass(Payment.class);
         verify(paymentRepository).save(paymentCaptor.capture());
         assertThat(paymentCaptor.getValue().getStatus()).isEqualTo(PaymentStatus.REFUNDED);
@@ -1512,7 +1513,7 @@ class OrderServiceTest {
         service.cancelActiveOrdersForShiftAutoClose(shiftId);
 
         // El pedido se cancela igual, pero el efectivo no dispara reembolso.
-        verify(paymentGateway, never()).refundPayment(any());
+        verify(paymentGateway, never()).refundPayment(any(), any());
         verify(paymentRepository, never()).save(any(Payment.class));
     }
 
@@ -1524,7 +1525,7 @@ class OrderServiceTest {
         service.cancelActiveOrdersForShiftAutoClose(shiftId);
 
         verify(orderRepository, never()).save(any(Order.class));
-        verify(paymentGateway, never()).refundPayment(any());
+        verify(paymentGateway, never()).refundPayment(any(), any());
     }
 
     // --- findActiveOrdersByBranch: exclusión de estados terminales sin turno ---
@@ -1562,5 +1563,143 @@ class OrderServiceTest {
                 .containsExactlyInAnyOrder(
                         OrderStatus.RECEIVED, OrderStatus.IN_PREPARATION, OrderStatus.ON_THE_WAY)
                 .doesNotContain(OrderStatus.DELIVERED, OrderStatus.CANCELLED);
+    }
+
+    // --- US-17-02: reembolso total automático al cancelar antes de IN_PREPARATION ---
+
+    private Payment mercadoPagoPayment(Order order, PaymentStatus status) {
+        return Payment.builder()
+                .id(UUID.randomUUID())
+                .order(order)
+                .status(status)
+                .method(PaymentMethod.MERCADOPAGO)
+                .mercadopagoPaymentId("mp-payment-17-02")
+                .build();
+    }
+
+    @Test
+    void cancelOrder_receivedWithApprovedMercadoPago_triggersFullRefund() {
+        UUID orderId = UUID.randomUUID();
+        Order order = activeOrder(OrderStatus.RECEIVED);
+        Payment payment = mercadoPagoPayment(order, PaymentStatus.APPROVED);
+
+        when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(paymentRepository.findByOrderId(order.getId())).thenReturn(Optional.of(payment));
+
+        service.cancelOrder(orderId, "cliente se arrepintió");
+
+        // Reembolso TOTAL (monto null) y pago marcado REFUNDED.
+        verify(paymentGateway).refundPayment("mp-payment-17-02", null);
+        ArgumentCaptor<Payment> paymentCaptor = ArgumentCaptor.forClass(Payment.class);
+        verify(paymentRepository).save(paymentCaptor.capture());
+        assertThat(paymentCaptor.getValue().getStatus()).isEqualTo(PaymentStatus.REFUNDED);
+        // El pedido queda CANCELLED.
+        ArgumentCaptor<Order> orderCaptor = ArgumentCaptor.forClass(Order.class);
+        verify(orderRepository).save(orderCaptor.capture());
+        assertThat(orderCaptor.getValue().getStatus()).isEqualTo(OrderStatus.CANCELLED);
+    }
+
+    @Test
+    void cancelOrder_refundFails_cancellationProceedsAndFailureNotMaskedAsRefunded() {
+        UUID orderId = UUID.randomUUID();
+        Order order = activeOrder(OrderStatus.RECEIVED);
+        Payment payment = mercadoPagoPayment(order, PaymentStatus.APPROVED);
+
+        when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(paymentRepository.findByOrderId(order.getId())).thenReturn(Optional.of(payment));
+        doThrow(new RuntimeException("MP gateway caído"))
+                .when(paymentGateway).refundPayment("mp-payment-17-02", null);
+
+        // El fallo del gateway NO debe propagarse ni bloquear la cancelación.
+        service.cancelOrder(orderId, "cliente se arrepintió");
+
+        // La cancelación procede igual: el pedido queda CANCELLED.
+        ArgumentCaptor<Order> orderCaptor = ArgumentCaptor.forClass(Order.class);
+        verify(orderRepository).save(orderCaptor.capture());
+        assertThat(orderCaptor.getValue().getStatus()).isEqualTo(OrderStatus.CANCELLED);
+        // El pago NO se marca REFUNDED ante el fallo (no se persiste como reembolsado).
+        // La persistencia explícita del estado de fallo queda para US-17-04.
+        verify(paymentRepository, never()).save(any(Payment.class));
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.APPROVED);
+    }
+
+    @Test
+    void cancelOrder_cashPayment_doesNotTriggerRefund() {
+        UUID orderId = UUID.randomUUID();
+        Order order = activeOrder(OrderStatus.RECEIVED);
+        Payment payment = Payment.builder()
+                .id(UUID.randomUUID())
+                .order(order)
+                .status(PaymentStatus.APPROVED)
+                .method(PaymentMethod.CASH)
+                .build();
+
+        when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(paymentRepository.findByOrderId(order.getId())).thenReturn(Optional.of(payment));
+
+        service.cancelOrder(orderId, "cliente se arrepintió");
+
+        verify(paymentGateway, never()).refundPayment(any(), any());
+        verify(paymentRepository, never()).save(any(Payment.class));
+    }
+
+    @Test
+    void cancelOrder_mercadoPagoNotApproved_doesNotTriggerRefund() {
+        UUID orderId = UUID.randomUUID();
+        Order order = activeOrder(OrderStatus.RECEIVED);
+        Payment payment = mercadoPagoPayment(order, PaymentStatus.PENDING);
+
+        when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(paymentRepository.findByOrderId(order.getId())).thenReturn(Optional.of(payment));
+
+        service.cancelOrder(orderId, "cliente se arrepintió");
+
+        verify(paymentGateway, never()).refundPayment(any(), any());
+        verify(paymentRepository, never()).save(any(Payment.class));
+    }
+
+    @Test
+    void cancelOrder_pendingPaymentState_doesNotEvenAttemptRefund() {
+        // Invariante: un pedido PENDING_PAYMENT no puede tener un pago MP aprobado
+        // (el webhook aprueba y mueve a RECEIVED en la misma transacción). El disparo
+        // del reembolso está gateado a previous==RECEIVED, así que en PENDING_PAYMENT
+        // ni siquiera se consulta el pago.
+        UUID orderId = UUID.randomUUID();
+        Order order = activeOrder(OrderStatus.PENDING_PAYMENT);
+
+        when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.cancelOrder(orderId, "cliente se arrepintió");
+
+        // El pedido se cancela, pero no se intenta ningún reembolso.
+        ArgumentCaptor<Order> orderCaptor = ArgumentCaptor.forClass(Order.class);
+        verify(orderRepository).save(orderCaptor.capture());
+        assertThat(orderCaptor.getValue().getStatus()).isEqualTo(OrderStatus.CANCELLED);
+        verify(paymentRepository, never()).findByOrderId(any());
+        verify(paymentGateway, never()).refundPayment(any(), any());
+    }
+
+    @Test
+    void transitionStatusForBackoffice_receivedToCancelled_triggersFullRefund() {
+        UUID orderId = UUID.randomUUID();
+        Order order = activeOrder(OrderStatus.RECEIVED);
+        Payment payment = mercadoPagoPayment(order, PaymentStatus.APPROVED);
+
+        when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(paymentRepository.findByOrderId(order.getId())).thenReturn(Optional.of(payment));
+
+        // branchId=1 coincide con la sucursal del pedido (activeOrder usa branch id=1).
+        service.transitionStatusForBackoffice(orderId, OrderStatus.CANCELLED, "operador canceló", 1, 99);
+
+        verify(paymentGateway).refundPayment("mp-payment-17-02", null);
+        ArgumentCaptor<Payment> paymentCaptor = ArgumentCaptor.forClass(Payment.class);
+        verify(paymentRepository).save(paymentCaptor.capture());
+        assertThat(paymentCaptor.getValue().getStatus()).isEqualTo(PaymentStatus.REFUNDED);
     }
 }
