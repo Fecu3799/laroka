@@ -65,6 +65,12 @@ mercadopago:
   webhook-secret: ${MERCADOPAGO_WEBHOOK_SECRET:}
   notifications-url: ${MERCADOPAGO_NOTIFICATIONS_URL:}
 
+# Email transaccional (US-17-06) — proveedor Resend vía API HTTP.
+# Si email.api-key está vacío, EmailService opera en modo no-op (loguea y no envía).
+email:
+  api-key: ${RESEND_API_KEY:}
+  from: ${EMAIL_FROM:}
+
 order:
   expiration-minutes: ${ORDER_EXPIRATION_MINUTES:30}
 
