@@ -6,6 +6,7 @@ import { useOrdersContext } from "../context/OrdersContext";
 import {
   advanceOrderStatus,
   resolveCancelRequest,
+  retryRefund,
 } from "../services/ordersService";
 import { printTicket, downloadTicket, printComanda } from "../services/ticketService";
 import { apiFetch } from "../services/http";
@@ -46,6 +47,8 @@ const PAYMENT_STATUS_LABEL = {
   PENDING: "Pendiente",
   REJECTED: "Rechazado",
   CANCELLED: "Cancelado",
+  REFUNDED: "Reembolsado",
+  REFUND_FAILED: "Reembolso fallido",
 };
 
 const PAYMENT_STATUS_COLOR = {
@@ -53,6 +56,8 @@ const PAYMENT_STATUS_COLOR = {
   PENDING: "#fb923c",
   REJECTED: "#f87171",
   CANCELLED: "#f87171",
+  REFUNDED: "#38bdf8",
+  REFUND_FAILED: "#f87171",
 };
 
 const PAYMENT_METHOD_LABEL = {
@@ -65,6 +70,8 @@ const PAYMENT_BADGE_CONFIG = {
   APPROVED: { bg: "#0a2e14", color: "#4ade80", border: "#1a5c2c" },
   REJECTED: { bg: "#2e0f0f", color: "#f87171", border: "#5c1f1f" },
   CANCELLED: { bg: "#2e0f0f", color: "#f87171", border: "#5c1f1f" },
+  REFUNDED: { bg: "#0a1e2e", color: "#38bdf8", border: "#1a3a5c" },
+  REFUND_FAILED: { bg: "#2e0f0f", color: "#f87171", border: "#5c1f1f" },
 };
 
 const TABS = [
@@ -602,7 +609,7 @@ function PaymentStatusIcon({ status }) {
 // ── Main component ────────────────────────────────────────────
 
 export default function Orders() {
-  const { token, tenantName } = useAuth();
+  const { token, tenantName, role } = useAuth();
   const { activeBranchId: branchId, activeBranchName } = useBranch();
   const { resetCounts } = useOutletContext();
   const {
@@ -868,6 +875,7 @@ export default function Orders() {
                 advancing={advancing}
                 token={token}
                 branchId={branchId}
+                role={role}
                 onRefetch={refetchDetail}
                 onRefresh={refresh}
                 onPaymentConfirmed={updatePaymentInList}
@@ -1115,6 +1123,7 @@ function OrderDetail({
   advancing,
   token,
   branchId,
+  role,
   onRefetch,
   onRefresh,
   onPaymentConfirmed,
@@ -1124,11 +1133,27 @@ function OrderDetail({
   const next = getNextStatus(order.status, order.orderType);
   const isTerminal = TERMINAL.has(order.status);
 
+  // ── Reembolso (US-17-04/05 · US-17-F-02) ─────────────────────
+  // El backend expone refundedAmount (monto reembolsado o intentado) y el
+  // paymentStatus REFUNDED / REFUND_FAILED. Total vs parcial es derivable: el
+  // reembolso total iguala el totalAmount; cualquier monto menor es parcial.
+  const refundFailed = order.paymentStatus === "REFUND_FAILED";
+  const hasRefundInfo =
+    order.paymentStatus === "REFUNDED" ||
+    refundFailed ||
+    order.refundedAmount != null;
+  const isPartialRefund =
+    order.refundedAmount != null &&
+    order.totalAmount != null &&
+    Number(order.refundedAmount) < Number(order.totalAmount);
+  const refundKindLabel = isPartialRefund ? "Parcial" : "Total";
+
   const [paying, setPaying] = useState(false);
   const [actionLoading, setActionLoading] = useState(null);
   const [cancelRequestLoading, setCancelRequestLoading] = useState(null);
   const [cancelConfirming, setCancelConfirming] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
+  const [retryingRefund, setRetryingRefund] = useState(false);
 
   const canGoBack = goBackAllowed(order.status);
   const canCancel = cancelAllowed(order.status);
@@ -1200,6 +1225,25 @@ function OrderDetail({
       setActionLoading(null);
       setCancelConfirming(false);
       setCancelReason("");
+    }
+  };
+
+  const handleRetryRefund = async (e) => {
+    e.stopPropagation();
+    setRetryingRefund(true);
+    try {
+      await retryRefund(order.id, token, branchId);
+      window.dispatchEvent(
+        new CustomEvent("laroka:toast", {
+          detail: { message: "Reembolso procesado correctamente" },
+        }),
+      );
+      onRefetch();
+      onRefresh();
+    } catch {
+      /* apiFetch ya mostró el toast con el mensaje de error del backend */
+    } finally {
+      setRetryingRefund(false);
     }
   };
 
@@ -1535,6 +1579,34 @@ function OrderDetail({
                 order.paymentMethod ??
                 "—"}
             </div>
+
+            {hasRefundInfo && (
+              <div
+                className={`detail-refund${refundFailed ? " detail-refund--failed" : ""}`}
+              >
+                <div className="detail-refund-head">
+                  <span className="detail-refund-title">
+                    {refundFailed ? "Reembolso fallido" : "Reembolsado"}
+                  </span>
+                  <span className="detail-refund-kind">{refundKindLabel}</span>
+                </div>
+                {order.refundedAmount != null && (
+                  <div className="detail-refund-amount">
+                    {formatPrice(order.refundedAmount)}
+                  </div>
+                )}
+                {refundFailed && role === "ADMIN" && (
+                  <button
+                    className="detail-action-btn detail-action-retry-refund"
+                    type="button"
+                    onClick={handleRetryRefund}
+                    disabled={retryingRefund}
+                  >
+                    {retryingRefund ? "···" : "Reintentar reembolso"}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
