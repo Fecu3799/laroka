@@ -257,6 +257,27 @@
   text-align: right;
 }
 
+/* Botón de reporte de bugs (US-17-F-03) — fijo en el header, visible en toda pantalla. */
+.layout-bug-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  color: #8aaa8d;
+  background-color: rgba(101, 163, 105, 0.06);
+  border: 1px solid rgba(101, 163, 105, 0.18);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background-color 0.15s;
+}
+
+.layout-bug-btn:hover {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+  background-color: rgba(101, 163, 105, 0.12);
+}
+
 /* ── Main content ───────────────────────────────────────────── */
 
 .layout-main {

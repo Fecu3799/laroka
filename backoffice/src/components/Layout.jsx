@@ -7,6 +7,7 @@ import { logout } from '../services/authService'
 import SubHeader from './SubHeader'
 import ErrorBoundary from './ErrorBoundary'
 import { Toast } from './Toast'
+import BugReportModal from './BugReportModal'
 import { OrdersProvider } from '../context/OrdersContext'
 import { ShiftProvider } from '../context/ShiftContext'
 import { OperatorMessagesProvider } from '../context/OperatorMessagesContext'
@@ -92,6 +93,7 @@ export default function Layout() {
   const [connectionStatus, setConnectionStatus] = useState('disconnected')
   const [newOrderCount, setNewOrderCount] = useState(0)
   const [cancelCount, setCancelCount] = useState(0)
+  const [bugReportOpen, setBugReportOpen] = useState(false)
   const openOrderIdRef = useRef(null)
   const setOpenOrderId = useCallback(id => { openOrderIdRef.current = id }, [])
 
@@ -262,6 +264,20 @@ export default function Layout() {
             <span className="layout-header-tenant">{tenantName ?? '—'}</span>
           </div>
           <div className="layout-header-right">
+            <button
+              type="button"
+              className="layout-bug-btn"
+              onClick={() => setBugReportOpen(true)}
+              aria-label="Reportar un problema"
+              title="Reportar un problema"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <rect x="7" y="8" width="10" height="11" rx="5" stroke="currentColor" strokeWidth="1.8" />
+                <path d="M9 6a3 3 0 0 1 6 0" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                <path d="M12 10v8M3 12h4M17 12h4M4.5 7.5 7 9M19.5 7.5 17 9M4.5 17.5 7 16M19.5 17.5 17 16"
+                  stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
+            </button>
             <div className="layout-sse-status">
               <span
                 className="layout-sse-dot"
@@ -308,6 +324,8 @@ export default function Layout() {
       </div>
 
       <Toast />
+
+      {bugReportOpen && <BugReportModal onClose={() => setBugReportOpen(false)} />}
     </div>
   )
 }
