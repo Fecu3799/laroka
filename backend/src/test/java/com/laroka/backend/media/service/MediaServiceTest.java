@@ -116,6 +116,39 @@ class MediaServiceTest {
     }
 
     @Test
+    void uploadBugReportsUsesFlatKeyWithoutTenant() {
+        byte[] content = new byte[] { 5, 6, 7 };
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "captura.png", "image/png", content);
+
+        String expectedUrl = "https://pub-xxxx.r2.dev/bug-reports/some-uuid.png";
+        when(storageService.upload(any(), anyString(), eq("image/png"), anyString()))
+                .thenReturn(expectedUrl);
+
+        String result = mediaService.upload(file, TENANT_ID, "bug-reports");
+
+        assertThat(result).isEqualTo(expectedUrl);
+
+        ArgumentCaptor<String> keyCaptor = ArgumentCaptor.forClass(String.class);
+        verify(storageService).upload(eq(content), keyCaptor.capture(), eq("image/png"), anyString());
+        // Carpeta plana: empieza con "bug-reports/" y NO lleva el tenant como prefijo.
+        assertThat(keyCaptor.getValue())
+                .startsWith("bug-reports/")
+                .doesNotStartWith(TENANT_ID + "/")
+                .endsWith(".png");
+    }
+
+    @Test
+    void listRejectsBugReportsContext() {
+        // bug-reports es subible pero NO listable desde la galería.
+        assertThatThrownBy(() -> mediaService.list(TENANT_ID, "bug-reports"))
+                .isInstanceOf(InvalidFileException.class)
+                .hasMessageContaining("Contexto no permitido");
+
+        verify(storageService, never()).list(anyString());
+    }
+
+    @Test
     void listRejectsInvalidContext() {
         assertThatThrownBy(() -> mediaService.list(TENANT_ID, "avatars"))
                 .isInstanceOf(InvalidFileException.class)

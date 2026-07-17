@@ -15,9 +15,36 @@
 }
 
 .iu-body {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 14px;
+  border-radius: 12px;
+  outline: 2px dashed transparent;
+  outline-offset: 4px;
+  transition: outline-color 0.15s, background 0.15s;
+}
+
+/* Resaltado de la zona de drop mientras se arrastra un archivo (US-17). */
+.iu-body--dragging {
+  outline-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.iu-drop-hint {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+  /* Deja pasar los eventos de drag/drop al contenedor (dropzone). */
+  pointer-events: none;
 }
 
 .iu-preview {

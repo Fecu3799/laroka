@@ -17,4 +17,7 @@ public class BugReportRequestDTO {
     private String url;
 
     private String userAgent;
+
+    /** Opcional: URL pública de una captura de pantalla subida a R2 (contexto bug-reports). */
+    private String screenshotUrl;
 }

@@ -43,7 +43,8 @@ public class BugReportController {
 
         Integer branchId = securityUtils.resolveBranchId(principal, request);
         bugReportService.report(
-                principal.getUserId(), branchId, dto.getDescription(), dto.getUrl(), dto.getUserAgent());
+                principal.getUserId(), branchId, dto.getDescription(), dto.getUrl(),
+                dto.getUserAgent(), dto.getScreenshotUrl());
         return ResponseEntity.ok().build();
     }
 }

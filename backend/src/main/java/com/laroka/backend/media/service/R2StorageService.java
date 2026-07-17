@@ -1,5 +1,8 @@
 package com.laroka.backend.media.service;
 
+import java.net.URLDecoder;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -51,16 +54,22 @@ public class R2StorageService implements StorageService {
                 .contentLength((long) content.length);
 
         if (originalName != null && !originalName.isBlank()) {
-            builder.metadata(Map.of(METADATA_ORIGINAL_NAME, originalName));
+            // R2/S3 firma las cabeceras de metadata; un valor con caracteres
+            // no-ASCII (acentos, ñ, emojis…) rompe el cálculo de firma y el SDK
+            // responde SignatureDoesNotMatch. Se URL-encodea para garantizar un
+            // valor ASCII; readOriginalName lo decodifica al leerlo de vuelta.
+            String encodedName = URLEncoder.encode(originalName, StandardCharsets.UTF_8);
+            builder.metadata(Map.of(METADATA_ORIGINAL_NAME, encodedName));
         }
 
         try {
             r2S3Client.putObject(builder.build(), RequestBody.fromBytes(content));
         } catch (Exception ex) {
             // No exponer detalles del proveedor: se loguea internamente y se
-            // propaga una excepción genérica que el handler mapea a 502.
+            // propaga un mensaje claro (fallo de storage) que el handler mapea a 502.
             log.error("Fallo al subir objeto a R2 (key={}): {}", key, ex.getMessage(), ex);
-            throw new StorageException("No se pudo subir el archivo al almacenamiento", ex);
+            throw new StorageException(
+                    "No se pudo guardar el archivo en el almacenamiento. Intentá de nuevo en unos minutos.", ex);
         }
 
         return buildPublicUrl(key);
@@ -101,7 +110,10 @@ public class R2StorageService implements StorageService {
                 .bucket(r2Config.getBucketName())
                 .key(key)
                 .build());
-        return head.metadata().get(METADATA_ORIGINAL_NAME);
+        String raw = head.metadata().get(METADATA_ORIGINAL_NAME);
+        // El nombre se persiste URL-encodeado (ver upload) para soportar caracteres
+        // no-ASCII; se decodifica para devolver el nombre original tal cual.
+        return raw == null ? null : URLDecoder.decode(raw, StandardCharsets.UTF_8);
     }
 
     private String buildPublicUrl(String key) {

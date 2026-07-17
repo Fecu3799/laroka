@@ -9,11 +9,11 @@ function authHeaders(token, branchId) {
 // fetch directo (no apiFetch) a propósito: US-17-F-03 exige feedback con copy
 // específico ("Reporte enviado" / "No se pudo enviar, intentá de nuevo.") manejado
 // por el modal, no el toast genérico global que dispara apiFetch ante un error.
-export async function sendBugReport({ description, url, userAgent }, token, branchId) {
+export async function sendBugReport({ description, url, userAgent, screenshotUrl }, token, branchId) {
   const res = await fetch(`${API_URL}/backoffice/bug-reports`, {
     method: 'POST',
     headers: authHeaders(token, branchId),
-    body: JSON.stringify({ description, url, userAgent }),
+    body: JSON.stringify({ description, url, userAgent, screenshotUrl }),
   })
   if (!res.ok) {
     const err = new Error(`HTTP ${res.status}`)

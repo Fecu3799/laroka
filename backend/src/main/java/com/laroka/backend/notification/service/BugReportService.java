@@ -53,8 +53,10 @@ public class BugReportService {
      * @param description    descripción del problema (tipeada por el operador)
      * @param url            URL donde ocurrió (capturada por el frontend)
      * @param userAgent      user agent del navegador (capturado por el frontend)
+     * @param screenshotUrl  URL pública de la captura adjunta (opcional, puede ser null)
      */
-    public void report(Integer userId, Integer activeBranchId, String description, String url, String userAgent) {
+    public void report(Integer userId, Integer activeBranchId, String description, String url,
+                       String userAgent, String screenshotUrl) {
         StaffUser reporter = staffUserRepository.findById(userId)
                 .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado: " + userId));
         Branch branch = branchRepository.findById(activeBranchId)
@@ -62,7 +64,7 @@ public class BugReportService {
 
         String role = reporter.getRole().name();
         String subject = "[LaRoka] Reporte de bug — " + reporter.getName() + " (" + role + ")";
-        String body = buildBody(reporter.getName(), role, branch.getName(), description, url, userAgent);
+        String body = buildBody(reporter.getName(), role, branch.getName(), description, url, userAgent, screenshotUrl);
 
         boolean sent = emailService.send(bugReportEmail, subject, body);
         if (!sent) {
@@ -74,7 +76,13 @@ public class BugReportService {
     }
 
     private String buildBody(String reporterName, String role, String branchName,
-                             String description, String url, String userAgent) {
+                             String description, String url, String userAgent, String screenshotUrl) {
+        // Si hay captura, se agrega su URL en una línea propia. En texto plano los
+        // clientes de mail (Gmail, etc.) la vuelven un link clickeable automáticamente.
+        String screenshotLine = screenshotUrl != null && !screenshotUrl.isBlank()
+                ? "\nCaptura de pantalla: " + screenshotUrl + "\n"
+                : "";
+
         return """
                 Nuevo reporte de bug — LaRoka Backoffice
 
@@ -87,13 +95,14 @@ public class BugReportService {
 
                 URL: %s
                 User agent: %s
-                """.formatted(
+                %s""".formatted(
                 reporterName,
                 role,
                 branchName,
                 LocalDateTime.now().format(TIMESTAMP_FORMAT),
                 description,
                 url != null && !url.isBlank() ? url : "—",
-                userAgent != null && !userAgent.isBlank() ? userAgent : "—");
+                userAgent != null && !userAgent.isBlank() ? userAgent : "—",
+                screenshotLine);
     }
 }

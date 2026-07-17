@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -61,6 +63,55 @@ class R2StorageServiceTest {
         ArgumentCaptor<PutObjectRequest> captor = ArgumentCaptor.forClass(PutObjectRequest.class);
         verifyPutObject(captor);
         assertThat(captor.getValue().metadata()).containsEntry("original-name", "mi-foto.png");
+    }
+
+    @Test
+    void uploadUrlEncodesNonAsciiOriginalName() {
+        // Un nombre real con acentos/ñ/símbolos: sin el URL-encode, R2 firma la
+        // cabecera de metadata con bytes no-ASCII y responde SignatureDoesNotMatch.
+        String originalName = "piña & señóra €.png";
+        when(r2Config.getBucketName()).thenReturn(BUCKET);
+        when(r2Config.getPublicUrl()).thenReturn(PUBLIC_URL);
+        when(r2S3Client.putObject(any(PutObjectRequest.class), any(RequestBody.class)))
+                .thenReturn(PutObjectResponse.builder().build());
+
+        storageService.upload(new byte[] { 1, 2, 3 }, "7/products/a.png", "image/png", originalName);
+
+        ArgumentCaptor<PutObjectRequest> captor = ArgumentCaptor.forClass(PutObjectRequest.class);
+        verifyPutObject(captor);
+        String storedValue = captor.getValue().metadata().get("original-name");
+        // Se guarda URL-encodeado y, por tanto, es puro ASCII (condición que hoy
+        // fallaría sin el fix: se guardaría el nombre no-ASCII crudo).
+        assertThat(storedValue).isEqualTo(URLEncoder.encode(originalName, StandardCharsets.UTF_8));
+        assertThat(storedValue).isEqualTo(new String(storedValue.getBytes(StandardCharsets.US_ASCII),
+                StandardCharsets.US_ASCII));
+        assertThat(storedValue).doesNotContain("ñ", "€", "ó");
+    }
+
+    @Test
+    void listDecodesNonAsciiOriginalName() {
+        // El objeto tiene la metadata URL-encodeada (como la dejó upload): list debe
+        // devolver el nombre original decodificado, no la cadena %XX cruda.
+        String originalName = "piña & señóra €.png";
+        String encoded = URLEncoder.encode(originalName, StandardCharsets.UTF_8);
+        when(r2Config.getBucketName()).thenReturn(BUCKET);
+        when(r2Config.getPublicUrl()).thenReturn(PUBLIC_URL);
+
+        S3Object object = S3Object.builder()
+                .key("7/products/a.png")
+                .lastModified(Instant.EPOCH)
+                .build();
+        when(r2S3Client.listObjectsV2(any(ListObjectsV2Request.class)))
+                .thenReturn(ListObjectsV2Response.builder().contents(List.of(object)).build());
+        when(r2S3Client.headObject(any(HeadObjectRequest.class)))
+                .thenReturn(HeadObjectResponse.builder()
+                        .metadata(Map.of("original-name", encoded))
+                        .build());
+
+        List<StoredObject> result = storageService.list("7/products/");
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).originalName()).isEqualTo(originalName);
     }
 
     @Test

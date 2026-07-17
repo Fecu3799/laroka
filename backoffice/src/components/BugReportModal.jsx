@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom'
 import useAuth from '../hooks/useAuth'
 import useBranch from '../hooks/useBranch'
 import { sendBugReport } from '../services/bugReportsService'
+import ImageUploader from './ui/ImageUploader'
 import './BugReportModal.css'
 
 // US-17-F-03: modal simple para reportar bugs desde cualquier pantalla del
@@ -13,6 +14,7 @@ export default function BugReportModal({ onClose }) {
   const { token } = useAuth()
   const { activeBranchId: branchId } = useBranch()
   const [description, setDescription] = useState('')
+  const [screenshotUrl, setScreenshotUrl] = useState(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
 
@@ -29,6 +31,7 @@ export default function BugReportModal({ onClose }) {
           description: description.trim(),
           url: window.location.href,
           userAgent: navigator.userAgent,
+          screenshotUrl: screenshotUrl ?? undefined,
         },
         token,
         branchId,
@@ -72,6 +75,20 @@ export default function BugReportModal({ onClose }) {
               onChange={e => setDescription(e.target.value)}
               rows={5}
               autoFocus
+            />
+          </div>
+
+          {/* Captura opcional. Sin aspectRatio → sin recorte (no se recorta un
+              screenshot). enableGallery=false porque bug-reports no es listable. */}
+          <div className="brm-field">
+            <ImageUploader
+              value={screenshotUrl}
+              onChange={setScreenshotUrl}
+              token={token}
+              label="Captura de pantalla (opcional)"
+              context="bug-reports"
+              enableGallery={false}
+              helperText="Adjuntá una imagen si ayuda a entender el problema."
             />
           </div>
 

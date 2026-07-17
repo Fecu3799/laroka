@@ -100,7 +100,9 @@ public class GlobalExceptionHandler {
 	public ResponseEntity<Map<String, Object>> handleStorage(
 			StorageException ex, HttpServletRequest request) {
 		log.error("Fallo de almacenamiento en {} {}", request.getMethod(), request.getRequestURI(), ex);
-		return buildResponse(HttpStatus.BAD_GATEWAY, "Error al procesar el archivo", null, request);
+		// El mensaje de StorageException ya es específico y seguro (no expone
+		// detalles del proveedor): distingue fallo de storage vs. lectura del archivo.
+		return buildResponse(HttpStatus.BAD_GATEWAY, ex.getMessage(), null, request);
 	}
 
 	// US-17-07: el proveedor de email falló. 502 con mensaje genérico — el detalle

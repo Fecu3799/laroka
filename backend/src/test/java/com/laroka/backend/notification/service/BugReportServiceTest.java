@@ -62,7 +62,7 @@ class BugReportServiceTest {
                 org.mockito.ArgumentMatchers.anyString())).thenReturn(true);
 
         service.report(USER_ID, BRANCH_ID, "El botón de pago no responde",
-                "https://backoffice.laroka.app/orders", "Mozilla/5.0 (Macintosh)");
+                "https://backoffice.laroka.app/orders", "Mozilla/5.0 (Macintosh)", null);
 
         ArgumentCaptor<String> subject = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<String> body = ArgumentCaptor.forClass(String.class);
@@ -78,6 +78,26 @@ class BugReportServiceTest {
                 .contains("El botón de pago no responde")
                 .contains("https://backoffice.laroka.app/orders")
                 .contains("Mozilla/5.0 (Macintosh)");
+        // Sin captura: no aparece la línea de screenshot.
+        assertThat(body.getValue()).doesNotContain("Captura de pantalla");
+    }
+
+    // --- captura adjunta: la URL viaja en el cuerpo del email ---
+
+    @Test
+    void report_withScreenshot_includesUrlInBody() {
+        when(emailService.send(eq(BUG_REPORT_EMAIL), org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyString())).thenReturn(true);
+
+        String screenshotUrl = "https://pub-xxxx.r2.dev/bug-reports/abc123.png";
+        service.report(USER_ID, BRANCH_ID, "Se rompió el checkout",
+                "https://x", "UA", screenshotUrl);
+
+        ArgumentCaptor<String> body = ArgumentCaptor.forClass(String.class);
+        verify(emailService).send(eq(BUG_REPORT_EMAIL), org.mockito.ArgumentMatchers.anyString(), body.capture());
+        assertThat(body.getValue())
+                .contains("Captura de pantalla")
+                .contains(screenshotUrl);
     }
 
     // --- fallo del proveedor → EmailDeliveryException (el handler la mapea a 502) ---
@@ -87,7 +107,7 @@ class BugReportServiceTest {
         when(emailService.send(eq(BUG_REPORT_EMAIL), org.mockito.ArgumentMatchers.anyString(),
                 org.mockito.ArgumentMatchers.anyString())).thenReturn(false);
 
-        assertThatThrownBy(() -> service.report(USER_ID, BRANCH_ID, "Algo falló", "https://x", "UA"))
+        assertThatThrownBy(() -> service.report(USER_ID, BRANCH_ID, "Algo falló", "https://x", "UA", null))
                 .isInstanceOf(EmailDeliveryException.class);
     }
 }
