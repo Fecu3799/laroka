@@ -10,7 +10,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.laroka.backend.shared.exception.BusinessException;
 import lombok.extern.slf4j.Slf4j;
 
@@ -20,6 +23,12 @@ public class MercadoPagoAdapter implements PaymentGateway {
 
     private static final String MP_PREFERENCES_URL = "https://api.mercadopago.com/checkout/preferences";
     private static final String MP_PAYMENTS_URL = "https://api.mercadopago.com/v1/payments/";
+
+    // Solo para logging de diagnóstico: parsea el cuerpo crudo de MP a un record
+    // enriquecido sin romper si aparecen campos nuevos. No participa de la lógica
+    // de negocio (el valor de retorno sigue saliendo de status + external_reference).
+    private static final ObjectMapper DEBUG_MAPPER = new ObjectMapper()
+            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
     private final String accessToken;
     private final String notificationUrl;
@@ -74,6 +83,12 @@ public class MercadoPagoAdapter implements PaymentGateway {
                     "failure", backUrls.failure(),
                     "pending", backUrls.pending()
             ));
+            // auto_return="approved": MP redirige automáticamente a back_urls.success
+            // (sin que el usuario toque el botón de volver) solo cuando el pago fue
+            // aprobado. MP exige un back_urls.success válido para aceptar auto_return,
+            // por eso va dentro de este guard. Los únicos valores válidos son
+            // "approved" y "all"; ninguno redirige automáticamente en pending/rejected.
+            body.put("auto_return", "approved");
         }
 
         try {
@@ -108,15 +123,39 @@ public class MercadoPagoAdapter implements PaymentGateway {
         }
 
         try {
-            MpPaymentResponse response = restClient.get()
+            // Se recibe el cuerpo crudo (String) para poder loguear la respuesta
+            // COMPLETA de MercadoPago a nivel DEBUG — incluyendo status_detail y
+            // cualquier campo que el record tipado no mapee — sin alterar el valor
+            // de retorno (que sigue derivándose de status + external_reference).
+            String rawBody = restClient.get()
                     .uri(MP_PAYMENTS_URL + paymentId)
                     .header("Authorization", "Bearer " + accessToken)
                     .retrieve()
-                    .body(MpPaymentResponse.class);
+                    .body(String.class);
 
+            // Volcado íntegro primero: si el parseo fallara, el crudo queda visible igual.
+            log.debug("fetchPayment: raw MP response — paymentId={}, body={}", paymentId, rawBody);
+
+            if (rawBody == null) {
+                throw new BusinessException("MercadoPago no devolvió datos del pago");
+            }
+
+            MpPaymentResponse response = DEBUG_MAPPER.readValue(rawBody, MpPaymentResponse.class);
             if (response == null) {
                 throw new BusinessException("MercadoPago no devolvió datos del pago");
             }
+
+            // Línea estructurada de alta señal: status_detail es el motivo puntual del
+            // rechazo (más granular que status, ej. "cc_rejected_insufficient_amount"),
+            // junto al resto de campos diagnósticos que hoy no se mapeaban.
+            log.debug("fetchPayment: parsed MP payment — id={}, status={}, statusDetail={}, "
+                            + "paymentMethodId={}, paymentTypeId={}, transactionAmount={}, currencyId={}, "
+                            + "dateApproved={}, dateCreated={}, externalReference={}",
+                    response.id(), response.status(), response.statusDetail(),
+                    response.paymentMethodId(), response.paymentTypeId(), response.transactionAmount(),
+                    response.currencyId(), response.dateApproved(), response.dateCreated(),
+                    response.externalReference());
+
             log.info("fetchPayment: MP response received — status={}, externalReference={}", response.status(), response.externalReference());
             return new PaymentInfo(response.status(), response.externalReference());
         } catch (BusinessException e) {
@@ -237,9 +276,22 @@ public class MercadoPagoAdapter implements PaymentGateway {
             @JsonProperty("init_point") String initPoint
     ) {}
 
+    // Enriquecido solo para diagnóstico: status_detail y demás campos se usan en el
+    // logging DEBUG de fetchPayment. La lógica de negocio sigue usando únicamente
+    // status y externalReference. ignoreUnknown = true para no romper ante campos
+    // nuevos del payload de MP (que trae muchos más de los declarados acá).
+    @JsonIgnoreProperties(ignoreUnknown = true)
     private record MpPaymentResponse(
+            @JsonProperty("id") Long id,
             @JsonProperty("status") String status,
-            @JsonProperty("external_reference") String externalReference
+            @JsonProperty("status_detail") String statusDetail,
+            @JsonProperty("external_reference") String externalReference,
+            @JsonProperty("payment_method_id") String paymentMethodId,
+            @JsonProperty("payment_type_id") String paymentTypeId,
+            @JsonProperty("transaction_amount") BigDecimal transactionAmount,
+            @JsonProperty("currency_id") String currencyId,
+            @JsonProperty("date_approved") String dateApproved,
+            @JsonProperty("date_created") String dateCreated
     ) {}
 
     private record MpQrChargeResponse(

@@ -63,6 +63,7 @@ cors:
 mercadopago:
   key: ${MERCADOPAGO_ACCESS_TOKEN:}
   webhook-secret: ${MERCADOPAGO_WEBHOOK_SECRET:}
+  notifications-url: ${MERCADOPAGO_NOTIFICATIONS_URL:}
 
 order:
   expiration-minutes: ${ORDER_EXPIRATION_MINUTES:30}
