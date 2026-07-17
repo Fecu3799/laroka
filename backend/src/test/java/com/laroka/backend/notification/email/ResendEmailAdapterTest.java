@@ -1,5 +1,6 @@
 package com.laroka.backend.notification.email;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
@@ -51,33 +52,39 @@ class ResendEmailAdapterTest {
                         """))
                 .andRespond(withSuccess("{\"id\":\"email-123\"}", MediaType.APPLICATION_JSON));
 
-        assertThatCode(() -> adapter.send(TO, SUBJECT, BODY)).doesNotThrowAnyException();
+        boolean[] result = new boolean[1];
+        assertThatCode(() -> result[0] = adapter.send(TO, SUBJECT, BODY)).doesNotThrowAnyException();
+        assertThat(result[0]).isTrue();
 
         server.verify();
     }
 
-    // --- fallo del proveedor: se loguea y NO se propaga al caller ---
+    // --- fallo del proveedor: se loguea, NO se propaga y devuelve false ---
 
     @Test
-    void send_providerError_doesNotThrow() {
+    void send_providerError_doesNotThrowAndReturnsFalse() {
         newAdapter("test-key", "no-reply@laroka.app");
         server.expect(requestTo(RESEND_URL))
                 .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
 
-        assertThatCode(() -> adapter.send(TO, SUBJECT, BODY)).doesNotThrowAnyException();
+        boolean[] result = new boolean[1];
+        assertThatCode(() -> result[0] = adapter.send(TO, SUBJECT, BODY)).doesNotThrowAnyException();
+        assertThat(result[0]).isFalse();
 
         server.verify();
     }
 
-    // --- sin api-key: no-op, no se emite ninguna request ---
+    // --- sin api-key: no-op, no se emite ninguna request y devuelve false ---
 
     @Test
-    void send_blankApiKey_isNoOp() {
+    void send_blankApiKey_isNoOpAndReturnsFalse() {
         newAdapter("", "no-reply@laroka.app");
 
         // Sin expectativas: si se emitiera cualquier request, MockRestServiceServer
         // fallaría con "unexpected request". verify() en verde ⇒ no hubo llamada.
-        assertThatCode(() -> adapter.send(TO, SUBJECT, BODY)).doesNotThrowAnyException();
+        boolean[] result = new boolean[1];
+        assertThatCode(() -> result[0] = adapter.send(TO, SUBJECT, BODY)).doesNotThrowAnyException();
+        assertThat(result[0]).isFalse();
 
         server.verify();
     }

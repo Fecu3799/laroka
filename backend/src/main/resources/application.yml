@@ -71,6 +71,10 @@ email:
   api-key: ${RESEND_API_KEY:}
   from: ${EMAIL_FROM:}
 
+# Casilla fija que recibe los reportes de bugs del backoffice (US-17-07).
+bug-report:
+  email: ${BUG_REPORT_EMAIL:}
+
 order:
   expiration-minutes: ${ORDER_EXPIRATION_MINUTES:30}
 

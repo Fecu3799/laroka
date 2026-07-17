@@ -42,12 +42,12 @@ public class ResendEmailAdapter implements EmailService {
     }
 
     @Override
-    public void send(String to, String subject, String body) {
+    public boolean send(String to, String subject, String body) {
         log.info("send: to={}, subject={}", to, subject);
 
         if (apiKey == null || apiKey.isBlank()) {
             log.warn("send: email api-key not configured, skipping send — to={}, subject={}", to, subject);
-            return;
+            return false;
         }
 
         Map<String, Object> payload = new LinkedHashMap<>();
@@ -65,12 +65,14 @@ public class ResendEmailAdapter implements EmailService {
                     .retrieve()
                     .toBodilessEntity();
             log.info("send: email accepted by provider — to={}, subject={}", to, subject);
+            return true;
         } catch (Exception e) {
             // Best-effort (US-17-06): el fallo del proveedor se loguea y NO se propaga,
             // para no romper el flujo que dispara el envío (igual criterio que Web Push
-            // y los reembolsos automáticos).
+            // y los reembolsos automáticos). El caller decide qué hacer con el false.
             log.error("send: error sending email via provider — to={}, subject={}, error={}",
                     to, subject, e.getMessage());
+            return false;
         }
     }
 }
