@@ -5,5 +5,8 @@ public enum PaymentStatus {
     APPROVED,
     REJECTED,
     CANCELLED,
-    REFUNDED
+    REFUNDED,
+    // El reembolso automático (US-17-02/03) se intentó pero el gateway falló. El
+    // dinero sigue en el comercio; queda pendiente de reintento manual (US-17-05).
+    REFUND_FAILED
 }

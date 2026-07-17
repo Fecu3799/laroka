@@ -271,6 +271,10 @@ export function CartScreen({ items, extras = [], onBack, onRemove, onUpdateQty, 
       // para que el reintento no vuelva a fallar por lo mismo.
       if (err?.status === 422 && err.body?.productId != null) {
         onRemove(err.body.productId)
+        // US-17-CF-01: además de removerlo, volver a la pantalla del carrito
+        // (no quedarse en checkout) para que el cliente vea el error y reintente
+        // desde el carrito ya corregido.
+        setShowCheckout(false)
       }
       throw err
     }

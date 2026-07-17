@@ -38,11 +38,15 @@ public class MediaController {
     private final MediaService mediaService;
 
     @PostMapping(path = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    // products/branches/logo son exclusivos de ADMIN/MANAGER. bug-reports (capturas
+    // de reportes) lo puede subir cualquier rol operativo, incluido STAFF, porque el
+    // reporte de bugs está disponible para todos los roles autenticados.
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER') or (#context == 'bug-reports' and hasRole('STAFF'))")
     @Operation(summary = "Subir imagen",
             description = "Sube una imagen (JPEG, PNG o WebP) a R2 bajo la subcarpeta del "
-                    + "contexto (products, branches o logo) y retorna su URL pública. "
-                    + "No persiste ninguna entidad.")
+                    + "contexto (products, branches, logo o bug-reports) y retorna su URL pública. "
+                    + "products/branches/logo requieren ADMIN o MANAGER; bug-reports lo puede subir "
+                    + "también STAFF. No persiste ninguna entidad.")
     public ResponseEntity<MediaUploadResponseDTO> upload(
             @RequestParam("file") MultipartFile file,
             @RequestParam("context") String context,

@@ -42,3 +42,13 @@ export async function resolveCancelRequest(orderId, action, token, branchId) {
     body: JSON.stringify({ action }),
   })
 }
+
+// US-17-05 / US-17-F-02: reintento manual de un reembolso fallido (ADMIN-only,
+// backend valida el rol). El endpoint devuelve 204 si el reintento tuvo éxito
+// (Payment pasa a REFUNDED) o un error con mensaje si vuelve a fallar.
+export async function retryRefund(orderId, token, branchId) {
+  await apiFetch(`${API_URL}/backoffice/orders/${orderId}/retry-refund`, {
+    method: 'POST',
+    headers: backofficeHeaders(token, branchId),
+  })
+}

@@ -75,3 +75,47 @@ describe('ImageUploader · picker de galería (US-R2-F-02)', () => {
     expect(fetchMedia).not.toHaveBeenCalled()
   })
 })
+
+describe('ImageUploader · drag & drop (US-17)', () => {
+  test('soltar un archivo lo sube con el mismo flujo, enviando el context', async () => {
+    uploadImage.mockResolvedValue('https://cdn.r2.dev/bug-reports/x.png')
+    const onChange = vi.fn()
+
+    const { container } = render(
+      <ImageUploader value={null} onChange={onChange} token="tok" context="bug-reports" enableGallery={false} />,
+    )
+
+    const zone = container.querySelector('.iu-body')
+    const file = new File([new Uint8Array([1, 2, 3])], 'captura.png', { type: 'image/png' })
+    fireEvent.drop(zone, { dataTransfer: { files: [file] } })
+
+    await waitFor(() => expect(uploadImage).toHaveBeenCalledWith(file, 'tok', 'bug-reports'))
+    expect(onChange).toHaveBeenCalledWith('https://cdn.r2.dev/bug-reports/x.png')
+  })
+
+  test('arrastrar sobre el área muestra el resaltado de la zona de drop', () => {
+    const { container } = render(<ImageUploader value={null} onChange={vi.fn()} token="tok" />)
+
+    const zone = container.querySelector('.iu-body')
+    expect(zone.className).not.toContain('iu-body--dragging')
+
+    fireEvent.dragEnter(zone)
+
+    expect(zone.className).toContain('iu-body--dragging')
+    expect(screen.getByText('Soltá la imagen acá')).toBeInTheDocument()
+  })
+
+  test('soltar un archivo que no es imagen no sube y avisa el formato', () => {
+    const onChange = vi.fn()
+    const { container } = render(
+      <ImageUploader value={null} onChange={onChange} token="tok" context="bug-reports" enableGallery={false} />,
+    )
+
+    const zone = container.querySelector('.iu-body')
+    const file = new File(['x'], 'doc.pdf', { type: 'application/pdf' })
+    fireEvent.drop(zone, { dataTransfer: { files: [file] } })
+
+    expect(uploadImage).not.toHaveBeenCalled()
+    expect(screen.getByText(/Formato no permitido/)).toBeInTheDocument()
+  })
+})

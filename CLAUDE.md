@@ -88,6 +88,7 @@ Capas obligatorias por módulo:
 | V27     | branch_schedule + branch_schedule_override (drop branch opening_time/closing_time/open_days) |
 | V28     | branch image_url                           |
 | V29     | order order_number + branch_order_sequence |
+| V30     | payment refunded_amount                    |
 
 Toda migración nueva debe ser la siguiente versión disponible en esta tabla.
 Actualizar esta tabla al agregar una migración.

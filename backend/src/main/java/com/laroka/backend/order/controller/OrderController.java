@@ -22,6 +22,7 @@ import com.laroka.backend.order.dto.OrderStatusResponseDTO;
 import com.laroka.backend.order.entity.Order;
 import com.laroka.backend.order.entity.OrderItem;
 import com.laroka.backend.order.entity.OrderStatus;
+import com.laroka.backend.order.entity.PaymentMethod;
 import com.laroka.backend.order.mapper.OrderMapper;
 import com.laroka.backend.order.service.BackofficeOrderRow;
 import com.laroka.backend.order.service.OrderCreationResult;
@@ -70,7 +71,8 @@ public class OrderController {
     @Operation(summary = "Get order status", description = "Returns the current status, payment status, and full state history of an order.")
     public ResponseEntity<OrderStatusResponseDTO> getOrderStatus(@PathVariable UUID id) {
         Order order = orderService.findByIdWithHistory(id);
-        return ResponseEntity.ok(orderMapper.toStatusResponseDTO(order, order.getStatusHistory()));
+        PaymentMethod paymentMethod = orderService.findPaymentMethod(id);
+        return ResponseEntity.ok(orderMapper.toStatusResponseDTO(order, order.getStatusHistory(), paymentMethod));
     }
 
     @PostMapping("/{id}/cancel")

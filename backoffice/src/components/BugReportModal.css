@@ -1,0 +1,132 @@
+/* ── Modal de reporte de bugs (US-17-F-03) ─────────────────────── */
+
+.brm-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: brm-fade 0.18s ease;
+}
+
+@keyframes brm-fade { from { opacity: 0; } to { opacity: 1; } }
+
+.brm-dialog {
+  width: min(460px, 92vw);
+  background: var(--color-sidebar-bg);
+  border: 1px solid color-mix(in srgb, var(--border) 28%, transparent);
+  border-radius: 14px;
+  padding: 22px 24px 24px;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.7);
+}
+
+.brm-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.brm-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.brm-close {
+  width: 28px;
+  height: 28px;
+  border: 1px solid color-mix(in srgb, var(--border) 30%, transparent);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 19px;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.brm-close:hover { color: var(--text-primary); border-color: var(--border); }
+
+.brm-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.brm-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.brm-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.brm-textarea {
+  background: color-mix(in srgb, var(--border) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 28%, transparent);
+  border-radius: 9px;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  padding: 11px 13px;
+  outline: none;
+  resize: vertical;
+  min-height: 96px;
+  transition: border-color 0.15s;
+}
+
+.brm-textarea:focus { border-color: var(--accent); }
+
+.brm-error { font-size: 13px; color: var(--color-danger); }
+
+.brm-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.brm-cancel,
+.brm-submit {
+  flex: 1;
+  padding: 11px 16px;
+  border-radius: 9px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: filter 0.15s, background 0.15s, opacity 0.15s;
+}
+
+.brm-cancel {
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--border) 38%, transparent);
+  color: var(--text-secondary);
+}
+
+.brm-cancel:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--border) 12%, transparent);
+  color: var(--text-primary);
+}
+
+.brm-submit {
+  background: var(--accent);
+  border: none;
+  color: #0a1810;
+}
+
+.brm-submit:hover:not(:disabled) { filter: brightness(1.08); }
+
+.brm-submit:disabled,
+.brm-cancel:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

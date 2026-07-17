@@ -1,6 +1,7 @@
 package com.laroka.backend.order.service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -95,6 +96,13 @@ public class OrderService {
     private static final List<OrderStatus> TERMINAL_ORDER_STATUSES = List.of(
             OrderStatus.DELIVERED, OrderStatus.CANCELLED);
 
+    /**
+     * Proporción del subtotal que se reembolsa al aprobar una cancelación tardía
+     * (pedido ya en preparación, US-17-03): 85%. El 15% restante es la comisión por
+     * cancelación tardía. Constante de clase para poder ajustarla sin tocar la lógica.
+     */
+    private static final BigDecimal CANCELLATION_REFUND_RATE = new BigDecimal("0.85");
+
     @Transactional
     public OrderCreationResult createOrder(Order order, List<OrderItem> items,
                                            PaymentMethod paymentMethod, String idempotencyKey) {
@@ -160,6 +168,16 @@ public class OrderService {
                 newStatus == OrderStatus.CANCELLED ? reason : null);
         log.info("Backoffice status transition | orderId={} from={} to={} staffUserId={}",
                 saved.getId(), previous, newStatus, staffUserId);
+
+        // US-17-02: cancelación directa desde RECEIVED → reembolso TOTAL automático si
+        // el pago fue MercadoPago aprobado. No bloquea si el gateway falla. Solo RECEIVED:
+        // un pedido PENDING_PAYMENT no puede tener un pago MP aprobado (el webhook aprueba
+        // el pago y lo mueve a RECEIVED en la misma transacción). La cancelación tardía
+        // (IN_PREPARATION → CANCELLATION_REQUESTED → CANCELLED) va por otro camino con
+        // reembolso parcial (US-17-03), no por acá.
+        if (newStatus == OrderStatus.CANCELLED && previous == OrderStatus.RECEIVED) {
+            refundIfMercadoPagoApproved(saved, null);
+        }
         return saved;
     }
 
@@ -217,6 +235,15 @@ public class OrderService {
         recordHistory(saved, previous, next, null, reason);
         log.info("Order cancel flow | orderId={} from={} to={}", saved.getId(), previous, next);
 
+        // US-17-02: cancelación directa desde RECEIVED → reembolso TOTAL automático si
+        // el pago fue MercadoPago aprobado. No bloquea si el gateway falla. Solo RECEIVED:
+        // un pedido PENDING_PAYMENT no puede tener un pago MP aprobado (el webhook aprueba
+        // el pago y mueve el pedido a RECEIVED en la misma transacción), así que ahí no
+        // hay cobro que revertir.
+        if (previous == OrderStatus.RECEIVED) {
+            refundIfMercadoPagoApproved(saved, null);
+        }
+
         // La emisión del evento SSE se hace en OrderController, después de que esta
         // transacción commitea (mismo patrón que BackofficeOrderController). Hacer el
         // emitter.send() dentro de la transacción retenía la conexión JDBC mientras se
@@ -249,36 +276,55 @@ public class OrderService {
             order.setStatus(OrderStatus.CANCELLED);
             Order saved = orderRepository.save(order);
             recordHistory(saved, previous, OrderStatus.CANCELLED, null, SHIFT_AUTO_CLOSE_CANCELLATION_REASON);
-            refundIfMercadoPagoApproved(saved);
+            refundIfMercadoPagoApproved(saved, null);
             log.info("Order cancelled by shift auto-close | orderId={} from={} shiftId={}",
                     saved.getId(), previous, shiftId);
         }
     }
 
     /**
-     * Reembolso TOTAL del pago del pedido si —y solo si— existe un {@link Payment}
-     * APPROVED de método MERCADOPAGO. Usa {@code PaymentGateway.refundPayment} (sin
-     * monto → reembolso completo). Un pago en efectivo no dispara reembolso: no
-     * hubo cobro electrónico que revertir. El fallo del gateway se loguea para
-     * acción manual y no aborta el cierre del turno (mismo patrón que el reembolso
-     * por race-condition del webhook).
+     * Reembolsa el pago del pedido si —y solo si— existe un {@link Payment} APPROVED
+     * de método MERCADOPAGO. {@code amount} null → reembolso TOTAL (cancelación
+     * temprana / auto-cierre); {@code amount} con valor → reembolso PARCIAL de ese
+     * monto (cancelación tardía, US-17-03). Un pago en efectivo no dispara reembolso:
+     * no hubo cobro electrónico que revertir; un pago no aprobado (PENDING) tampoco.
+     *
+     * El fallo del gateway NO aborta la cancelación del pedido (best-effort, no
+     * bloqueante): el cliente/operador no debe quedar bloqueado por un fallo del
+     * gateway. En su lugar el pago se marca {@link PaymentStatus#REFUND_FAILED} con
+     * el monto pendiente (US-17-04), dándole visibilidad al operador y habilitando el
+     * reintento manual (US-17-05).
+     *
+     * Usado por el auto-cierre de turno y la cancelación directa previa a
+     * IN_PREPARATION (US-17-02, monto null) y por la cancelación tardía aprobada
+     * (US-17-03, monto parcial).
      */
-    private void refundIfMercadoPagoApproved(Order order) {
+    private void refundIfMercadoPagoApproved(Order order, BigDecimal amount) {
         Payment payment = paymentRepository.findByOrderId(order.getId()).orElse(null);
         if (payment == null
                 || payment.getStatus() != PaymentStatus.APPROVED
                 || payment.getMethod() != PaymentMethod.MERCADOPAGO) {
             return;
         }
+        boolean partial = amount != null;
+        // Monto a registrar (US-17-04): parcial = el monto pasado; total = el cargo
+        // completo del pedido. Nunca null, para que el operador vea siempre la cifra.
+        BigDecimal refundedAmount = partial ? amount : order.getTotalAmount();
         try {
-            paymentGateway.refundPayment(payment.getMercadopagoPaymentId());
+            paymentGateway.refundPayment(payment.getMercadopagoPaymentId(), amount);
             payment.setStatus(PaymentStatus.REFUNDED);
+            payment.setRefundedAmount(refundedAmount);
             paymentRepository.save(payment);
-            log.info("Full refund issued by shift auto-close | orderId={} mpPaymentId={}",
-                    order.getId(), payment.getMercadopagoPaymentId());
+            log.info("Refund issued | orderId={} mpPaymentId={} partial={} amount={}",
+                    order.getId(), payment.getMercadopagoPaymentId(), partial, refundedAmount);
         } catch (Exception e) {
-            log.error("Shift auto-close refund FAILED — manual action required | orderId={} mpPaymentId={} error={}",
-                    order.getId(), payment.getMercadopagoPaymentId(), e.getMessage());
+            // US-17-04: persistir el fallo de forma explícita (REFUND_FAILED + monto
+            // pendiente) en lugar de solo loguear, para visibilidad y reintento.
+            payment.setStatus(PaymentStatus.REFUND_FAILED);
+            payment.setRefundedAmount(refundedAmount);
+            paymentRepository.save(payment);
+            log.error("Refund FAILED — marked REFUND_FAILED for manual retry | orderId={} mpPaymentId={} partial={} amount={} error={}",
+                    order.getId(), payment.getMercadopagoPaymentId(), partial, refundedAmount, e.getMessage());
         }
     }
 
@@ -312,6 +358,71 @@ public class OrderService {
         recordHistory(saved, previous, next, staffUserId);
         log.info("Cancellation request resolved | orderId={} action={} to={} staffUserId={}",
                 saved.getId(), action, next, staffUserId);
+
+        // US-17-03: aprobar una cancelación tardía (pedido en preparación) dispara un
+        // reembolso PARCIAL del 85% del subtotal si el pago fue MercadoPago aprobado.
+        // El 15% restante es la comisión por cancelación tardía. REJECT (vuelve a
+        // IN_PREPARATION) no toca el pago. No bloquea si el gateway falla (mismo
+        // criterio que US-17-02).
+        if (next == OrderStatus.CANCELLED) {
+            BigDecimal refundAmount = saved.getSubtotal()
+                    .multiply(CANCELLATION_REFUND_RATE)
+                    .setScale(2, RoundingMode.HALF_UP);
+            refundIfMercadoPagoApproved(saved, refundAmount);
+        }
+    }
+
+    /**
+     * Reintento manual de un reembolso que falló automáticamente (US-17-05, ADMIN).
+     * Válido solo si el pago está en {@link PaymentStatus#REFUND_FAILED}. Reintenta con
+     * el mismo monto persistido en {@code refundedAmount} (total o parcial, según el
+     * camino original de cancelación — para un total, ese monto es el cargo completo,
+     * equivalente a un reembolso total). Si tiene éxito, pasa a REFUNDED. Si vuelve a
+     * fallar, mantiene REFUND_FAILED sin cambios y propaga el error para dar feedback.
+     */
+    @Transactional
+    public void retryRefund(UUID orderId, Integer branchId) {
+        Order order = orderRepository.findByIdWithBranch(orderId)
+                .orElseThrow(() -> {
+                    log.warn("Order not found | orderId={}", orderId);
+                    return new OrderNotFoundException(orderId);
+                });
+
+        if (!order.getBranch().getId().equals(branchId)) {
+            log.warn("Branch mismatch on retry-refund | orderId={} orderBranch={} userBranch={}",
+                    orderId, order.getBranch().getId(), branchId);
+            throw new AccessDeniedException("El pedido no pertenece a la sucursal del usuario");
+        }
+
+        Payment payment = paymentRepository.findByOrderId(orderId).orElse(null);
+        if (payment == null || payment.getStatus() != PaymentStatus.REFUND_FAILED) {
+            throw new BusinessException("El pedido no tiene un reembolso fallido pendiente de reintento");
+        }
+
+        try {
+            paymentGateway.refundPayment(payment.getMercadopagoPaymentId(), payment.getRefundedAmount());
+            payment.setStatus(PaymentStatus.REFUNDED);
+            paymentRepository.save(payment);
+            log.info("Refund retry succeeded | orderId={} mpPaymentId={} amount={}",
+                    orderId, payment.getMercadopagoPaymentId(), payment.getRefundedAmount());
+        } catch (Exception e) {
+            // Se mantiene REFUND_FAILED sin cambios; el reintento puede repetirse.
+            log.error("Refund retry FAILED — stays REFUND_FAILED | orderId={} mpPaymentId={} amount={} error={}",
+                    orderId, payment.getMercadopagoPaymentId(), payment.getRefundedAmount(), e.getMessage());
+            throw new BusinessException("El reintento de reembolso falló: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Método de pago del pedido (o null si aún no hay Payment). Lo usa el endpoint
+     * público de estado para que el client sepa si mostrar el aviso de comisión por
+     * cancelación tardía (solo MERCADOPAGO; US-17-CF-02).
+     */
+    @Transactional(readOnly = true)
+    public PaymentMethod findPaymentMethod(UUID orderId) {
+        return paymentRepository.findByOrderId(orderId)
+                .map(Payment::getMethod)
+                .orElse(null);
     }
 
     @Transactional(readOnly = true)

@@ -46,6 +46,7 @@ export default function useAuth() {
   return {
     token: rawToken,
     userId: payload?.sub ?? payload?.userId ?? null,
+    name: payload?.name ?? null,
     role: payload?.role ?? null,
     branchId: payload?.branchId ?? null,
     branchName: payload?.branchName ?? null,

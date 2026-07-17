@@ -13,7 +13,16 @@ public interface PaymentGateway {
 
     void cancelQrCharge(String externalId);
 
-    void refundPayment(String paymentId);
+    /**
+     * Reembolsa un pago. Si {@code amount} es null, se reembolsa el total
+     * (comportamiento histórico). Si tiene valor, se reembolsa ese monto parcial.
+     */
+    void refundPayment(String paymentId, BigDecimal amount);
+
+    /** Reembolso total: atajo de {@link #refundPayment(String, BigDecimal)} con amount null. */
+    default void refundPayment(String paymentId) {
+        refundPayment(paymentId, null);
+    }
 
     record PaymentInfo(String status, String externalReference) {}
 

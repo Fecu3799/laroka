@@ -1,5 +1,6 @@
 package com.laroka.backend.payment.entity;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -47,6 +48,12 @@ public class Payment {
 
     @Column(name = "paid_at")
     private LocalDateTime paidAt;
+
+    // Monto reembolsado (US-17-04). Total → totalAmount del pedido; parcial → 85% del
+    // subtotal. Se setea al reembolsar (éxito → junto a REFUNDED) y también al fallar
+    // (junto a REFUND_FAILED = monto pendiente de reintento). null = sin reembolso.
+    @Column(name = "refunded_amount", precision = 10, scale = 2)
+    private BigDecimal refundedAmount;
 
     @Column(name = "payment_link", columnDefinition = "TEXT")
     private String paymentLink;

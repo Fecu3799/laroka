@@ -8,10 +8,12 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -198,5 +200,25 @@ public class BackofficeOrderController {
                 .method(payment.getMethod())
                 .paidAt(payment.getPaidAt())
                 .build());
+    }
+
+    @PostMapping("/{id}/retry-refund")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Retry a failed refund (ADMIN only)",
+            description = "Retries a refund that previously failed automatically (Payment in REFUND_FAILED). " +
+                    "Reintenta con el mismo monto que correspondía (total o parcial). On success the payment " +
+                    "becomes REFUNDED; on repeated failure it stays REFUND_FAILED and returns an error. " +
+                    "Returns 422 if the order has no pending failed refund, 403 if wrong branch or not ADMIN.")
+    public ResponseEntity<Void> retryRefund(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal CustomUserDetails principal,
+            HttpServletRequest request) {
+
+        Integer branchId = securityUtils.resolveBranchId(principal, request);
+        orderService.retryRefund(id, branchId);
+        BackofficeOrderRow updatedRow = orderService.findOrderRowById(id);
+        notificationService.sendOrderUpdatedEvent(branchId,
+                orderMapper.toBackofficeResponseDTO(updatedRow.order(), updatedRow.payment()), "BACKOFFICE");
+        return ResponseEntity.noContent().build();
     }
 }

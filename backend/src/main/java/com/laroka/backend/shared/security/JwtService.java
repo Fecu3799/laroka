@@ -42,6 +42,7 @@ public class JwtService {
 
 		JwtBuilder builder = Jwts.builder()
 			.subject(String.valueOf(user.getId()))
+			.claim("name", user.getName())
 			.claim("role", user.getRole().name())
 			.claim("tenantId", user.getBranch().getTenant().getId())
 			.claim("tenantName", user.getBranch().getTenant().getName())

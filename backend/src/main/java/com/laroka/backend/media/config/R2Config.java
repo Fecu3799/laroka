@@ -11,6 +11,8 @@ import software.amazon.awssdk.auth.credentials.AnonymousCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.core.checksums.RequestChecksumCalculation;
+import software.amazon.awssdk.core.checksums.ResponseChecksumValidation;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3ClientBuilder;
@@ -72,6 +74,13 @@ public class R2Config {
                 // R2 no usa regiones reales; "auto" es el valor convencional.
                 .region(Region.of("auto"))
                 .credentialsProvider(credentialsProvider)
+                // Desde el SDK 2.30 el default (WHEN_SUPPORTED) adjunta un checksum CRC32
+                // automático vía aws-chunked / STREAMING-UNSIGNED-PAYLOAD-TRAILER en cada
+                // putObject. R2 no lo soporta igual que S3 real y lo rechaza con error de
+                // firma. WHEN_REQUIRED vuelve al comportamiento previo (solo adjunta checksum
+                // cuando la operación lo exige), compatible con R2.
+                .requestChecksumCalculation(RequestChecksumCalculation.WHEN_REQUIRED)
+                .responseChecksumValidation(ResponseChecksumValidation.WHEN_REQUIRED)
                 // R2 trabaja con acceso path-style (bucket en el path, no en el host).
                 .serviceConfiguration(S3Configuration.builder()
                         .pathStyleAccessEnabled(true)

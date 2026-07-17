@@ -5,6 +5,9 @@ import { uploadImage, fetchMedia } from '../../services/mediaService'
 import './ImageUploader.css'
 
 const ACCEPTED = 'image/jpeg,image/png,image/webp'
+// El input filtra por `accept`, pero un drop lo esquiva: validamos el tipo a mano
+// para dar feedback inmediato en vez de dejar que el backend rechace con 400.
+const ACCEPTED_TYPES = new Set(ACCEPTED.split(','))
 
 // Fallback de etiqueta cuando la miniatura no tiene originalName (imágenes
 // subidas antes de US-R2-01): fecha de subida formateada.
@@ -17,6 +20,17 @@ function formatUploadedAt(iso) {
 // Tipos que preservan transparencia; si el original no es uno de estos, el recorte
 // se emite como JPEG. Así un logo PNG/WebP no pierde su fondo transparente.
 const TRANSPARENT_TYPES = new Set(['image/png', 'image/webp'])
+
+// Traduce un error de upload a un mensaje específico para el usuario según la
+// causa real. El backend ya devuelve mensajes concretos por tipo/formato inválido
+// (400), tamaño excedido (400) o fallo de storage (502) en `err.message`; acá
+// sólo mapeamos los sentinels internos de apiFetch (red/sesión) y damos un
+// fallback final para no mostrar nunca un "Error" crudo.
+function uploadErrorMessage(err) {
+  if (err?.message === 'network_error') return 'Sin conexión. Verificá tu internet e intentá de nuevo.'
+  if (err?.message === 'session_expired') return 'Tu sesión expiró. Volvé a iniciar sesión.'
+  return err?.message ?? 'No se pudo subir la imagen. Intentá de nuevo.'
+}
 
 function createImage(url) {
   return new Promise((resolve, reject) => {
@@ -67,14 +81,18 @@ async function getCroppedBlob(imageSrc, pixelCrop, mimeType) {
  * - aspectRatio: número ancho/alto del marco de recorte. Si es null/omitido, se
  *   omite el editor y la imagen se sube tal cual (cualquier proporción), sin recorte.
  * - helperText: texto de ayuda opcional, visible antes de seleccionar el archivo.
- * - context: subcarpeta de R2 (products, branches o logo). Habilita el picker
- *   "Elegir de la galería" (US-R2-F-02) y define dónde se sube/lista la imagen.
+ * - context: subcarpeta de R2 (products, branches, logo o bug-reports). Define
+ *   dónde se sube/lista la imagen.
+ * - enableGallery: si es true (default) y hay context, muestra el picker "Elegir
+ *   de la galería" (US-R2-F-02). Se pasa false para contextos no listables como
+ *   bug-reports, donde el backend no expone GET /media?context=bug-reports.
  */
-export default function ImageUploader({ value, onChange, token, label, aspectRatio = null, helperText, context }) {
+export default function ImageUploader({ value, onChange, token, label, aspectRatio = null, helperText, context, enableGallery = true }) {
   const inputRef = useRef(null)
   const [localPreview, setLocalPreview] = useState(null)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState(null)
+  const [dragging, setDragging] = useState(false)
 
   // Estado del picker de galería (US-R2-F-02).
   const [galleryOpen, setGalleryOpen] = useState(false)
@@ -113,10 +131,9 @@ export default function ImageUploader({ value, onChange, token, label, aspectRat
     inputRef.current?.click()
   }
 
-  function handleFile(e) {
-    const file = e.target.files?.[0]
-    // Reset del input para permitir re-seleccionar el mismo archivo tras cancelar.
-    e.target.value = ''
+  // Procesa un archivo elegido (por el selector o por drag & drop): si hay crop
+  // habilitado abre el editor, si no sube directo. Misma lógica para ambos orígenes.
+  function processFile(file) {
     if (!file) return
     setError(null)
     if (!cropEnabled) {
@@ -130,6 +147,44 @@ export default function ImageUploader({ value, onChange, token, label, aspectRat
     setCropSrc(URL.createObjectURL(file)) // abre el editor; no sube todavía
   }
 
+  function handleFile(e) {
+    const file = e.target.files?.[0]
+    // Reset del input para permitir re-seleccionar el mismo archivo tras cancelar.
+    e.target.value = ''
+    processFile(file)
+  }
+
+  // ── Drag & drop ──────────────────────────────────────────────
+  function handleDragOver(e) {
+    e.preventDefault() // necesario para que el navegador permita el drop
+  }
+
+  function handleDragEnter(e) {
+    e.preventDefault()
+    if (uploading) return
+    setDragging(true)
+  }
+
+  function handleDragLeave(e) {
+    e.preventDefault()
+    // Ignora el leave hacia un hijo del propio dropzone: evita el parpadeo del borde.
+    if (e.currentTarget.contains(e.relatedTarget)) return
+    setDragging(false)
+  }
+
+  function handleDrop(e) {
+    e.preventDefault()
+    setDragging(false)
+    if (uploading) return
+    const file = e.dataTransfer?.files?.[0]
+    if (!file) return
+    if (!ACCEPTED_TYPES.has(file.type)) {
+      setError('Formato no permitido. Subí una imagen JPG, PNG o WebP.')
+      return
+    }
+    processFile(file)
+  }
+
   async function uploadDirect(file) {
     setLocalPreview(URL.createObjectURL(file)) // preview local inmediato
     setUploading(true)
@@ -137,8 +192,8 @@ export default function ImageUploader({ value, onChange, token, label, aspectRat
       const uploadedUrl = await uploadImage(file, token, context)
       onChange(uploadedUrl)
     } catch (err) {
-      // apiFetch ya emitió un toast con el mensaje del backend; lo repetimos inline.
-      setError(err?.message ?? 'No se pudo subir la imagen.')
+      // apiFetch ya emitió un toast; repetimos inline el mensaje específico según la causa.
+      setError(uploadErrorMessage(err))
       setLocalPreview(null) // descarta el preview fallido → vuelve a `value`
     } finally {
       setUploading(false)
@@ -171,8 +226,8 @@ export default function ImageUploader({ value, onChange, token, label, aspectRat
       onChange(uploadedUrl)
       closeEditor()
     } catch (err) {
-      // apiFetch ya emitió un toast con el mensaje del backend; lo repetimos inline.
-      setError(err?.message ?? 'No se pudo subir la imagen.')
+      // apiFetch ya emitió un toast; repetimos inline el mensaje específico según la causa.
+      setError(uploadErrorMessage(err))
     } finally {
       setUploading(false)
     }
@@ -299,7 +354,14 @@ export default function ImageUploader({ value, onChange, token, label, aspectRat
   return (
     <div className="iu">
       {label && <span className="iu-label">{label}</span>}
-      <div className="iu-body">
+      <div
+        className={`iu-body${dragging ? ' iu-body--dragging' : ''}`}
+        onDragOver={handleDragOver}
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
+        {dragging && <div className="iu-drop-hint" aria-hidden="true">Soltá la imagen acá</div>}
         <div className={`iu-preview${preview ? '' : ' iu-preview--empty'}`}>
           {preview
             ? <img src={preview} alt="Vista previa de la imagen" className="iu-img" />
@@ -316,7 +378,7 @@ export default function ImageUploader({ value, onChange, token, label, aspectRat
           <button type="button" className="iu-btn" onClick={openPicker} disabled={uploading}>
             {preview ? 'Reemplazar imagen' : 'Subir imagen'}
           </button>
-          {context && (
+          {context && enableGallery && (
             <button type="button" className="iu-btn" onClick={openGallery} disabled={uploading}>
               Elegir de la galería
             </button>

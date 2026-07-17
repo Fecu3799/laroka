@@ -107,6 +107,40 @@
 }
 
 
+/* Identidad del operador (US-17-F-01) — arriba del botón de logout. */
+.layout-sidebar-user {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: calc(100% - 12px);
+  margin: 0 6px 0.625rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+
+.layout-sidebar-user-name {
+  max-width: 100%;
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  color: #d4e8d6;
+  text-align: center;
+  line-height: 1.25;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  hyphens: none;
+}
+
+.layout-sidebar-user-role {
+  font-family: 'Inter', sans-serif;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--color-accent);
+}
+
 .layout-logout-btn {
   display: flex;
   align-items: center;
@@ -221,6 +255,27 @@
   color: #8aaa8d;
   min-width: 72px;
   text-align: right;
+}
+
+/* Botón de reporte de bugs (US-17-F-03) — fijo en el header, visible en toda pantalla. */
+.layout-bug-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  color: #8aaa8d;
+  background-color: rgba(101, 163, 105, 0.06);
+  border: 1px solid rgba(101, 163, 105, 0.18);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background-color 0.15s;
+}
+
+.layout-bug-btn:hover {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+  background-color: rgba(101, 163, 105, 0.12);
 }
 
 /* ── Main content ───────────────────────────────────────────── */

@@ -186,6 +186,30 @@ describe('CartScreen — producto no disponible al confirmar (US-15-CF-05)', () 
     expect(props.onClear).not.toHaveBeenCalled()
   })
 
+  it('vuelve a la pantalla del carrito tras el 422 con productId (US-17-CF-01)', async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ acceptingOrders: true }) })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 422,
+        json: () => Promise.resolve({
+          message: 'El producto no está disponible: Napolitana',
+          productId: 2,
+        }),
+      })
+
+    const props = await goToCheckoutAndConfirm()
+
+    // Se remueve el producto...
+    await waitFor(() => expect(props.onRemove).toHaveBeenCalledWith(2))
+    // ...y se navega de vuelta al carrito: el checkout se desmonta (su campo de
+    // nombre desaparece) y reaparece el botón "IR A PAGAR" propio del carrito.
+    await waitFor(() =>
+      expect(screen.queryByPlaceholderText(/cómo te llamás/i)).not.toBeInTheDocument(),
+    )
+    expect(screen.getByRole('button', { name: /ir a pagar/i })).toBeInTheDocument()
+  })
+
   it('no remueve nada si el 422 es por otra regla de negocio', async () => {
     vi.mocked(fetch)
       .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ acceptingOrders: true }) })
