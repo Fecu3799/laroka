@@ -1,0 +1,35 @@
+# Perfil "test": apunta a la base de datos efímera del compose stack
+# (servicio postgres-test, puerto 55432), NUNCA al postgres de desarrollo (5432).
+# Activado por @ActiveProfiles("test") en los tests de integración (@SpringBootTest).
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5433/laroka_test
+    username: postgres
+    password: postgres
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+
+# Secreto fijo para los tests (≥32 bytes para HMAC-SHA256). Coincide con el
+# usado por OrderFlowsIntegrationTest y SecurityIntegrationTest.
+jwt:
+  secret: test-secret-minimum-32-chars-for-hmac256-ok
+  expiration: 3600000
+
+order:
+  bypass-branch-hours: true
+
+# El RateLimitFilter es un bean singleton del contexto Spring compartido entre los
+# tests de integración; su bucket Caffeine (por IP) no se resetea con el TRUNCATE de
+# cada test, así que los múltiples POST /orders de la suite agotarían el límite real
+# (10/60s) y devolverían 429. Se elevan los límites para no throttlear entre tests;
+# el comportamiento real del rate limiter lo cubre RateLimitFilterTest (unit).
+rate:
+  limit:
+    orders:
+      max-requests: 100000
+    menu:
+      max-requests: 100000
+    login:
+      max-requests: 100000
