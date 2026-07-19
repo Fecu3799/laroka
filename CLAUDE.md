@@ -90,6 +90,7 @@ Capas obligatorias por módulo:
 | V29     | order order_number + branch_order_sequence |
 | V30     | payment refunded_amount                    |
 | V31     | category_type (tipos de categoría maestros) |
+| V32     | category category_type_id (FK a category_type, nullable) |
 
 Toda migración nueva debe ser la siguiente versión disponible en esta tabla.
 Actualizar esta tabla al agregar una migración.

@@ -39,6 +39,12 @@ public class Category {
 	@JoinColumn(name = "tenant_id", nullable = false)
 	private Tenant tenant;
 
+	// US-CAT-02: FK al catálogo maestro de tipos. Nullable inicialmente — las categorías
+	// existentes quedan sin tipo hasta que el ADMIN las reasigne (ver docs/KNOWN_ISSUES.md).
+	@ManyToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "category_type_id")
+	private CategoryType categoryType;
+
 	@Column(name = "created_at", nullable = false, updatable = false)
 	private LocalDateTime createdAt;
 

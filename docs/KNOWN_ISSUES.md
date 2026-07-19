@@ -24,3 +24,15 @@
 - Si el gateway falla, el reembolso se loguea para acción manual y **no** aborta el cierre del turno (mismo patrón que el reembolso por race-condition del webhook de MercadoPago).
 
 **Diferencia con Sprint 17:** esta política difiere del **reembolso parcial (85%)** que se implementará en Sprint 17 para **cancelaciones tardías iniciadas por el cliente**. En ese caso la responsabilidad es del cliente y el local retiene una fracción; acá, al ser responsabilidad operativa, el reembolso es total.
+
+## Categorías existentes sin tipo maestro asignado (US-CAT-02)
+
+**Contexto:** La tabla `category_type` (catálogo maestro de tipos, US-CAT-01) se seedea manualmente por TablePlus, no vía migración Flyway con `INSERT`. La columna `category.category_type_id` (US-CAT-02) es una FK **nullable** y **no** hay migración de datos automática que asigne un tipo a las categorías preexistentes.
+
+**Impacto:** Tras aplicar V31/V32, todas las categorías ya cargadas quedan con `category_type_id = NULL`. Hasta que se cargue el seed de `category_type` y el ADMIN reasigne cada categoría a su tipo desde el backoffice (US-CAT-03), esas categorías no tienen tipo maestro y, por lo tanto, no participan de reglas que dependan del tipo (p. ej. `allows_half_and_half` para pedidos mitad y mitad, US-HH).
+
+**Resolución:** Manual y operativa —
+1. Cargar el seed de `category_type` por TablePlus.
+2. El ADMIN edita cada categoría existente desde el backoffice y le asigna el tipo correspondiente (US-CAT-03).
+
+No requiere migración de datos ni cambio de código.
