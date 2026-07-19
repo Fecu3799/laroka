@@ -79,10 +79,15 @@ public class OrderMapper {
     }
 
     private OrderItemResponseDTO toItemResponseDTO(OrderItem item) {
+        // US-HH-01: secondProduct puede ser null (ítem simple). Debe venir inicializado desde la
+        // query (items.secondProduct en el @EntityGraph) para leer su name fuera de sesión.
+        Product secondProduct = item.getSecondProduct();
         return OrderItemResponseDTO.builder()
                 .id(item.getId())
                 .productId(item.getProduct().getId())
                 .productName(item.getProduct().getName())
+                .secondProductId(secondProduct != null ? secondProduct.getId() : null)
+                .secondProductName(secondProduct != null ? secondProduct.getName() : null)
                 .quantity(item.getQuantity())
                 .unitPrice(item.getUnitPrice())
                 .subtotal(item.getSubtotal())
@@ -165,8 +170,11 @@ public class OrderMapper {
     }
 
     private BackofficeOrderItemDTO toBackofficeItemDTO(OrderItem item) {
+        // US-HH-01: expone la segunda mitad cuando corresponde (null en ítems simples).
+        Product secondProduct = item.getSecondProduct();
         return BackofficeOrderItemDTO.builder()
                 .productName(item.getProduct().getName())
+                .secondProductName(secondProduct != null ? secondProduct.getName() : null)
                 .quantity(item.getQuantity())
                 .unitPrice(item.getUnitPrice())
                 .subtotal(item.getSubtotal())

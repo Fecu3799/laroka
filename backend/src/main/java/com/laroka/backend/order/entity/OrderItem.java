@@ -44,4 +44,10 @@ public class OrderItem {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "product_id", nullable = false)
     private Product product;
+
+    // US-HH-01: segunda mitad de un ítem mitad y mitad. Null en ítems simples (comportamiento
+    // actual sin cambios). La validación y el pricing de la combinación son US-HH-02 / US-HH-03.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "second_product_id")
+    private Product secondProduct;
 }

@@ -14,6 +14,8 @@ import lombok.NoArgsConstructor;
 public class BackofficeOrderItemDTO {
 
     private String productName;
+    // US-HH-01: segunda mitad de un ítem mitad y mitad. Null en ítems simples.
+    private String secondProductName;
     private Integer quantity;
     private BigDecimal unitPrice;
     private BigDecimal subtotal;
