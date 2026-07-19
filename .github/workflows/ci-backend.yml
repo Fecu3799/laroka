@@ -52,3 +52,10 @@ jobs:
           SPRING_DATASOURCE_USERNAME: postgres
           SPRING_DATASOURCE_PASSWORD: postgres
           JWT_SECRET: test-secret-minimum-32-chars-for-hmac256-ok
+          # Credenciales del bucket de test de R2 (US-TEST-07). Separadas de dev/prod;
+          # las consume MediaR2UploadIntegrationTest vía las propiedades r2.test.*.
+          R2_TEST_ACCESS_KEY: ${{ secrets.R2_TEST_ACCESS_KEY }}
+          R2_TEST_SECRET_KEY: ${{ secrets.R2_TEST_SECRET_KEY }}
+          R2_TEST_BUCKET_NAME: ${{ secrets.R2_TEST_BUCKET_NAME }}
+          R2_TEST_ENDPOINT: ${{ secrets.R2_TEST_ENDPOINT }}
+          R2_TEST_PUBLIC_URL: ${{ secrets.R2_TEST_PUBLIC_URL }}
