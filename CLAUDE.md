@@ -94,6 +94,7 @@ Capas obligatorias por módulo:
 | V33     | order_item second_product_id (FK a product, nullable) |
 | V34     | category_type allows_sizes                  |
 | V35     | product_size (tamaños con precio propio por producto) |
+| V36     | branch_product_size (override de precio por sucursal a nivel tamaño) |
 
 Toda migración nueva debe ser la siguiente versión disponible en esta tabla.
 Actualizar esta tabla al agregar una migración.
