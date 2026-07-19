@@ -91,6 +91,13 @@ r2:
   # upload se construye como ${r2.public-url}/{tenantId}/{uuid}.{ext}.
   public-url: ${R2_PUBLIC_URL:}
 
+  test:
+    access-key: ${R2_TEST_ACCESS_KEY:}
+    secret-key: ${R2_TEST_SECRET_KEY:}
+    bucket-name: ${R2_TEST_BUCKET_NAME:laroka-test}
+    endpoint: ${R2_TEST_ENDPOINT:}
+    public-url: ${R2_TEST_PUBLIC_URL:}
+
 media:
   # Tamaño máximo de imagen permitido en el endpoint de upload (US-15-01).
   max-upload-size-mb: ${MAX_UPLOAD_SIZE_MB:5}

@@ -34,4 +34,3 @@ build/
 
 ### Config
 src/main/resources/application-local.yml
-src/test/resources/application-test.yml
