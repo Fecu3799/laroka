@@ -17,4 +17,9 @@ public class CategoryRequestDTO {
 
 	@NotNull(message = "Tenant ID is required")
 	private Integer tenantId;
+
+	// US-CAT-03: tipo maestro obligatorio. El name se precarga con category_type.name en el
+	// frontend al elegir el tipo, pero es editable — por eso ambos campos son de entrada.
+	@NotNull(message = "Category type ID is required")
+	private Integer categoryTypeId;
 }

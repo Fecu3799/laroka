@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 import com.laroka.backend.catalog.dto.CategoryRequestDTO;
 import com.laroka.backend.catalog.dto.CategoryResponseDTO;
 import com.laroka.backend.catalog.entity.Category;
+import com.laroka.backend.catalog.entity.CategoryType;
 import com.laroka.backend.tenant.entity.Tenant;
 
 @Component
@@ -21,10 +22,16 @@ public class CategoryMapper {
 		if (category == null) {
 			return null;
 		}
+		// US-CAT-03: categoryType puede ser null (categorías aún sin reasignar). Debe venir
+		// inicializado desde la query (@EntityGraph en CategoryRepository) para poder leer su
+		// name acá, fuera de la sesión, sin LazyInitializationException.
+		CategoryType categoryType = category.getCategoryType();
 		return CategoryResponseDTO.builder()
 			.id(category.getId())
 			.name(category.getName())
 			.tenantId(category.getTenant().getId())
+			.categoryTypeId(categoryType != null ? categoryType.getId() : null)
+			.categoryTypeName(categoryType != null ? categoryType.getName() : null)
 			.productCount(productCount)
 			.createdAt(category.getCreatedAt())
 			.updatedAt(category.getUpdatedAt())
@@ -46,6 +53,7 @@ public class CategoryMapper {
 		return Category.builder()
 			.name(dto.getName())
 			.tenant(Tenant.builder().id(dto.getTenantId()).build())
+			.categoryType(CategoryType.builder().id(dto.getCategoryTypeId()).build())
 			.build();
 	}
 }

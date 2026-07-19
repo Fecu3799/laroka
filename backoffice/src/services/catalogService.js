@@ -24,7 +24,16 @@ export async function fetchCategories(token, tenantId) {
   return res.json()
 }
 
-// data: { name, tenantId }. Exclusivo ADMIN.
+// Tipos de categoría maestros activos (US-CAT-03), ordenados por nombre. Cada uno:
+// { id, name, allowsHalfAndHalf }. ADMIN y MANAGER pueden listar.
+export async function fetchCategoryTypes(token) {
+  const res = await apiFetch(`${API_URL}/backoffice/category-types`, {
+    headers: catalogHeaders(token),
+  })
+  return res.json()
+}
+
+// data: { name, tenantId, categoryTypeId }. Exclusivo ADMIN.
 export async function createCategory(data, token) {
   const res = await apiFetch(`${API_URL}/backoffice/categories`, {
     method: 'POST',
@@ -34,7 +43,7 @@ export async function createCategory(data, token) {
   return res.json()
 }
 
-// data: { name, tenantId }. Exclusivo ADMIN.
+// data: { name, tenantId, categoryTypeId }. Exclusivo ADMIN.
 export async function updateCategory(id, data, token) {
   const res = await apiFetch(`${API_URL}/backoffice/categories/${id}`, {
     method: 'PUT',
