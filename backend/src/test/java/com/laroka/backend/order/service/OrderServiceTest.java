@@ -34,6 +34,8 @@ import com.laroka.backend.branch.entity.Branch;
 import com.laroka.backend.branch.exception.BranchNotFoundException;
 import com.laroka.backend.branch.repository.BranchRepository;
 import com.laroka.backend.catalog.entity.BranchProduct;
+import com.laroka.backend.catalog.entity.Category;
+import com.laroka.backend.catalog.entity.CategoryType;
 import com.laroka.backend.catalog.entity.Product;
 import com.laroka.backend.catalog.repository.BranchProductRepository;
 import com.laroka.backend.catalog.repository.ProductRepository;
@@ -43,6 +45,7 @@ import com.laroka.backend.order.entity.OrderOrigin;
 import com.laroka.backend.order.entity.OrderStatus;
 import com.laroka.backend.order.entity.OrderType;
 import com.laroka.backend.order.entity.PaymentMethod;
+import com.laroka.backend.order.exception.InvalidHalfAndHalfException;
 import com.laroka.backend.order.exception.OrderNotFoundException;
 import com.laroka.backend.order.exception.ProductUnavailableException;
 import com.laroka.backend.order.mapper.OrderMapper;
@@ -168,7 +171,7 @@ class OrderServiceTest {
     private void stubBaseCreation(Branch branch, Product product) {
         when(idempotencyStore.get(any())).thenReturn(Optional.empty());
         when(branchRepository.findById(branch.getId())).thenReturn(Optional.of(branch));
-        when(productRepository.findById(product.getId())).thenReturn(Optional.of(product));
+        when(productRepository.findByIdWithCategoryType(product.getId())).thenReturn(Optional.of(product));
         // US-15-09: para pedidos CLIENT el producto debe estar disponible en la
         // sucursal. priceOverride=null preserva el precio base del producto.
         when(branchProductRepository.findByBranchIdAndProductId(branch.getId(), product.getId()))
@@ -210,7 +213,7 @@ class OrderServiceTest {
 
         when(idempotencyStore.get(any())).thenReturn(Optional.empty());
         when(branchRepository.findById(1)).thenReturn(Optional.of(branch));
-        when(productRepository.findById(1)).thenReturn(Optional.of(product));
+        when(productRepository.findByIdWithCategoryType(1)).thenReturn(Optional.of(product));
         when(branchProductRepository.findByBranchIdAndProductId(1, 1)).thenReturn(Optional.of(bp));
         when(workShiftRepository.findByBranchIdAndStatus(branch.getId(), ShiftStatus.OPEN))
                 .thenReturn(Optional.of(WorkShift.builder().id(UUID.randomUUID()).build()));
@@ -289,7 +292,7 @@ class OrderServiceTest {
 
         when(idempotencyStore.get(any())).thenReturn(Optional.empty());
         when(branchRepository.findById(branch.getId())).thenReturn(Optional.of(branch));
-        when(productRepository.findById(product.getId())).thenReturn(Optional.of(product));
+        when(productRepository.findByIdWithCategoryType(product.getId())).thenReturn(Optional.of(product));
         when(branchProductRepository.findByBranchIdAndProductId(branch.getId(), product.getId()))
                 .thenReturn(Optional.of(availableBranchProduct(branch, product)));
         when(workShiftRepository.findByBranchIdAndStatus(branch.getId(), ShiftStatus.OPEN))
@@ -420,7 +423,7 @@ class OrderServiceTest {
 
         when(idempotencyStore.get(any())).thenReturn(Optional.empty());
         when(branchRepository.findById(branch.getId())).thenReturn(Optional.of(branch));
-        when(productRepository.findById(product.getId())).thenReturn(Optional.of(product));
+        when(productRepository.findByIdWithCategoryType(product.getId())).thenReturn(Optional.of(product));
         when(branchProductRepository.findByBranchIdAndProductId(branch.getId(), product.getId()))
                 .thenReturn(Optional.of(unavailableBranchProduct(branch, product)));
 
@@ -443,7 +446,7 @@ class OrderServiceTest {
 
         when(idempotencyStore.get(any())).thenReturn(Optional.empty());
         when(branchRepository.findById(branch.getId())).thenReturn(Optional.of(branch));
-        when(productRepository.findById(product.getId())).thenReturn(Optional.of(product));
+        when(productRepository.findByIdWithCategoryType(product.getId())).thenReturn(Optional.of(product));
         when(branchProductRepository.findByBranchIdAndProductId(branch.getId(), product.getId()))
                 .thenReturn(Optional.empty());
 
@@ -463,7 +466,7 @@ class OrderServiceTest {
 
         when(idempotencyStore.get(any())).thenReturn(Optional.empty());
         when(branchRepository.findById(branch.getId())).thenReturn(Optional.of(branch));
-        when(productRepository.findById(product.getId())).thenReturn(Optional.of(product));
+        when(productRepository.findByIdWithCategoryType(product.getId())).thenReturn(Optional.of(product));
         when(branchProductRepository.findByBranchIdAndProductId(branch.getId(), product.getId()))
                 .thenReturn(Optional.of(unavailableBranchProduct(branch, product)));
         when(workShiftRepository.findByBranchIdAndStatus(branch.getId(), ShiftStatus.OPEN))
@@ -490,6 +493,142 @@ class OrderServiceTest {
 
         assertThat(result.order()).isNotNull();
         verify(orderRepository).save(any(Order.class));
+    }
+
+    // --- createOrder: mitad y mitad (US-HH-02) ---
+
+    private CategoryType categoryType(int id, boolean allowsHalfAndHalf) {
+        return CategoryType.builder().id(id).name("type-" + id).allowsHalfAndHalf(allowsHalfAndHalf).active(true).build();
+    }
+
+    private Product productWithType(int id, String name, BigDecimal price, CategoryType type) {
+        return Product.builder()
+                .id(id).name(name).price(price)
+                .category(Category.builder().id(id).name("cat-" + id).categoryType(type).build())
+                .build();
+    }
+
+    private OrderItem halfItem(int firstProductId, int secondProductId, int quantity) {
+        return OrderItem.builder()
+                .product(Product.builder().id(firstProductId).build())
+                .secondProduct(Product.builder().id(secondProductId).build())
+                .quantity(quantity)
+                .build();
+    }
+
+    // Stubbea la creación con dos productos (mitad y mitad), ambos disponibles en la sucursal.
+    private void stubHalfAndHalfCreation(Branch branch, Product first, Product second) {
+        when(idempotencyStore.get(any())).thenReturn(Optional.empty());
+        when(branchRepository.findById(branch.getId())).thenReturn(Optional.of(branch));
+        when(productRepository.findByIdWithCategoryType(first.getId())).thenReturn(Optional.of(first));
+        when(productRepository.findByIdWithCategoryType(second.getId())).thenReturn(Optional.of(second));
+        when(branchProductRepository.findByBranchIdAndProductId(branch.getId(), first.getId()))
+                .thenReturn(Optional.of(availableBranchProduct(branch, first)));
+        when(branchProductRepository.findByBranchIdAndProductId(branch.getId(), second.getId()))
+                .thenReturn(Optional.of(availableBranchProduct(branch, second)));
+        when(workShiftRepository.findByBranchIdAndStatus(branch.getId(), ShiftStatus.OPEN))
+                .thenReturn(Optional.of(WorkShift.builder().id(UUID.randomUUID()).build()));
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(orderRepository.findByIdWithDetails(any()))
+                .thenReturn(Optional.of(minimalSavedOrder(OrderStatus.PENDING_PAYMENT)));
+    }
+
+    @Test
+    void createOrder_halfAndHalf_validCombination_createsOrderWithSecondProduct() {
+        Branch branch = branch(tenant());
+        CategoryType pizza = categoryType(7, true);
+        Product first = productWithType(1, "Muzzarella", new BigDecimal("2800.00"), pizza);
+        Product second = productWithType(2, "Napolitana", new BigDecimal("3200.00"), pizza);
+        stubHalfAndHalfCreation(branch, first, second);
+
+        service.createOrder(takeawayOrder(branch), List.of(halfItem(1, 2, 1)), PaymentMethod.MERCADOPAGO, "key-hh-ok");
+
+        ArgumentCaptor<Order> captor = ArgumentCaptor.forClass(Order.class);
+        verify(orderRepository).save(captor.capture());
+        OrderItem saved = captor.getValue().getItems().get(0);
+        assertThat(saved.getProduct().getId()).isEqualTo(1);
+        assertThat(saved.getSecondProduct().getId()).isEqualTo(2);
+    }
+
+    // Stubs mínimos: ambos productos disponibles. La validación mitad y mitad falla después
+    // de las verificaciones de disponibilidad, antes de tocar turno/persistencia.
+    private void stubHalfAndHalfAvailable(Branch branch, Product first, Product second) {
+        when(idempotencyStore.get(any())).thenReturn(Optional.empty());
+        when(branchRepository.findById(branch.getId())).thenReturn(Optional.of(branch));
+        when(productRepository.findByIdWithCategoryType(first.getId())).thenReturn(Optional.of(first));
+        when(productRepository.findByIdWithCategoryType(second.getId())).thenReturn(Optional.of(second));
+        when(branchProductRepository.findByBranchIdAndProductId(branch.getId(), first.getId()))
+                .thenReturn(Optional.of(availableBranchProduct(branch, first)));
+        when(branchProductRepository.findByBranchIdAndProductId(branch.getId(), second.getId()))
+                .thenReturn(Optional.of(availableBranchProduct(branch, second)));
+    }
+
+    @Test
+    void createOrder_halfAndHalf_categoryDoesNotAllow_throwsInvalidHalfAndHalf() {
+        Branch branch = branch(tenant());
+        CategoryType noHalf = categoryType(9, false);
+        Product first = productWithType(1, "Lomo", new BigDecimal("5000.00"), noHalf);
+        Product second = productWithType(2, "Milanesa", new BigDecimal("5200.00"), noHalf);
+        stubHalfAndHalfAvailable(branch, first, second);
+
+        assertThatThrownBy(() ->
+                service.createOrder(takeawayOrder(branch), List.of(halfItem(1, 2, 1)), PaymentMethod.MERCADOPAGO, "key-hh-noallow"))
+                .isInstanceOf(InvalidHalfAndHalfException.class);
+        verify(orderRepository, never()).save(any());
+    }
+
+    @Test
+    void createOrder_halfAndHalf_sameProductBothHalves_throwsInvalidHalfAndHalf() {
+        Branch branch = branch(tenant());
+        Product product = productWithType(1, "Muzzarella", new BigDecimal("2800.00"), categoryType(7, true));
+
+        when(idempotencyStore.get(any())).thenReturn(Optional.empty());
+        when(branchRepository.findById(branch.getId())).thenReturn(Optional.of(branch));
+        when(productRepository.findByIdWithCategoryType(product.getId())).thenReturn(Optional.of(product));
+        when(branchProductRepository.findByBranchIdAndProductId(branch.getId(), product.getId()))
+                .thenReturn(Optional.of(availableBranchProduct(branch, product)));
+
+        assertThatThrownBy(() ->
+                service.createOrder(takeawayOrder(branch), List.of(halfItem(1, 1, 1)), PaymentMethod.MERCADOPAGO, "key-hh-same"))
+                .isInstanceOf(InvalidHalfAndHalfException.class);
+        verify(orderRepository, never()).save(any());
+    }
+
+    @Test
+    void createOrder_halfAndHalf_differentCategoryTypes_throwsInvalidHalfAndHalf() {
+        Branch branch = branch(tenant());
+        Product first = productWithType(1, "Muzzarella", new BigDecimal("2800.00"), categoryType(7, true));
+        Product second = productWithType(2, "Hamburguesa", new BigDecimal("4000.00"), categoryType(8, true));
+        stubHalfAndHalfAvailable(branch, first, second);
+
+        assertThatThrownBy(() ->
+                service.createOrder(takeawayOrder(branch), List.of(halfItem(1, 2, 1)), PaymentMethod.MERCADOPAGO, "key-hh-difftype"))
+                .isInstanceOf(InvalidHalfAndHalfException.class);
+        verify(orderRepository, never()).save(any());
+    }
+
+    @Test
+    void createOrder_halfAndHalf_clientOrder_secondProductUnavailable_throwsProductUnavailable() {
+        Branch branch = branch(tenant());
+        CategoryType pizza = categoryType(7, true);
+        Product first = productWithType(1, "Muzzarella", new BigDecimal("2800.00"), pizza);
+        Product second = productWithType(2, "Napolitana", new BigDecimal("3200.00"), pizza);
+
+        when(idempotencyStore.get(any())).thenReturn(Optional.empty());
+        when(branchRepository.findById(branch.getId())).thenReturn(Optional.of(branch));
+        when(productRepository.findByIdWithCategoryType(first.getId())).thenReturn(Optional.of(first));
+        when(productRepository.findByIdWithCategoryType(second.getId())).thenReturn(Optional.of(second));
+        when(branchProductRepository.findByBranchIdAndProductId(branch.getId(), first.getId()))
+                .thenReturn(Optional.of(availableBranchProduct(branch, first)));
+        when(branchProductRepository.findByBranchIdAndProductId(branch.getId(), second.getId()))
+                .thenReturn(Optional.of(unavailableBranchProduct(branch, second)));
+
+        assertThatThrownBy(() ->
+                service.createOrder(takeawayOrder(branch), List.of(halfItem(1, 2, 1)), PaymentMethod.MERCADOPAGO, "key-hh-unavail"))
+                .isInstanceOf(ProductUnavailableException.class)
+                .extracting(e -> ((ProductUnavailableException) e).getProductId())
+                .isEqualTo(2);
+        verify(orderRepository, never()).save(any());
     }
 
     // --- createOrder: idempotencia ---

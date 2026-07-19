@@ -10,6 +10,9 @@ public class OrderItemRequestDTO {
     @NotNull
     private Integer productId;
 
+    // US-HH-02: segunda mitad opcional (mitad y mitad). Null → ítem simple.
+    private Integer secondProductId;
+
     @NotNull
     @Min(1)
     private Integer quantity;

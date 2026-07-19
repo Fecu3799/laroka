@@ -34,6 +34,7 @@ import com.laroka.backend.branch.entity.Branch;
 import com.laroka.backend.branch.exception.BranchNotFoundException;
 import com.laroka.backend.branch.repository.BranchRepository;
 import com.laroka.backend.catalog.entity.BranchProduct;
+import com.laroka.backend.catalog.entity.CategoryType;
 import com.laroka.backend.catalog.entity.Product;
 import com.laroka.backend.catalog.exception.ProductNotFoundException;
 import com.laroka.backend.catalog.repository.BranchProductRepository;
@@ -46,6 +47,7 @@ import com.laroka.backend.order.entity.OrderStatus;
 import com.laroka.backend.order.entity.OrderStatusHistory;
 import com.laroka.backend.order.entity.OrderType;
 import com.laroka.backend.order.entity.PaymentMethod;
+import com.laroka.backend.order.exception.InvalidHalfAndHalfException;
 import com.laroka.backend.order.exception.OrderNotFoundException;
 import com.laroka.backend.order.exception.ProductUnavailableException;
 import com.laroka.backend.order.repository.BranchOrderSequenceRepository;
@@ -579,6 +581,46 @@ public class OrderService {
         return orderItemRepository.findByOrderIdWithProduct(orderId);
     }
 
+    // US-15-09: criterio de disponibilidad para pedidos del client (el backoffice puede forzar).
+    // Un producto es no disponible si no tiene BranchProduct en la sucursal o si available != true.
+    private boolean isUnavailableForClient(OrderOrigin origin, Optional<BranchProduct> branchProduct) {
+        return origin == OrderOrigin.CLIENT
+                && branchProduct.map(bp -> !Boolean.TRUE.equals(bp.getAvailable())).orElse(true);
+    }
+
+    // US-HH-02: valida una combinación mitad y mitad. Ambos productos deben pertenecer a
+    // categorías cuyo category_type permita la combinación (allows_half_and_half) y ambos
+    // deben ser del mismo category_type (no se combina pizza con hamburguesa). La
+    // disponibilidad en la sucursal se valida aparte, en el loop. Rechaza con 422.
+    private void validateHalfAndHalf(Product first, Product second) {
+        // Combinar un producto consigo mismo no tiene sentido de negocio: es un ítem simple.
+        if (first.getId().equals(second.getId())) {
+            throw new InvalidHalfAndHalfException(
+                    "Una combinación mitad y mitad requiere dos productos distintos: " + first.getName());
+        }
+
+        CategoryType firstType = categoryTypeOf(first);
+        CategoryType secondType = categoryTypeOf(second);
+
+        if (firstType == null || !firstType.isAllowsHalfAndHalf()) {
+            throw new InvalidHalfAndHalfException(
+                    "La categoría del producto no permite mitad y mitad: " + first.getName());
+        }
+        if (secondType == null || !secondType.isAllowsHalfAndHalf()) {
+            throw new InvalidHalfAndHalfException(
+                    "La categoría del producto no permite mitad y mitad: " + second.getName());
+        }
+        if (!firstType.getId().equals(secondType.getId())) {
+            throw new InvalidHalfAndHalfException(
+                    "No se pueden combinar productos de distinto tipo: "
+                            + first.getName() + " y " + second.getName());
+        }
+    }
+
+    private CategoryType categoryTypeOf(Product product) {
+        return product.getCategory() != null ? product.getCategory().getCategoryType() : null;
+    }
+
     private OrderCreationResult doCreateOrder(Order order, List<OrderItem> items,
                                               PaymentMethod paymentMethod, String idempotencyKey) {
         if (items == null || items.isEmpty()) {
@@ -605,7 +647,10 @@ public class OrderService {
         BigDecimal subtotal = BigDecimal.ZERO;
 
         for (OrderItem item : items) {
-            Product product = productRepository.findById(item.getProduct().getId())
+            // Se carga con el grafo category.categoryType para poder validar mitad y mitad
+            // (US-HH-02) sin depender del lazy loading. Para ítems simples el grafo es un
+            // ManyToOne extra sin uso, costo despreciable.
+            Product product = productRepository.findByIdWithCategoryType(item.getProduct().getId())
                     .orElseThrow(() -> new ProductNotFoundException(item.getProduct().getId()));
 
             Optional<BranchProduct> branchProduct =
@@ -615,11 +660,29 @@ public class OrderService {
             // sucursal (BranchProduct inexistente o available=false). El backoffice
             // (ADMIN/STAFF) puede forzar el pedido igual — ya fue advertido en el
             // frontend (US-15-F-09). Rechaza el pedido completo antes de persistir nada.
-            if (order.getOrigin() == OrderOrigin.CLIENT
-                    && branchProduct.map(bp -> !Boolean.TRUE.equals(bp.getAvailable())).orElse(true)) {
+            if (isUnavailableForClient(order.getOrigin(), branchProduct)) {
                 log.warn("Order rejected — product not available | branchId={} productId={} productName={}",
                         branch.getId(), product.getId(), product.getName());
                 throw new ProductUnavailableException(product.getId(), product.getName());
+            }
+
+            // US-HH-02: ítem mitad y mitad. Se resuelve y valida la segunda mitad antes de
+            // construir el ítem combinado. El pricing de la combinación es US-HH-03; acá el
+            // unitPrice sigue siendo el de la primera mitad.
+            Product secondProduct = null;
+            if (item.getSecondProduct() != null) {
+                secondProduct = productRepository.findByIdWithCategoryType(item.getSecondProduct().getId())
+                        .orElseThrow(() -> new ProductNotFoundException(item.getSecondProduct().getId()));
+
+                Optional<BranchProduct> secondBranchProduct =
+                        branchProductRepository.findByBranchIdAndProductId(branch.getId(), secondProduct.getId());
+                if (isUnavailableForClient(order.getOrigin(), secondBranchProduct)) {
+                    log.warn("Order rejected — second product not available | branchId={} productId={} productName={}",
+                            branch.getId(), secondProduct.getId(), secondProduct.getName());
+                    throw new ProductUnavailableException(secondProduct.getId(), secondProduct.getName());
+                }
+
+                validateHalfAndHalf(product, secondProduct);
             }
 
             BigDecimal unitPrice = branchProduct
@@ -632,6 +695,7 @@ public class OrderService {
             resolvedItems.add(OrderItem.builder()
                     .id(UUID.randomUUID())
                     .product(product)
+                    .secondProduct(secondProduct)
                     .quantity(item.getQuantity())
                     .unitPrice(unitPrice)
                     .subtotal(lineSubtotal)

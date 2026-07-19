@@ -43,6 +43,10 @@ public class OrderMapper {
         return dto.getItems().stream()
                 .map(item -> OrderItem.builder()
                         .product(Product.builder().id(item.getProductId()).build())
+                        // US-HH-02: segunda mitad opcional. El service la resuelve y valida.
+                        .secondProduct(item.getSecondProductId() != null
+                                ? Product.builder().id(item.getSecondProductId()).build()
+                                : null)
                         .quantity(item.getQuantity())
                         .build())
                 .toList();
