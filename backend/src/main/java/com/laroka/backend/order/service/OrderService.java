@@ -36,9 +36,12 @@ import com.laroka.backend.branch.repository.BranchRepository;
 import com.laroka.backend.catalog.entity.BranchProduct;
 import com.laroka.backend.catalog.entity.CategoryType;
 import com.laroka.backend.catalog.entity.Product;
+import com.laroka.backend.catalog.entity.ProductSize;
 import com.laroka.backend.catalog.exception.ProductNotFoundException;
 import com.laroka.backend.catalog.repository.BranchProductRepository;
 import com.laroka.backend.catalog.repository.ProductRepository;
+import com.laroka.backend.catalog.repository.ProductSizeRepository;
+import com.laroka.backend.catalog.service.ProductSizeService;
 import com.laroka.backend.order.domain.OrderStateMachine;
 import com.laroka.backend.order.entity.Order;
 import com.laroka.backend.order.entity.OrderItem;
@@ -48,6 +51,7 @@ import com.laroka.backend.order.entity.OrderStatusHistory;
 import com.laroka.backend.order.entity.OrderType;
 import com.laroka.backend.order.entity.PaymentMethod;
 import com.laroka.backend.order.exception.InvalidHalfAndHalfException;
+import com.laroka.backend.order.exception.InvalidProductSizeException;
 import com.laroka.backend.order.exception.OrderNotFoundException;
 import com.laroka.backend.order.exception.ProductUnavailableException;
 import com.laroka.backend.order.repository.BranchOrderSequenceRepository;
@@ -74,6 +78,8 @@ public class OrderService {
     private final BranchRepository branchRepository;
     private final ProductRepository productRepository;
     private final BranchProductRepository branchProductRepository;
+    private final ProductSizeRepository productSizeRepository;
+    private final ProductSizeService productSizeService;
     private final IdempotencyStore idempotencyStore;
     private final PaymentRepository paymentRepository;
     private final WorkShiftRepository workShiftRepository;
@@ -621,6 +627,26 @@ public class OrderService {
         return product.getCategory() != null ? product.getCategory().getCategoryType() : null;
     }
 
+    // US-SIZE-03: el tamaño pedido debe existir y pertenecer al producto del ítem — no se
+    // puede pedir el tamaño de un producto distinto al elegido. Un tamaño dado de baja por el
+    // ADMIN (active=false) tampoco es pedible: sigue en la tabla solo por los pedidos
+    // históricos que lo referencian.
+    private ProductSize resolveProductSize(Integer productSizeId, Product product) {
+        ProductSize productSize = productSizeRepository.findById(productSizeId)
+                .orElseThrow(() -> new InvalidProductSizeException(
+                        "El tamaño seleccionado no existe: " + productSizeId));
+
+        if (!productSize.getProduct().getId().equals(product.getId())) {
+            throw new InvalidProductSizeException(
+                    "El tamaño seleccionado no pertenece al producto: " + product.getName());
+        }
+        if (!Boolean.TRUE.equals(productSize.getActive())) {
+            throw new InvalidProductSizeException(
+                    "El tamaño seleccionado no está disponible: " + productSize.getSize());
+        }
+        return productSize;
+    }
+
     // Precio efectivo de un producto en la sucursal: priceOverride si existe, si no el precio
     // base del producto. Sin BranchProduct (backoffice forzando), cae al precio base.
     private BigDecimal effectivePrice(Product product, Optional<BranchProduct> branchProduct) {
@@ -655,6 +681,13 @@ public class OrderService {
         BigDecimal subtotal = BigDecimal.ZERO;
 
         for (OrderItem item : items) {
+            // US-SIZE-03: tamaño y mitad y mitad son excluyentes en el mismo ítem. Se valida
+            // antes de resolver nada para que la combinación inválida falle igual, sin depender
+            // de si los productos existen o están disponibles en la sucursal.
+            if (item.getProductSize() != null && item.getSecondProduct() != null) {
+                throw new InvalidProductSizeException("Un ítem mitad y mitad no puede llevar tamaño");
+            }
+
             // Se carga con el grafo category.categoryType para poder validar mitad y mitad
             // (US-HH-02) sin depender del lazy loading. Para ítems simples el grafo es un
             // ManyToOne extra sin uso, costo despreciable.
@@ -693,10 +726,21 @@ public class OrderService {
                 validateHalfAndHalf(product, secondProduct);
             }
 
+            // US-SIZE-03: tamaño del ítem. La disponibilidad en la sucursal ya quedó cubierta
+            // por el BranchProduct.available del producto base — el tamaño no tiene flag propio.
+            ProductSize productSize = null;
+            if (item.getProductSize() != null) {
+                productSize = resolveProductSize(item.getProductSize().getId(), product);
+            }
+
             // US-HH-03: el precio efectivo de cada mitad es priceOverride ?? product.price (por
             // sucursal). El del ítem combinado es el mayor de las dos mitades. Un ítem simple
             // (secondProduct == null) conserva el precio efectivo de su único producto.
-            BigDecimal unitPrice = effectivePrice(product, branchProduct);
+            // US-SIZE-03: con tamaño, el precio sale de la fórmula por tamaño (US-SIZE-02) en
+            // vez del precio base. Nunca coexiste con secondProduct (validado arriba).
+            BigDecimal unitPrice = productSize != null
+                    ? productSizeService.resolveEffectivePrice(branch.getId(), productSize)
+                    : effectivePrice(product, branchProduct);
             if (secondProduct != null) {
                 unitPrice = unitPrice.max(effectivePrice(secondProduct, secondBranchProduct));
             }
@@ -708,6 +752,7 @@ public class OrderService {
                     .id(UUID.randomUUID())
                     .product(product)
                     .secondProduct(secondProduct)
+                    .productSize(productSize)
                     .quantity(item.getQuantity())
                     .unitPrice(unitPrice)
                     .subtotal(lineSubtotal)

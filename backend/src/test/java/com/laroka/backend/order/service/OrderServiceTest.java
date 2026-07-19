@@ -45,7 +45,10 @@ import com.laroka.backend.order.entity.OrderOrigin;
 import com.laroka.backend.order.entity.OrderStatus;
 import com.laroka.backend.order.entity.OrderType;
 import com.laroka.backend.order.entity.PaymentMethod;
+import com.laroka.backend.catalog.entity.ProductSize;
+import com.laroka.backend.catalog.entity.ProductSizeName;
 import com.laroka.backend.order.exception.InvalidHalfAndHalfException;
+import com.laroka.backend.order.exception.InvalidProductSizeException;
 import com.laroka.backend.order.exception.OrderNotFoundException;
 import com.laroka.backend.order.exception.ProductUnavailableException;
 import com.laroka.backend.order.mapper.OrderMapper;
@@ -71,6 +74,8 @@ class OrderServiceTest {
     @Mock private BranchRepository branchRepository;
     @Mock private ProductRepository productRepository;
     @Mock private BranchProductRepository branchProductRepository;
+    @Mock private com.laroka.backend.catalog.repository.ProductSizeRepository productSizeRepository;
+    @Mock private com.laroka.backend.catalog.service.ProductSizeService productSizeService;
     @Mock private IdempotencyStore idempotencyStore;
     @Mock private PaymentRepository paymentRepository;
     @Mock private com.laroka.backend.notification.service.NotificationService notificationService;
@@ -700,6 +705,165 @@ class OrderServiceTest {
                 .isInstanceOf(ProductUnavailableException.class)
                 .extracting(e -> ((ProductUnavailableException) e).getProductId())
                 .isEqualTo(2);
+        verify(orderRepository, never()).save(any());
+    }
+
+    // --- createOrder: tamaños (US-SIZE-03) ---
+
+    private ProductSize size(int id, Product product, ProductSizeName name, BigDecimal price, boolean active) {
+        return ProductSize.builder()
+                .id(id).product(product).size(name).price(price).active(active)
+                .build();
+    }
+
+    private OrderItem sizedItem(int productId, int productSizeId, int quantity) {
+        return OrderItem.builder()
+                .product(Product.builder().id(productId).build())
+                .productSize(ProductSize.builder().id(productSizeId).build())
+                .quantity(quantity)
+                .build();
+    }
+
+    // Stubs de una creación con un único producto disponible en la sucursal.
+    private void stubSingleProductCreation(Branch branch, Product product) {
+        when(idempotencyStore.get(any())).thenReturn(Optional.empty());
+        when(branchRepository.findById(branch.getId())).thenReturn(Optional.of(branch));
+        when(productRepository.findByIdWithCategoryType(product.getId())).thenReturn(Optional.of(product));
+        when(branchProductRepository.findByBranchIdAndProductId(branch.getId(), product.getId()))
+                .thenReturn(Optional.of(availableBranchProduct(branch, product)));
+        when(workShiftRepository.findByBranchIdAndStatus(branch.getId(), ShiftStatus.OPEN))
+                .thenReturn(Optional.of(WorkShift.builder().id(UUID.randomUUID()).build()));
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(orderRepository.findByIdWithDetails(any()))
+                .thenReturn(Optional.of(minimalSavedOrder(OrderStatus.PENDING_PAYMENT)));
+    }
+
+    @Test
+    void createOrder_withSize_usesSizeEffectivePriceAndPersistsChosenSize() {
+        Branch branch = branch(tenant());
+        CategoryType pizza = categoryType(7, true);
+        Product muzza = productWithType(1, "Muzzarella", new BigDecimal("10000.00"), pizza);
+        ProductSize grande = size(50, muzza, ProductSizeName.GRANDE, new BigDecimal("15000.00"), true);
+        stubSingleProductCreation(branch, muzza);
+        when(productSizeRepository.findById(50)).thenReturn(Optional.of(grande));
+        // El override de la sucursal (US-SIZE-02) manda sobre el precio base del tamaño.
+        when(productSizeService.resolveEffectivePrice(branch.getId(), grande))
+                .thenReturn(new BigDecimal("18000.00"));
+
+        service.createOrder(takeawayOrder(branch), List.of(sizedItem(1, 50, 2)),
+                PaymentMethod.MERCADOPAGO, "key-size-ok");
+
+        ArgumentCaptor<Order> captor = ArgumentCaptor.forClass(Order.class);
+        verify(orderRepository).save(captor.capture());
+        OrderItem saved = captor.getValue().getItems().get(0);
+        assertThat(saved.getProductSize().getId()).isEqualTo(50);
+        // El precio del tamaño reemplaza al precio base del producto, no lo suma ni lo promedia.
+        assertThat(saved.getUnitPrice()).isEqualByComparingTo("18000.00");
+        assertThat(saved.getSubtotal()).isEqualByComparingTo("36000.00");
+    }
+
+    @Test
+    void createOrder_withoutSize_keepsBaseProductPricing() {
+        // Retrocompatibilidad: sin productSizeId el ítem se comporta exactamente como antes.
+        Branch branch = branch(tenant());
+        CategoryType pizza = categoryType(7, true);
+        Product muzza = productWithType(1, "Muzzarella", new BigDecimal("10000.00"), pizza);
+        stubSingleProductCreation(branch, muzza);
+
+        service.createOrder(takeawayOrder(branch), List.of(itemFor(1, 1)),
+                PaymentMethod.MERCADOPAGO, "key-size-none");
+
+        ArgumentCaptor<Order> captor = ArgumentCaptor.forClass(Order.class);
+        verify(orderRepository).save(captor.capture());
+        OrderItem saved = captor.getValue().getItems().get(0);
+        assertThat(saved.getProductSize()).isNull();
+        assertThat(saved.getUnitPrice()).isEqualByComparingTo("10000.00");
+        verify(productSizeService, never()).resolveEffectivePrice(any(), any());
+    }
+
+    @Test
+    void createOrder_sizeOfAnotherProduct_throwsInvalidProductSize() {
+        Branch branch = branch(tenant());
+        CategoryType pizza = categoryType(7, true);
+        Product muzza = productWithType(1, "Muzzarella", new BigDecimal("10000.00"), pizza);
+        Product napo = productWithType(2, "Napolitana", new BigDecimal("12000.00"), pizza);
+        // El tamaño 50 pertenece a Napolitana, pero el ítem pide Muzzarella.
+        ProductSize grandeDeNapo = size(50, napo, ProductSizeName.GRANDE, new BigDecimal("17000.00"), true);
+
+        when(idempotencyStore.get(any())).thenReturn(Optional.empty());
+        when(branchRepository.findById(branch.getId())).thenReturn(Optional.of(branch));
+        when(productRepository.findByIdWithCategoryType(muzza.getId())).thenReturn(Optional.of(muzza));
+        when(branchProductRepository.findByBranchIdAndProductId(branch.getId(), muzza.getId()))
+                .thenReturn(Optional.of(availableBranchProduct(branch, muzza)));
+        when(productSizeRepository.findById(50)).thenReturn(Optional.of(grandeDeNapo));
+
+        assertThatThrownBy(() -> service.createOrder(takeawayOrder(branch), List.of(sizedItem(1, 50, 1)),
+                PaymentMethod.MERCADOPAGO, "key-size-wrong-product"))
+                .isInstanceOf(InvalidProductSizeException.class);
+        verify(orderRepository, never()).save(any());
+    }
+
+    @Test
+    void createOrder_sizeDoesNotExist_throwsInvalidProductSize() {
+        Branch branch = branch(tenant());
+        CategoryType pizza = categoryType(7, true);
+        Product muzza = productWithType(1, "Muzzarella", new BigDecimal("10000.00"), pizza);
+
+        when(idempotencyStore.get(any())).thenReturn(Optional.empty());
+        when(branchRepository.findById(branch.getId())).thenReturn(Optional.of(branch));
+        when(productRepository.findByIdWithCategoryType(muzza.getId())).thenReturn(Optional.of(muzza));
+        when(branchProductRepository.findByBranchIdAndProductId(branch.getId(), muzza.getId()))
+                .thenReturn(Optional.of(availableBranchProduct(branch, muzza)));
+        when(productSizeRepository.findById(999)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.createOrder(takeawayOrder(branch), List.of(sizedItem(1, 999, 1)),
+                PaymentMethod.MERCADOPAGO, "key-size-missing"))
+                .isInstanceOf(InvalidProductSizeException.class);
+        verify(orderRepository, never()).save(any());
+    }
+
+    @Test
+    void createOrder_inactiveSize_throwsInvalidProductSize() {
+        // Un tamaño dado de baja por el ADMIN sigue en la tabla por los pedidos históricos,
+        // pero no se puede pedir.
+        Branch branch = branch(tenant());
+        CategoryType pizza = categoryType(7, true);
+        Product muzza = productWithType(1, "Muzzarella", new BigDecimal("10000.00"), pizza);
+        ProductSize chicaDadaDeBaja = size(51, muzza, ProductSizeName.CHICA, new BigDecimal("9000.00"), false);
+
+        when(idempotencyStore.get(any())).thenReturn(Optional.empty());
+        when(branchRepository.findById(branch.getId())).thenReturn(Optional.of(branch));
+        when(productRepository.findByIdWithCategoryType(muzza.getId())).thenReturn(Optional.of(muzza));
+        when(branchProductRepository.findByBranchIdAndProductId(branch.getId(), muzza.getId()))
+                .thenReturn(Optional.of(availableBranchProduct(branch, muzza)));
+        when(productSizeRepository.findById(51)).thenReturn(Optional.of(chicaDadaDeBaja));
+
+        assertThatThrownBy(() -> service.createOrder(takeawayOrder(branch), List.of(sizedItem(1, 51, 1)),
+                PaymentMethod.MERCADOPAGO, "key-size-inactive"))
+                .isInstanceOf(InvalidProductSizeException.class);
+        verify(orderRepository, never()).save(any());
+    }
+
+    @Test
+    void createOrder_sizeCombinedWithHalfAndHalf_throwsInvalidProductSizeBeforeResolvingAnything() {
+        // Fuera de alcance por diseño: un ítem con tamaño no puede ser mitad y mitad. Falla
+        // antes de tocar productos, tamaños o disponibilidad — de ahí que no haya más stubs.
+        Branch branch = branch(tenant());
+        OrderItem invalid = OrderItem.builder()
+                .product(Product.builder().id(1).build())
+                .secondProduct(Product.builder().id(2).build())
+                .productSize(ProductSize.builder().id(50).build())
+                .quantity(1)
+                .build();
+
+        when(idempotencyStore.get(any())).thenReturn(Optional.empty());
+        when(branchRepository.findById(branch.getId())).thenReturn(Optional.of(branch));
+
+        assertThatThrownBy(() -> service.createOrder(takeawayOrder(branch), List.of(invalid),
+                PaymentMethod.MERCADOPAGO, "key-size-and-hh"))
+                .isInstanceOf(InvalidProductSizeException.class);
+        verify(productRepository, never()).findByIdWithCategoryType(any());
+        verify(productSizeRepository, never()).findById(any());
         verify(orderRepository, never()).save(any());
     }
 

@@ -6,6 +6,7 @@ import org.springframework.stereotype.Component;
 
 import com.laroka.backend.branch.entity.Branch;
 import com.laroka.backend.catalog.entity.Product;
+import com.laroka.backend.catalog.entity.ProductSize;
 import com.laroka.backend.order.dto.BackofficeOrderDetailDTO;
 import com.laroka.backend.order.dto.BackofficeOrderItemDTO;
 import com.laroka.backend.order.dto.BackofficeOrderResponseDTO;
@@ -46,6 +47,10 @@ public class OrderMapper {
                         // US-HH-02: segunda mitad opcional. El service la resuelve y valida.
                         .secondProduct(item.getSecondProductId() != null
                                 ? Product.builder().id(item.getSecondProductId()).build()
+                                : null)
+                        // US-SIZE-03: tamaño opcional. El service lo resuelve y valida.
+                        .productSize(item.getProductSizeId() != null
+                                ? ProductSize.builder().id(item.getProductSizeId()).build()
                                 : null)
                         .quantity(item.getQuantity())
                         .build())
