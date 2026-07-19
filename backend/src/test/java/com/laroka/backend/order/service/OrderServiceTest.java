@@ -577,6 +577,78 @@ class OrderServiceTest {
         verify(orderRepository, never()).save(any());
     }
 
+    private BranchProduct branchProductWithOverride(Branch branch, Product product, BigDecimal override) {
+        return BranchProduct.builder()
+                .branch(branch).product(product)
+                .available(true).priceOverride(override)
+                .build();
+    }
+
+    private OrderItem savedFirstItem() {
+        ArgumentCaptor<Order> captor = ArgumentCaptor.forClass(Order.class);
+        verify(orderRepository).save(captor.capture());
+        return captor.getValue().getItems().get(0);
+    }
+
+    @Test
+    void createOrder_halfAndHalf_firstHalfMoreExpensive_usesFirstPrice() {
+        Branch branch = branch(tenant());
+        CategoryType pizza = categoryType(7, true);
+        Product first = productWithType(1, "Muzzarella", new BigDecimal("3200.00"), pizza);
+        Product second = productWithType(2, "Napolitana", new BigDecimal("2800.00"), pizza);
+        stubHalfAndHalfCreation(branch, first, second);
+
+        service.createOrder(takeawayOrder(branch), List.of(halfItem(1, 2, 1)), PaymentMethod.MERCADOPAGO, "key-hh-p1");
+
+        OrderItem saved = savedFirstItem();
+        assertThat(saved.getUnitPrice()).isEqualByComparingTo("3200.00");
+        assertThat(saved.getSubtotal()).isEqualByComparingTo("3200.00");
+    }
+
+    @Test
+    void createOrder_halfAndHalf_secondHalfMoreExpensive_usesSecondPrice() {
+        Branch branch = branch(tenant());
+        CategoryType pizza = categoryType(7, true);
+        Product first = productWithType(1, "Muzzarella", new BigDecimal("2800.00"), pizza);
+        Product second = productWithType(2, "Especial", new BigDecimal("3500.00"), pizza);
+        stubHalfAndHalfCreation(branch, first, second);
+
+        service.createOrder(takeawayOrder(branch), List.of(halfItem(1, 2, 2)), PaymentMethod.MERCADOPAGO, "key-hh-p2");
+
+        OrderItem saved = savedFirstItem();
+        assertThat(saved.getUnitPrice()).isEqualByComparingTo("3500.00");
+        // subtotal refleja unitPrice * cantidad (2).
+        assertThat(saved.getSubtotal()).isEqualByComparingTo("7000.00");
+    }
+
+    @Test
+    void createOrder_halfAndHalf_branchPriceOverrideRespectedInComparison() {
+        Branch branch = branch(tenant());
+        CategoryType pizza = categoryType(7, true);
+        // Por precio base la segunda mitad (3200) sería la más cara, pero el override de esta
+        // sucursal la baja a 2000: gana la primera (2800), probando que se compara el efectivo.
+        Product first = productWithType(1, "Muzzarella", new BigDecimal("2800.00"), pizza);
+        Product second = productWithType(2, "Napolitana", new BigDecimal("3200.00"), pizza);
+
+        when(idempotencyStore.get(any())).thenReturn(Optional.empty());
+        when(branchRepository.findById(branch.getId())).thenReturn(Optional.of(branch));
+        when(productRepository.findByIdWithCategoryType(first.getId())).thenReturn(Optional.of(first));
+        when(productRepository.findByIdWithCategoryType(second.getId())).thenReturn(Optional.of(second));
+        when(branchProductRepository.findByBranchIdAndProductId(branch.getId(), first.getId()))
+                .thenReturn(Optional.of(availableBranchProduct(branch, first)));
+        when(branchProductRepository.findByBranchIdAndProductId(branch.getId(), second.getId()))
+                .thenReturn(Optional.of(branchProductWithOverride(branch, second, new BigDecimal("2000.00"))));
+        when(workShiftRepository.findByBranchIdAndStatus(branch.getId(), ShiftStatus.OPEN))
+                .thenReturn(Optional.of(WorkShift.builder().id(UUID.randomUUID()).build()));
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(orderRepository.findByIdWithDetails(any()))
+                .thenReturn(Optional.of(minimalSavedOrder(OrderStatus.PENDING_PAYMENT)));
+
+        service.createOrder(takeawayOrder(branch), List.of(halfItem(1, 2, 1)), PaymentMethod.MERCADOPAGO, "key-hh-override");
+
+        assertThat(savedFirstItem().getUnitPrice()).isEqualByComparingTo("2800.00");
+    }
+
     @Test
     void createOrder_halfAndHalf_sameProductBothHalves_throwsInvalidHalfAndHalf() {
         Branch branch = branch(tenant());

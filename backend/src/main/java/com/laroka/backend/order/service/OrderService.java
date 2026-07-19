@@ -621,6 +621,14 @@ public class OrderService {
         return product.getCategory() != null ? product.getCategory().getCategoryType() : null;
     }
 
+    // Precio efectivo de un producto en la sucursal: priceOverride si existe, si no el precio
+    // base del producto. Sin BranchProduct (backoffice forzando), cae al precio base.
+    private BigDecimal effectivePrice(Product product, Optional<BranchProduct> branchProduct) {
+        return branchProduct
+                .map(bp -> bp.getPriceOverride() != null ? bp.getPriceOverride() : product.getPrice())
+                .orElse(product.getPrice());
+    }
+
     private OrderCreationResult doCreateOrder(Order order, List<OrderItem> items,
                                               PaymentMethod paymentMethod, String idempotencyKey) {
         if (items == null || items.isEmpty()) {
@@ -667,14 +675,14 @@ public class OrderService {
             }
 
             // US-HH-02: ítem mitad y mitad. Se resuelve y valida la segunda mitad antes de
-            // construir el ítem combinado. El pricing de la combinación es US-HH-03; acá el
-            // unitPrice sigue siendo el de la primera mitad.
+            // construir el ítem combinado.
             Product secondProduct = null;
+            Optional<BranchProduct> secondBranchProduct = Optional.empty();
             if (item.getSecondProduct() != null) {
                 secondProduct = productRepository.findByIdWithCategoryType(item.getSecondProduct().getId())
                         .orElseThrow(() -> new ProductNotFoundException(item.getSecondProduct().getId()));
 
-                Optional<BranchProduct> secondBranchProduct =
+                secondBranchProduct =
                         branchProductRepository.findByBranchIdAndProductId(branch.getId(), secondProduct.getId());
                 if (isUnavailableForClient(order.getOrigin(), secondBranchProduct)) {
                     log.warn("Order rejected — second product not available | branchId={} productId={} productName={}",
@@ -685,9 +693,13 @@ public class OrderService {
                 validateHalfAndHalf(product, secondProduct);
             }
 
-            BigDecimal unitPrice = branchProduct
-                    .map(bp -> bp.getPriceOverride() != null ? bp.getPriceOverride() : product.getPrice())
-                    .orElse(product.getPrice());
+            // US-HH-03: el precio efectivo de cada mitad es priceOverride ?? product.price (por
+            // sucursal). El del ítem combinado es el mayor de las dos mitades. Un ítem simple
+            // (secondProduct == null) conserva el precio efectivo de su único producto.
+            BigDecimal unitPrice = effectivePrice(product, branchProduct);
+            if (secondProduct != null) {
+                unitPrice = unitPrice.max(effectivePrice(secondProduct, secondBranchProduct));
+            }
 
             BigDecimal lineSubtotal = unitPrice.multiply(BigDecimal.valueOf(item.getQuantity()));
             subtotal = subtotal.add(lineSubtotal);
