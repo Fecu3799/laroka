@@ -33,6 +33,11 @@ public class CategoryType {
 	@Column(name = "allows_half_and_half", nullable = false)
 	private boolean allowsHalfAndHalf;
 
+	// US-SIZE-01: independiente de allowsHalfAndHalf. Una categoría puede admitir tamaños
+	// sin admitir mitad y mitad, mitad y mitad sin tamaños, ambos, o ninguno.
+	@Column(name = "allows_sizes", nullable = false)
+	private boolean allowsSizes;
+
 	@Column(name = "active", nullable = false)
 	private boolean active;
 }

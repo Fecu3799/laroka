@@ -18,6 +18,7 @@ public class CategoryTypeMapper {
 			.id(type.getId())
 			.name(type.getName())
 			.allowsHalfAndHalf(type.isAllowsHalfAndHalf())
+			.allowsSizes(type.isAllowsSizes())
 			.build();
 	}
 

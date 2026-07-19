@@ -7,7 +7,7 @@ import lombok.NoArgsConstructor;
 
 /**
  * US-CAT-03: tipo de categoría maestro expuesto al backoffice. allowsHalfAndHalf lo
- * consume el flujo mitad y mitad (US-HH).
+ * consume el flujo mitad y mitad (US-HH); allowsSizes el de tamaños (US-SIZE).
  */
 @Data
 @NoArgsConstructor
@@ -17,4 +17,5 @@ public class CategoryTypeResponseDTO {
 	private Integer id;
 	private String name;
 	private boolean allowsHalfAndHalf;
+	private boolean allowsSizes;
 }

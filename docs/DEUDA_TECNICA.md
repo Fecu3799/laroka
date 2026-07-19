@@ -23,6 +23,14 @@
 **Impacto:** Cuando se implemente US-EV-01, las suscripciones push deberán migrarse a `customer_id` y el campo `order_id` deprecarse.  
 **Momento:** Resolver al implementar US-EV-01.
 
+## DT-04 — `product_size` sin constraint que ate el tamaño a `category_type.allows_sizes`
+
+**Estado:** Pendiente
+**US relacionada:** US-SIZE-01 (introduce la tabla), a resolver en US-SIZE-F-01
+**Descripción:** La regla "solo productos cuya categoría tenga `allows_sizes = true` pueden tener filas en `product_size`" no es expresable como constraint declarativo en PostgreSQL: requiere atravesar `product → category → category_type`, lo que exigiría un trigger o una FK compuesta redundante. Hoy nada a nivel base impide insertar un tamaño para un producto de una categoría que no admite tamaños.
+**Impacto:** La consistencia depende de la validación en el service. Mientras la única vía de escritura sea el backoffice, el riesgo es bajo; una carga manual por TablePlus puede violar la regla sin error.
+**Momento:** Agregar la validación en el service al implementar la escritura de tamaños (US-SIZE-F-01). Evaluar trigger solo si aparece una segunda vía de escritura.
+
 ---
 
 ## MP Webhook Signature Validation — Sandbox Only

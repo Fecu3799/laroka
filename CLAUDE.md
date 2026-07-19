@@ -92,6 +92,8 @@ Capas obligatorias por módulo:
 | V31     | category_type (tipos de categoría maestros) |
 | V32     | category category_type_id (FK a category_type, nullable) |
 | V33     | order_item second_product_id (FK a product, nullable) |
+| V34     | category_type allows_sizes                  |
+| V35     | product_size (tamaños con precio propio por producto) |
 
 Toda migración nueva debe ser la siguiente versión disponible en esta tabla.
 Actualizar esta tabla al agregar una migración.
