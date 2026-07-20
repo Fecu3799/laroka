@@ -8,6 +8,7 @@ import { OrderTrackingBanner } from '../features/order/OrderTrackingBanner'
 import { WelcomeModal } from '../components/WelcomeModal'
 import { useCart } from '../hooks/useCart'
 import { getTenantProfile } from '../services/tenantService'
+import { buildHalfAndHalfItem } from '../utils/halfAndHalf'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080'
 const INTRO_SEEN_KEY = 'laroka_intro_seen'
@@ -213,7 +214,17 @@ export function MenuScreen({ branchId, branchName, onChangeBranch, paymentFailur
 
   const handleSelectProduct = useCallback((product) => {
     const cat = categories.find(c => c.products.some(p => p.id === product.id))
-    setSelectedProduct({ ...product, categoryName: cat?.categoryName || '' })
+    setSelectedProduct({
+      ...product,
+      categoryName: cat?.categoryName || '',
+      // US-HH-F-01: candidatos para la otra mitad — productos disponibles de la MISMA
+      // categoría, excluyendo el propio (el backend rechaza combinar un producto consigo
+      // mismo, US-HH-02). El flag viene del menú (allowsHalfAndHalf por categoría).
+      allowsHalfAndHalf: cat?.allowsHalfAndHalf === true,
+      halfAndHalfCandidates: (cat?.products ?? []).filter(
+        p => p.id !== product.id && p.available !== false,
+      ),
+    })
   }, [categories])
 
   const handleCloseDetail = useCallback(() => {
@@ -222,6 +233,12 @@ export function MenuScreen({ branchId, branchName, onChangeBranch, paymentFailur
 
   const handleAddToCart = useCallback((product, qty) => {
     addItem(product, qty)
+  }, [addItem])
+
+  // US-HH-F-01: el ítem combinado entra al carrito con identidad propia (no se fusiona con
+  // el producto suelto) y con el precio ya resuelto por la regla del mayor precio.
+  const handleAddHalfAndHalf = useCallback((first, second, qty) => {
+    addItem(buildHalfAndHalfItem(first, second), qty)
   }, [addItem])
 
   // Perfil del negocio (US-13-F-02): se carga al montar la pantalla del menú.
@@ -629,6 +646,7 @@ export function MenuScreen({ branchId, branchName, onChangeBranch, paymentFailur
               product={selectedProduct}
               onBack={handleCloseDetail}
               onAddToCart={handleAddToCart}
+              onAddHalfAndHalf={handleAddHalfAndHalf}
             />
           </Motion.div>
         )}

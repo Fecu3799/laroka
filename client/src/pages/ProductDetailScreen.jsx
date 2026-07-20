@@ -1,4 +1,6 @@
 import { useState, useCallback } from 'react'
+import { ProductOptions, OptionAccordion, OptionRadioList } from '../components/ProductOptions'
+import { halfAndHalfPrice } from '../utils/halfAndHalf'
 
 function formatPrice(price) {
   return `$${Number(price).toLocaleString('es-AR')}`
@@ -38,20 +40,46 @@ function SizeIcon() {
   )
 }
 
-export function ProductDetailScreen({ product, onBack, onAddToCart }) {
+export function ProductDetailScreen({ product, onBack, onAddToCart, onAddHalfAndHalf }) {
   const [qty, setQty] = useState(1)
   const [added, setAdded] = useState(false)
+  const [halfAndHalf, setHalfAndHalf] = useState(false)
+  const [secondHalfId, setSecondHalfId] = useState(null)
 
   const increment = useCallback(() => setQty(q => Math.min(99, q + 1)), [])
   const decrement = useCallback(() => setQty(q => Math.max(1, q - 1)), [])
 
+  // US-HH-F-01: la opción no reemplaza el flujo normal — extiende el mismo CTA. Sólo aparece
+  // si la categoría del producto lo permite (allowsHalfAndHalf del menú) y hay al menos otro
+  // producto disponible de esa categoría con el que combinar.
+  const halfCandidates = product.halfAndHalfCandidates ?? []
+  const canOrderHalfAndHalf = product.allowsHalfAndHalf === true && halfCandidates.length > 0
+  const secondHalf = halfCandidates.find(c => c.id === secondHalfId) ?? null
+
+  // Al colapsar el acordeón se limpia la selección: volver a expandirlo no debe arrastrar la
+  // mitad elegida antes.
+  const handleToggleHalfAndHalf = useCallback((expanded) => {
+    setHalfAndHalf(expanded)
+    if (!expanded) setSecondHalfId(null)
+  }, [])
+
+  const isHalfAndHalfReady = halfAndHalf && secondHalf != null
+  // Falta elegir la otra mitad: el CTA se bloquea en vez de agregar el producto entero por
+  // error, que sería lo contrario a lo que el cliente marcó.
+  const ctaBlocked = halfAndHalf && !secondHalf
+
   const handleAdd = useCallback(() => {
-    onAddToCart?.(product, qty)
+    if (ctaBlocked) return
+    if (isHalfAndHalfReady) onAddHalfAndHalf?.(product, secondHalf, qty)
+    else onAddToCart?.(product, qty)
     setAdded(true)
     setTimeout(() => setAdded(false), 1800)
-  }, [onAddToCart, product, qty])
+  }, [ctaBlocked, isHalfAndHalfReady, onAddHalfAndHalf, onAddToCart, product, secondHalf, qty])
 
-  const totalPrice = product.price * qty
+  // Preview de precio: con la combinación armada vale el mayor de las dos mitades (misma
+  // regla que resuelve el backend, US-HH-03). Sin combinación, el precio del producto.
+  const unitPrice = isHalfAndHalfReady ? halfAndHalfPrice(product, secondHalf) : product.price
+  const totalPrice = unitPrice * qty
 
   return (
     <div className="detail-screen">
@@ -86,15 +114,41 @@ export function ProductDetailScreen({ product, onBack, onAddToCart }) {
           {product.description && (
             <p className="detail-description">{product.description}</p>
           )}
+
+          {canOrderHalfAndHalf && (
+            <ProductOptions>
+              {/* US-SIZE-F-02: el grupo de tamaños entra acá como OptionGroup hermano. */}
+              <OptionAccordion
+                id="option-half-and-half"
+                label="Pedir mitad y mitad"
+                expanded={halfAndHalf}
+                onToggle={handleToggleHalfAndHalf}
+              >
+                <OptionRadioList
+                  name="second-half"
+                  legend={`Primera mitad: ½ ${product.name}. Elegí la otra mitad:`}
+                  options={halfCandidates.map(c => ({
+                    id: c.id,
+                    label: `½ ${c.name}`,
+                    hint: formatPrice(c.price),
+                  }))}
+                  selectedId={secondHalfId}
+                  onSelect={setSecondHalfId}
+                />
+              </OptionAccordion>
+            </ProductOptions>
+          )}
         </div>
 
         <div className="detail-actions">
           <div className="detail-separator" aria-hidden="true" />
           <div className="detail-price-qty-row">
             <div className="detail-price-block">
-              <span className="detail-price">{formatPrice(totalPrice)}</span>
+              <span className="detail-price" data-testid="detail-total-price">
+                {formatPrice(totalPrice)}
+              </span>
               {qty > 1 && (
-                <span className="detail-unit-price">{formatPrice(product.price)} c/u</span>
+                <span className="detail-unit-price">{formatPrice(unitPrice)} c/u</span>
               )}
             </div>
             <div className="detail-qty-control" role="group" aria-label="Cantidad">
@@ -121,6 +175,7 @@ export function ProductDetailScreen({ product, onBack, onAddToCart }) {
           <button
             className={`detail-cta-btn${added ? ' detail-cta-btn--added' : ''}`}
             onClick={handleAdd}
+            disabled={ctaBlocked}
           >
             {added ? (
               <span className="detail-cta-check">✓</span>
@@ -128,7 +183,11 @@ export function ProductDetailScreen({ product, onBack, onAddToCart }) {
               <CartIcon />
             )}
             <span className="detail-cta-label">
-              {added ? '¡Agregado!' : 'Agregar al carrito'}
+              {added
+                ? '¡Agregado!'
+                : ctaBlocked
+                  ? 'Elegí la otra mitad'
+                  : 'Agregar al carrito'}
             </span>
           </button>
         </div>

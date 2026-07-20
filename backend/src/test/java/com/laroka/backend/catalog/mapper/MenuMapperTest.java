@@ -13,6 +13,7 @@ import com.laroka.backend.catalog.dto.MenuCategoryDTO;
 import com.laroka.backend.catalog.dto.MenuProductDTO;
 import com.laroka.backend.catalog.entity.BranchProduct;
 import com.laroka.backend.catalog.entity.Category;
+import com.laroka.backend.catalog.entity.CategoryType;
 import com.laroka.backend.catalog.entity.Product;
 
 /**
@@ -99,5 +100,48 @@ class MenuMapperTest {
 		assertThat(menu.get(0).getProducts())
 			.extracting(MenuProductDTO::getAvailable)
 			.containsExactly(true, false);
+	}
+
+	// US-HH-F-01: el menú expone allowsHalfAndHalf por categoría para que el client sepa
+	// en qué productos ofrecer la opción de mitad y mitad.
+
+	private BranchProduct branchProductWithType(CategoryType categoryType) {
+		Category category = Category.builder().id(1).name("Pizzas").categoryType(categoryType).build();
+		Product product = Product.builder()
+			.id(1).name("Muzzarella").price(new BigDecimal("2800.00")).category(category)
+			.build();
+		return BranchProduct.builder()
+			.branch(Branch.builder().id(1).build())
+			.product(product)
+			.available(true)
+			.build();
+	}
+
+	@Test
+	void toMenu_categoryTypeAllowsHalfAndHalf_exposesFlagTrue() {
+		CategoryType pizza = CategoryType.builder().id(7).name("Pizza").allowsHalfAndHalf(true).active(true).build();
+
+		List<MenuCategoryDTO> menu = mapper.toMenu(List.of(branchProductWithType(pizza)));
+
+		assertThat(menu.get(0).isAllowsHalfAndHalf()).isTrue();
+	}
+
+	@Test
+	void toMenu_categoryTypeDoesNotAllowHalfAndHalf_exposesFlagFalse() {
+		CategoryType bebida = CategoryType.builder().id(8).name("Bebida").allowsHalfAndHalf(false).active(true).build();
+
+		List<MenuCategoryDTO> menu = mapper.toMenu(List.of(branchProductWithType(bebida)));
+
+		assertThat(menu.get(0).isAllowsHalfAndHalf()).isFalse();
+	}
+
+	@Test
+	void toMenu_categoryWithoutType_exposesFlagFalseWithoutFailing() {
+		// Categoría anterior a US-CAT-02, sin tipo asignado: el FK es nullable y el menú
+		// debe seguir respondiendo, no romper con NPE.
+		List<MenuCategoryDTO> menu = mapper.toMenu(List.of(branchProductWithType(null)));
+
+		assertThat(menu).hasSize(1);
+		assertThat(menu.get(0).isAllowsHalfAndHalf()).isFalse();
 	}
 }

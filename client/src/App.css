@@ -1228,6 +1228,17 @@
   filter: brightness(0.88);
 }
 
+/* US-HH-F-01: bloqueado mientras falta elegir la otra mitad. */
+.detail-cta-btn:disabled {
+  filter: grayscale(0.55) brightness(0.55);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+.detail-cta-btn:disabled:active {
+  filter: grayscale(0.55) brightness(0.55);
+}
+
 .detail-cta-btn--added {
   background: linear-gradient(
     135deg,

@@ -24,6 +24,10 @@ public class MenuMapper {
 				return MenuCategoryDTO.builder()
 					.categoryId(category.getId())
 					.categoryName(category.getName())
+					// US-HH-F-01: categoryType viene del LEFT JOIN FETCH de la query del menú.
+					// Null (categoría sin tipo asignado) → false, no habilita mitad y mitad.
+					.allowsHalfAndHalf(category.getCategoryType() != null
+						&& category.getCategoryType().isAllowsHalfAndHalf())
 					.products(entry.getValue().stream()
 						// US-15-11: dentro de cada categoría, productos disponibles
 						// primero y no disponibles al final. Sort estable: preserva el
