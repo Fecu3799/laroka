@@ -22,15 +22,15 @@ public interface OrderRepository extends JpaRepository<Order, UUID>, JpaSpecific
 
     List<Order> findByStatusAndCreatedAtBefore(OrderStatus status, LocalDateTime threshold);
 
-    @EntityGraph(attributePaths = {"items", "items.product", "items.secondProduct"})
+    @EntityGraph(attributePaths = {"items", "items.product", "items.secondProduct", "items.productSize"})
     @Query("SELECT o FROM Order o WHERE o.branch.id = :branchId AND o.status NOT IN :excluded")
     List<Order> findActiveByBranchId(@Param("branchId") Integer branchId,
                                      @Param("excluded") Collection<OrderStatus> excluded);
 
-    @EntityGraph(attributePaths = {"items", "items.product", "items.secondProduct"})
+    @EntityGraph(attributePaths = {"items", "items.product", "items.secondProduct", "items.productSize"})
     List<Order> findByBranchIdAndShiftId(Integer branchId, UUID shiftId);
 
-    @EntityGraph(attributePaths = {"items", "items.product", "items.secondProduct"})
+    @EntityGraph(attributePaths = {"items", "items.product", "items.secondProduct", "items.productSize"})
     @Query("SELECT o FROM Order o WHERE o.id IN :ids")
     List<Order> findByIdsWithItems(@Param("ids") Collection<UUID> ids);
 
@@ -42,7 +42,8 @@ public interface OrderRepository extends JpaRepository<Order, UUID>, JpaSpecific
     @Query("SELECT o FROM Order o WHERE o.id = :id")
     Optional<Order> findByIdWithBranch(@Param("id") UUID id);
 
-    @EntityGraph(attributePaths = {"branch", "items", "items.product", "items.secondProduct"})
+    @EntityGraph(attributePaths = {"branch", "items", "items.product", "items.secondProduct",
+        "items.productSize"})
     @Query("SELECT o FROM Order o WHERE o.id = :id")
     Optional<Order> findByIdWithDetails(@Param("id") UUID id);
 

@@ -209,3 +209,43 @@ describe('ítem mitad y mitad en ticket y comanda (US-HH-04)', () => {
     expect(html).toContain('<td class="name">½ Muzzarella + ½ Calabresa</td>')
   })
 })
+
+describe('ítem con tamaño en ticket y comanda', () => {
+  const CHICA = { quantity: 1, productName: 'Muzzarella', sizeName: 'CHICA', unitPrice: 9000 }
+  const GRANDE = { quantity: 2, productName: 'Napolitana', sizeName: null, unitPrice: 17000 }
+
+  it('buildTicketModel muestra el tamaño entre paréntesis', () => {
+    const model = buildTicketModel({ items: [CHICA, GRANDE] }, {})
+
+    expect(model.items[0].name).toBe('Muzzarella (Chica)')
+    // El grande es implícito: sin sufijo, igual que antes de existir los tamaños.
+    expect(model.items[1].name).toBe('Napolitana')
+  })
+
+  it('buildComandaModel muestra el tamaño, que en cocina cambia qué se prepara', () => {
+    const model = buildComandaModel({ items: [CHICA, GRANDE] })
+
+    expect(model.items).toEqual([
+      { quantity: 1, name: 'Muzzarella (Chica)' },
+      { quantity: 2, name: 'Napolitana' },
+    ])
+  })
+
+  it('la comanda impresa muestra el tamaño con la misma tipografía que el resto', async () => {
+    const cap = installCapture()
+    printComanda({ orderNumber: 47, orderType: 'TAKEAWAY', createdAt: '2026-07-10T20:34:00', items: [CHICA] })
+    const html = await cap.html()
+
+    expect(html).toContain('<span class="item-name">Muzzarella (Chica)</span>')
+    vi.restoreAllMocks()
+  })
+
+  it('el ticket impreso muestra el tamaño en la columna de detalle', async () => {
+    const cap = installCapture()
+    printTicket({ orderNumber: 47, orderType: 'TAKEAWAY', createdAt: '2026-07-10T20:34:00', items: [CHICA] }, {})
+    const html = await cap.html()
+
+    expect(html).toContain('<td class="name">Muzzarella (Chica)</td>')
+    vi.restoreAllMocks()
+  })
+})

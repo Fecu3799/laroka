@@ -118,6 +118,30 @@ class OrderItemsHalfAndHalfIntegrationTest {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$[0].name").value("Muzzarella"))
 			.andExpect(jsonPath("$[0].secondProductName").doesNotExist())
+			.andExpect(jsonPath("$[0].sizeName").doesNotExist())
 			.andExpect(jsonPath("$[0].quantity").value(2));
+	}
+
+	// El mismo endpoint expone el tamaño, para que el banner de seguimiento muestre el ítem
+	// igual que el carrito antes de confirmar.
+
+	@Test
+	void getOrderItems_sizedItem_exposesSizeName() throws Exception {
+		jdbcTemplate.update(
+			"INSERT INTO product_size (product_id, size, price, active) VALUES (?, ?, ?, ?)",
+			1, "CHICA", new BigDecimal("1900.00"), true);
+		Integer sizeId = jdbcTemplate.queryForObject(
+			"SELECT id FROM product_size WHERE product_id = 1 AND size = 'CHICA'", Integer.class);
+
+		UUID orderId = createOrder(
+			"[{\"productId\":1,\"productSizeId\":" + sizeId + ",\"quantity\":1}]");
+
+		mockMvc.perform(get("/orders/" + orderId + "/items"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$[0].name").value("Muzzarella"))
+			.andExpect(jsonPath("$[0].sizeName").value("CHICA"))
+			.andExpect(jsonPath("$[0].secondProductName").doesNotExist())
+			// US-SIZE-02: el precio del ítem es el del tamaño, no el del producto.
+			.andExpect(jsonPath("$[0].unitPrice").value(1900.00));
 	}
 }

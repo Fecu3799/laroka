@@ -91,12 +91,17 @@ public class OrderMapper {
         // US-HH-01: secondProduct puede ser null (ítem simple). Debe venir inicializado desde la
         // query (items.secondProduct en el @EntityGraph) para leer su name fuera de sesión.
         Product secondProduct = item.getSecondProduct();
+        // Mismo criterio para el tamaño: viene del @EntityGraph (items.productSize), no de un
+        // lazy load. Este DTO alimenta el detalle del backoffice, y con él ticket y comanda.
+        ProductSize productSize = item.getProductSize();
         return OrderItemResponseDTO.builder()
                 .id(item.getId())
                 .productId(item.getProduct().getId())
                 .productName(item.getProduct().getName())
                 .secondProductId(secondProduct != null ? secondProduct.getId() : null)
                 .secondProductName(secondProduct != null ? secondProduct.getName() : null)
+                .productSizeId(productSize != null ? productSize.getId() : null)
+                .sizeName(productSize != null ? productSize.getSize().name() : null)
                 .quantity(item.getQuantity())
                 .unitPrice(item.getUnitPrice())
                 .subtotal(item.getSubtotal())
@@ -110,10 +115,13 @@ public class OrderMapper {
     private OrderItemStatusDTO toItemStatusDTO(OrderItem item) {
         // US-HH-F-02: secondProduct debe venir inicializado desde la query
         // (LEFT JOIN FETCH en findByOrderIdWithProduct) para leer su name fuera de sesión.
+        // Mismo criterio para productSize, que acá viaja como sizeName.
         Product secondProduct = item.getSecondProduct();
+        ProductSize productSize = item.getProductSize();
         return OrderItemStatusDTO.builder()
                 .name(item.getProduct().getName())
                 .secondProductName(secondProduct != null ? secondProduct.getName() : null)
+                .sizeName(productSize != null ? productSize.getSize().name() : null)
                 .quantity(item.getQuantity())
                 .unitPrice(item.getUnitPrice())
                 .subtotal(item.getSubtotal())
@@ -185,9 +193,13 @@ public class OrderMapper {
     private BackofficeOrderItemDTO toBackofficeItemDTO(OrderItem item) {
         // US-HH-01: expone la segunda mitad cuando corresponde (null en ítems simples).
         Product secondProduct = item.getSecondProduct();
+        // Igual que secondProduct, productSize debe venir inicializado desde la query
+        // (items.productSize en el @EntityGraph) para leerlo fuera de la sesión.
+        ProductSize productSize = item.getProductSize();
         return BackofficeOrderItemDTO.builder()
                 .productName(item.getProduct().getName())
                 .secondProductName(secondProduct != null ? secondProduct.getName() : null)
+                .sizeName(productSize != null ? productSize.getSize().name() : null)
                 .quantity(item.getQuantity())
                 .unitPrice(item.getUnitPrice())
                 .subtotal(item.getSubtotal())

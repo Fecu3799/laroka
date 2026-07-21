@@ -105,6 +105,21 @@ describe('orderItemDisplayName', () => {
     expect(orderItemDisplayName({ name: 'Fugazzeta', secondProductName: null })).toBe('Fugazzeta')
     expect(orderItemDisplayName({ name: 'Fugazzeta' })).toBe('Fugazzeta')
   })
+
+  it('muestra el tamaño con el mismo formato que el carrito', () => {
+    const apiItem = { name: 'Muzzarella', sizeName: 'CHICA', quantity: 1 }
+
+    expect(orderItemDisplayName(apiItem)).toBe('Muzzarella (Chica)')
+    // El mismo texto que arma buildSizedItem al agregarlo al carrito: el pedido se lee igual
+    // antes y después de confirmarlo.
+    expect(orderItemDisplayName(apiItem)).toBe(
+      buildSizedItem({ id: 1, name: 'Muzzarella' }, { id: 50, size: 'CHICA', price: 1900 }).name,
+    )
+  })
+
+  it('sin sizeName no agrega sufijo: el grande es implícito', () => {
+    expect(orderItemDisplayName({ name: 'Muzzarella', sizeName: null })).toBe('Muzzarella')
+  })
 })
 
 describe('buildSizedItem', () => {

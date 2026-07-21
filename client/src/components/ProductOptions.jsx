@@ -85,9 +85,9 @@ export function OptionAccordion({ id, label, expanded, onToggle, disabled, disab
  * Cada opción es `{ id, label, hint }` — `hint` es el texto secundario a la derecha
  * (el precio, en ambos casos).
  */
-export function OptionRadioList({ name, legend, options, selectedId, onSelect }) {
+export function OptionRadioList({ name, legend, options, selectedId, onSelect, disabled = false }) {
   return (
-    <fieldset className={styles.fieldset}>
+    <fieldset className={styles.fieldset} disabled={disabled}>
       <legend className={styles.legend}>{legend}</legend>
       <div className={styles.radioList}>
         {options.map((option) => {
@@ -95,7 +95,8 @@ export function OptionRadioList({ name, legend, options, selectedId, onSelect })
           return (
             <label
               key={option.id}
-              className={`${styles.radioRow}${selected ? ` ${styles.radioRowSelected}` : ''}`}
+              className={`${styles.radioRow}${selected ? ` ${styles.radioRowSelected}` : ''}`
+                + `${disabled ? ` ${styles.radioRowFixed}` : ''}`}
             >
               <input
                 type="radio"

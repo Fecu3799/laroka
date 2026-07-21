@@ -416,3 +416,62 @@ describe('OrderTrackingBanner — ítem mitad y mitad (US-HH-F-02)', () => {
     expect(screen.queryByText(/½/)).not.toBeInTheDocument()
   })
 })
+
+describe('OrderTrackingBanner — ítem con tamaño (US-SIZE)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  const STATUS = {
+    orderId: 'order-size',
+    status: 'IN_PREPARATION',
+    orderType: 'TAKEAWAY',
+    subtotal: 1900,
+    serviceFee: 0,
+    deliveryFee: 0,
+    totalAmount: 1900,
+    history: [],
+  }
+
+  function mockStatusAndItems(items) {
+    vi.stubGlobal('fetch', vi.fn(url => {
+      if (String(url).includes('/items')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(items) })
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(STATUS) })
+    }))
+  }
+
+  async function openDetail() {
+    seedOrder('order-size')
+    render(<OrderTrackingBanner branchId={1} />)
+    const btn = await screen.findByRole('button', { name: /ver detalle/i })
+    await act(async () => {
+      await userEvent.click(btn)
+    })
+  }
+
+  it('muestra el tamaño elegido en el ítem', async () => {
+    mockStatusAndItems([
+      { name: 'Muzzarella', secondProductName: null, sizeName: 'CHICA', quantity: 1, unitPrice: 1900, subtotal: 1900 },
+    ])
+    await openDetail()
+
+    await waitFor(() => {
+      expect(screen.getByText(/1×\s*Muzzarella \(Chica\)/)).toBeInTheDocument()
+    })
+  })
+
+  it('un ítem sin tamaño no gana sufijo', async () => {
+    // El grande es implícito: viaja sin sizeName y se muestra como siempre.
+    mockStatusAndItems([
+      { name: 'Muzzarella', secondProductName: null, sizeName: null, quantity: 2, unitPrice: 15000, subtotal: 30000 },
+    ])
+    await openDetail()
+
+    await waitFor(() => {
+      expect(screen.getByText(/2×\s*Muzzarella/)).toBeInTheDocument()
+    })
+    expect(screen.queryByText(/\(/)).not.toBeInTheDocument()
+  })
+})

@@ -63,7 +63,12 @@ export function ProductDetailScreen({ product, onBack, onAddToCart, onAddHalfAnd
   // primero y es la opción por defecto. Una fila GRANDE cargada por el ADMIN sería un
   // duplicado de esa opción, así que no se ofrece (ver nota en el informe de la historia).
   const sizes = (product.sizes ?? []).filter(s => s.size !== 'GRANDE')
-  const canChooseSize = product.allowsSizes === true && sizes.length > 0
+  // El grupo se muestra en toda la categoría que admite tamaños, tenga o no alternativas
+  // cargadas este producto: si desapareciera, el cliente no se enteraría de que los tamaños
+  // existen y leería este producto como si nunca hubiera opción.
+  const showSizes = product.allowsSizes === true
+  // Sin alternativas, "Grande" queda fijo: se ve elegido pero no se puede cambiar.
+  const hasAlternativeSizes = sizes.length > 0
   const selectedSize = sizes.find(s => s.id === sizeId) ?? null
 
   // US-SIZE-03: el backend rechaza con 422 un ítem que combine tamaño con mitad y mitad, y
@@ -143,14 +148,16 @@ export function ProductDetailScreen({ product, onBack, onAddToCart, onAddHalfAnd
             <p className="detail-description">{product.description}</p>
           )}
 
-          {(canChooseSize || canOrderHalfAndHalf) && (
+          {(showSizes || canOrderHalfAndHalf) && (
             <ProductOptions>
               {/* US-SIZE-F-02: el tamaño va primero — condiciona si mitad y mitad se puede. */}
-              {canChooseSize && (
+              {showSizes && (
                 <OptionGroup title="Tamaño">
                   <OptionRadioList
                     name="product-size"
-                    legend="Elegí el tamaño:"
+                    legend={hasAlternativeSizes
+                      ? 'Elegí el tamaño:'
+                      : 'Esta pizza va sólo en tamaño grande:'}
                     options={[
                       { id: null, label: 'Grande', hint: formatPrice(product.price) },
                       ...sizes.map(sz => ({
@@ -161,6 +168,7 @@ export function ProductDetailScreen({ product, onBack, onAddToCart, onAddHalfAnd
                     ]}
                     selectedId={sizeId}
                     onSelect={handleSelectSize}
+                    disabled={!hasAlternativeSizes}
                   />
                 </OptionGroup>
               )}

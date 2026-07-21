@@ -11,6 +11,8 @@ import org.junit.jupiter.api.Test;
 
 import com.laroka.backend.branch.entity.Branch;
 import com.laroka.backend.catalog.entity.Product;
+import com.laroka.backend.catalog.entity.ProductSize;
+import com.laroka.backend.catalog.entity.ProductSizeName;
 import com.laroka.backend.order.dto.BackofficeOrderResponseDTO;
 import com.laroka.backend.order.dto.CreateOrderResponseDTO;
 import com.laroka.backend.order.entity.Order;
@@ -85,5 +87,51 @@ class OrderMapperTest {
 			.containsExactly(
 				tuple("Muzzarella", null),
 				tuple("Muzzarella", "Napolitana"));
+	}
+
+	// El backoffice también expone el tamaño del ítem, con el mismo criterio: null cuando el
+	// ítem no lleva tamaño, que es el caso del grande (implícito, sin fila en product_size).
+
+	private OrderItem sizedItem() {
+		return OrderItem.builder()
+			.id(UUID.randomUUID())
+			.product(product(1, "Muzzarella"))
+			.productSize(ProductSize.builder()
+				.id(50).size(ProductSizeName.CHICA).price(new BigDecimal("9000.00")).build())
+			.quantity(1)
+			.unitPrice(new BigDecimal("9000.00"))
+			.subtotal(new BigDecimal("9000.00"))
+			.build();
+	}
+
+	@Test
+	void toBackofficeResponseDTO_exposesSizeName_onlyForSizedItem() {
+		Order withSize = Order.builder()
+			.id(UUID.randomUUID())
+			.status(OrderStatus.RECEIVED)
+			.orderType(OrderType.TAKEAWAY)
+			.subtotal(new BigDecimal("11800.00"))
+			.deliveryFee(BigDecimal.ZERO)
+			.serviceFee(BigDecimal.ZERO)
+			.totalAmount(new BigDecimal("11800.00"))
+			.branch(Branch.builder().id(1).name("Centro").build())
+			.items(List.of(simpleItem(), sizedItem()))
+			.build();
+
+		BackofficeOrderResponseDTO dto = mapper.toBackofficeResponseDTO(withSize, null);
+
+		assertThat(dto.getItems())
+			.extracting("productName", "sizeName")
+			.containsExactly(
+				tuple("Muzzarella", null),
+				tuple("Muzzarella", "CHICA"));
+	}
+
+	@Test
+	void toBackofficeResponseDTO_halfAndHalfItem_leavesSizeNameNull() {
+		// Tamaño y mitad y mitad son excluyentes (US-SIZE-03): nunca coinciden en un ítem.
+		BackofficeOrderResponseDTO dto = mapper.toBackofficeResponseDTO(order(), null);
+
+		assertThat(dto.getItems()).extracting("sizeName").containsOnlyNulls();
 	}
 }

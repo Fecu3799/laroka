@@ -27,12 +27,16 @@ export function halfAndHalfName(first, second) {
 }
 
 // US-HH-F-02: nombre a mostrar para un ítem que viene del backend
-// (GET /orders/{id}/items), cuya forma es { name, secondProductName } en vez de dos
-// productos. Delega en halfAndHalfName para no duplicar el formato "½ A + ½ B".
+// (GET /orders/{id}/items), cuya forma es { name, secondProductName, sizeName } en vez de
+// productos. Delega en los mismos formatos que usan el detalle y el carrito, para que un
+// pedido se lea igual antes y después de confirmarlo.
 export function orderItemDisplayName(item) {
-  return item.secondProductName
-    ? halfAndHalfName({ name: item.name }, { name: item.secondProductName })
-    : item.name
+  if (item.secondProductName) {
+    return halfAndHalfName({ name: item.name }, { name: item.secondProductName })
+  }
+  // Tamaño y mitad y mitad son excluyentes (US-SIZE-03), así que nunca compiten acá. El
+  // grande no lleva sufijo: es implícito y viaja sin sizeName.
+  return item.sizeName ? sizedItemName(item.name, item.sizeName) : item.name
 }
 
 export function buildHalfAndHalfItem(first, second) {
@@ -56,13 +60,19 @@ export function sizedCartId(productId, productSizeId) {
   return `size-${productId}-${productSizeId}`
 }
 
+// Nombre de un ítem con tamaño. Única definición del formato: la usan el armado del carrito
+// y el banner de seguimiento, así que el pedido se lee igual antes y después de confirmarlo.
+export function sizedItemName(name, size) {
+  return `${name} (${sizeLabel(size)})`
+}
+
 export function buildSizedItem(product, size) {
   return {
     id: sizedCartId(product.id, size.id),
     productId: product.id,
     productSizeId: size.id,
     sizeName: size.size,
-    name: `${product.name} (${sizeLabel(size.size)})`,
+    name: sizedItemName(product.name, size.size),
     price: Number(size.price),
     imageUrl: product.imageUrl || null,
     description: null,

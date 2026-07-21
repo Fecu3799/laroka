@@ -278,3 +278,35 @@ describe('ítem mitad y mitad', () => {
       .not.toHaveClass('detail-prod-name--multiline')
   })
 })
+
+// ── Ítem con tamaño ───────────────────────────────────────────
+
+describe('ítem con tamaño', () => {
+  const ORDER_SIZED = {
+    ...BASE_ORDER,
+    id: 'dddd0000-0000-0000-0000-000000000004',
+    items: [
+      { productName: 'Muzzarella', secondProductName: null, sizeName: 'CHICA', quantity: 1, unitPrice: 9000 },
+      { productName: 'Napolitana', secondProductName: null, sizeName: null, quantity: 2, unitPrice: 17000 },
+    ],
+  }
+
+  test('la columna de productos del listado muestra el tamaño', () => {
+    renderOrders([ORDER_SIZED])
+
+    const items = document.querySelector('.col-items')
+    expect(items.textContent).toContain('Muzzarella (Chica)')
+    // Sin tamaño no lleva sufijo: el grande es implícito.
+    expect(items.textContent).toContain('Napolitana')
+    expect(items.textContent).not.toContain('Napolitana (')
+  })
+
+  test('la tabla del panel de detalle muestra el tamaño', () => {
+    renderOrders([ORDER_SIZED])
+    fireEvent.click(document.querySelector('.orders-row'))
+
+    const panel = document.querySelector('.orders-detail-col')
+    expect(within(panel).getByText('Muzzarella (Chica)')).toBeInTheDocument()
+    expect(within(panel).getByText('Napolitana')).toBeInTheDocument()
+  })
+})

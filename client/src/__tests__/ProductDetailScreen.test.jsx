@@ -156,10 +156,38 @@ describe('ProductDetailScreen — tamaños (US-SIZE-F-02)', () => {
     expect(sizeRadio('Chica')).not.toBeInTheDocument()
   })
 
-  it('no ofrece tamaños si el producto no tiene ninguno cargado', () => {
+  it('sin tamaños cargados la sección no desaparece: queda fija en Grande', () => {
+    // Si se ocultara, el cliente no se enteraría de que existen tamaños y leería este
+    // producto como si nunca hubiera opción. Se muestra elegido pero no se puede cambiar.
     renderConTamanios({ sizes: [] })
 
-    expect(sizeRadio('Grande')).not.toBeInTheDocument()
+    expect(sizeRadio('Grande')).toBeInTheDocument()
+    expect(sizeRadio('Grande')).toBeChecked()
+    expect(sizeRadio('Grande')).toBeDisabled()
+    expect(sizeRadio('Chica')).not.toBeInTheDocument()
+  })
+
+  it('sin tamaños cargados explica que sólo va en grande', () => {
+    renderConTamanios({ sizes: [] })
+
+    expect(screen.getByText(/sólo en tamaño grande/i)).toBeInTheDocument()
+  })
+
+  it('sin tamaños cargados, mitad y mitad sigue disponible', () => {
+    // El bloqueo de mitad y mitad depende de haber elegido un tamaño alternativo, no de que
+    // el producto tenga tamaños cargados: en grande siempre se puede combinar.
+    renderConTamanios({ sizes: [] })
+
+    expect(halfRow()).toBeEnabled()
+    expect(screen.queryByText(/sólo disponible en tamaño grande/i)).not.toBeInTheDocument()
+  })
+
+  it('sin tamaños cargados el ítem se agrega sin productSizeId', () => {
+    const props = renderConTamanios({ sizes: [] })
+    fireEvent.click(cta())
+
+    expect(props.onAddToCart).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }), 1)
+    expect(props.onAddSized).not.toHaveBeenCalled()
   })
 
   it('ofrece Grande (por defecto) y Chica con sus precios', () => {

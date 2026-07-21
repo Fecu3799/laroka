@@ -64,17 +64,17 @@
   z-index: 1100;
 }
 
+/* Posición fija: la lista vive en un portal a <body>, con left/top/width calculados desde el
+   trigger. En absoluto dentro del formulario la recortaba el overflow-y de los drawers.
+   El max-height lo fija el componente según el espacio disponible en pantalla. */
 .cs-list {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  right: 0;
+  position: fixed;
   z-index: 1101;
   margin: 0;
   padding: 6px;
   list-style: none;
-  max-height: 220px;
   overflow-y: auto;
+  overscroll-behavior: contain;
   background: var(--color-sidebar-bg);
   border: 1px solid color-mix(in srgb, var(--border) 32%, transparent);
   border-radius: 11px;
@@ -82,6 +82,12 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
+}
+
+/* Sin esto los <li> son ítems flex y, al no entrar en el max-height, se comprimen en vez de
+   desbordar: la lista no scrollea y las opciones quedan aplastadas. */
+.cs-list > li {
+  flex-shrink: 0;
 }
 
 .cs-option {

@@ -142,6 +142,12 @@
   border-color: var(--accent);
 }
 
+/* Opción única y fija: el producto sólo viene en ese tamaño. Se muestra elegida pero sin
+   cursor de acción, para que no parezca que se puede cambiar y no responde. */
+.radioRowFixed {
+  cursor: default;
+}
+
 .radioRowSelected .radioDot::after {
   content: '';
   position: absolute;
