@@ -6,6 +6,7 @@ import java.util.Map;
 
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,6 +17,7 @@ import com.laroka.backend.catalog.entity.BranchProduct;
 import com.laroka.backend.catalog.entity.Category;
 import com.laroka.backend.catalog.entity.Product;
 import com.laroka.backend.catalog.entity.ProductSize;
+import com.laroka.backend.catalog.event.ProductDeletedEvent;
 import com.laroka.backend.catalog.exception.BranchProductNotFoundException;
 import com.laroka.backend.catalog.exception.CategoryNotFoundException;
 import com.laroka.backend.catalog.exception.ProductNotFoundException;
@@ -39,6 +41,7 @@ public class ProductService {
 	private final BranchProductRepository branchProductRepository;
 	private final ProductSizeService productSizeService;
 	private final TenantRepository tenantRepository;
+	private final ApplicationEventPublisher eventPublisher;
 
 	public Product findById(Integer id) {
 		return repository.findById(id)
@@ -124,12 +127,17 @@ public class ProductService {
 	// Eliminar un producto borra primero todas sus entradas branch_product (FK) y luego
 	// el producto, todo en la misma transacción. Invalida el caché del menú de todas las
 	// sucursales porque el producto deja de existir en cualquiera de ellas.
+	//
+	// La evicción NO va con @CacheEvict acá: el orden entre el advisor de transacción y el
+	// de cache no está garantizado, y evictar antes del commit abre una ventana donde un
+	// request concurrente repuebla "menu" con el producto todavía vivo. En su lugar se
+	// publica ProductDeletedEvent y MenuCacheEvictionListener evicta en AFTER_COMMIT.
 	@Transactional
-	@CacheEvict(value = "menu", allEntries = true)
 	public void delete(Integer id) {
 		Product product = findById(id);
 		branchProductRepository.deleteByProductId(id);
 		repository.delete(product);
+		eventPublisher.publishEvent(new ProductDeletedEvent(id));
 	}
 
 	@CacheEvict(value = "menu", key = "#branchId")

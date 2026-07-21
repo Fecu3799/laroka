@@ -47,6 +47,7 @@ class ProductServiceTest {
 	@Mock private BranchProductRepository branchProductRepository;
 	@Mock private com.laroka.backend.catalog.service.ProductSizeService productSizeService;
 	@Mock private TenantRepository tenantRepository;
+	@Mock private org.springframework.context.ApplicationEventPublisher eventPublisher;
 
 	@InjectMocks
 	private ProductService service;
@@ -313,6 +314,10 @@ class ProductServiceTest {
 		service.delete(1);
 
 		verify(productRepository).delete(product);
+		// La evicción del menú viaja por el evento, no por @CacheEvict: MenuCacheEvictionListener
+		// lo consume en AFTER_COMMIT para no evictar antes de que el commit esté confirmado.
+		verify(eventPublisher).publishEvent(
+			new com.laroka.backend.catalog.event.ProductDeletedEvent(1));
 	}
 
 	@Test
@@ -321,6 +326,7 @@ class ProductServiceTest {
 
 		assertThatThrownBy(() -> service.delete(99))
 			.isInstanceOf(ProductNotFoundException.class);
+		verify(eventPublisher, never()).publishEvent(any(Object.class));
 	}
 
 	// --- updateAvailability ---

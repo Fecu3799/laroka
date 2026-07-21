@@ -1,5 +1,6 @@
 package com.laroka.backend.catalog.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -102,5 +103,27 @@ class MenuCacheTest {
 		productService.getMenuForBranch(1);
 
 		verify(branchProductRepository, times(2)).findByBranchIdWithProductAndCategory(1);
+	}
+
+	// delete() no puede usar @CacheEvict (ver MenuCacheEvictionListener): evicta vía
+	// ProductDeletedEvent en AFTER_COMMIT. El test corre sin @Transactional a propósito, así
+	// que la transacción del service commitea de verdad y el listener llega a dispararse.
+	@Test
+	void delete_evictsMenuCacheAfterCommit() {
+		List<BranchProduct> initial = branchProductRepository.findByBranchIdWithProductAndCategory(1);
+		Assumptions.assumeTrue(!initial.isEmpty(), "Branch 1 must have at least one product");
+		Integer productId = initial.get(0).getProduct().getId();
+		clearInvocations(branchProductRepository);
+
+		productService.getMenuForBranch(1);
+		productService.delete(productId);
+
+		BranchMenu afterDelete = productService.getMenuForBranch(1);
+
+		// Si la evicción no hubiera corrido, esta segunda lectura vendría del cache y el
+		// repositorio se habría consultado una sola vez.
+		verify(branchProductRepository, times(2)).findByBranchIdWithProductAndCategory(1);
+		assertThat(afterDelete.branchProducts())
+			.noneMatch(bp -> bp.getProduct().getId().equals(productId));
 	}
 }
