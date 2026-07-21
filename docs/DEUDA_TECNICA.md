@@ -25,11 +25,12 @@
 
 ## DT-04 — `product_size` sin constraint que ate el tamaño a `category_type.allows_sizes`
 
-**Estado:** Pendiente
-**US relacionada:** US-SIZE-01 (introduce la tabla), a resolver en US-SIZE-F-01
-**Descripción:** La regla "solo productos cuya categoría tenga `allows_sizes = true` pueden tener filas en `product_size`" no es expresable como constraint declarativo en PostgreSQL: requiere atravesar `product → category → category_type`, lo que exigiría un trigger o una FK compuesta redundante. Hoy nada a nivel base impide insertar un tamaño para un producto de una categoría que no admite tamaños.
-**Impacto:** La consistencia depende de la validación en el service. Mientras la única vía de escritura sea el backoffice, el riesgo es bajo; una carga manual por TablePlus puede violar la regla sin error.
-**Momento:** Agregar la validación en el service al implementar la escritura de tamaños (US-SIZE-F-01). Evaluar trigger solo si aparece una segunda vía de escritura.
+**Estado:** Resuelta en el service (US-SIZE-04) — sin constraint a nivel base
+**US relacionada:** US-SIZE-01 (introduce la tabla), US-SIZE-04 (agrega la validación)
+**Descripción:** La regla "solo productos cuya categoría tenga `allows_sizes = true` pueden tener filas en `product_size`" no es expresable como constraint declarativo en PostgreSQL: requiere atravesar `product → category → category_type`, lo que exigiría un trigger o una FK compuesta redundante.
+**Resolución:** `ProductSizeService.create` valida la categoría y rechaza con 422. Lo mismo aplica a la restricción de que sólo `CHICA` puede existir como fila (GRANDE es implícito): se valida en el service, no en el enum, porque `ProductSizeName` conserva ambos valores.
+**Riesgo remanente:** Una carga manual por TablePlus sigue pudiendo violar ambas reglas sin error. En el caso de `GRANDE` el efecto es peor que una inconsistencia: el client filtra esas filas, así que la fila quedaría invisible y sin uso. Aceptado mientras el backoffice sea la única vía de escritura real.
+**Momento:** Evaluar un trigger sólo si aparece una segunda vía de escritura automatizada.
 
 ---
 

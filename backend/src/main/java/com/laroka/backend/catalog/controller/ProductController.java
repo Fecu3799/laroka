@@ -19,13 +19,20 @@ import org.springframework.web.bind.annotation.RestController;
 import com.laroka.backend.catalog.dto.AvailabilityUpdateDTO;
 import com.laroka.backend.catalog.dto.BranchProductConfigDTO;
 import com.laroka.backend.catalog.dto.BranchProductConfigRequestDTO;
+import com.laroka.backend.catalog.dto.BranchProductSizeConfigRequestDTO;
 import com.laroka.backend.catalog.dto.ProductPriceUpdateRequestDTO;
 import com.laroka.backend.catalog.dto.ProductRequestDTO;
 import com.laroka.backend.catalog.dto.ProductResponseDTO;
+import com.laroka.backend.catalog.dto.ProductSizeRequestDTO;
+import com.laroka.backend.catalog.dto.ProductSizeResponseDTO;
+import com.laroka.backend.catalog.dto.ProductSizeUpdateRequestDTO;
 import com.laroka.backend.catalog.entity.Product;
+import com.laroka.backend.catalog.entity.ProductSize;
 import com.laroka.backend.catalog.mapper.BranchProductConfigMapper;
 import com.laroka.backend.catalog.mapper.ProductMapper;
+import com.laroka.backend.catalog.mapper.ProductSizeMapper;
 import com.laroka.backend.catalog.service.ProductService;
+import com.laroka.backend.catalog.service.ProductSizeService;
 import com.laroka.backend.shared.security.CustomUserDetails;
 import com.laroka.backend.shared.security.SecurityUtils;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -44,8 +51,10 @@ import lombok.RequiredArgsConstructor;
 public class ProductController {
 
 	private final ProductService service;
+	private final ProductSizeService productSizeService;
 	private final ProductMapper mapper;
 	private final BranchProductConfigMapper branchProductConfigMapper;
+	private final ProductSizeMapper productSizeMapper;
 	private final SecurityUtils securityUtils;
 
 	@GetMapping("/{id}")
@@ -138,5 +147,56 @@ public class ProductController {
 			@Valid @RequestBody ProductPriceUpdateRequestDTO dto) {
 		Product updated = service.updatePrice(id, dto.getPrice(), dto.getApplyToAllBranches());
 		return ResponseEntity.ok(mapper.toResponseDTO(updated));
+	}
+
+	// ── Tamaños (US-SIZE-04) ────────────────────────────────────────────────────
+
+	@GetMapping("/{id}/sizes")
+	@PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+	@Operation(summary = "List product sizes",
+			description = "Returns every size of the product, active and inactive. The client menu only "
+					+ "exposes the active ones.")
+	public ResponseEntity<List<ProductSizeResponseDTO>> getSizes(@PathVariable Integer id) {
+		return ResponseEntity.ok(productSizeMapper.toResponseDTOList(productSizeService.findByProduct(id)));
+	}
+
+	@PostMapping("/{id}/sizes")
+	@PreAuthorize("hasRole('ADMIN')")
+	@Operation(summary = "Create a product size",
+			description = "Creates a size row with its base price. Only CHICA is accepted: the large size is "
+					+ "implicit and its price is always the product base price, so a GRANDE row would create a "
+					+ "second source of truth. Returns 422 for any other size, for a duplicate size, or when the "
+					+ "product category does not allow sizes.")
+	public ResponseEntity<ProductSizeResponseDTO> createSize(
+			@PathVariable Integer id,
+			@Valid @RequestBody ProductSizeRequestDTO dto) {
+		ProductSize created = productSizeService.create(id, dto.getSize(), dto.getPrice());
+		return ResponseEntity.status(HttpStatus.CREATED).body(productSizeMapper.toResponseDTO(created));
+	}
+
+	@PatchMapping("/{id}/sizes/{sizeId}")
+	@PreAuthorize("hasRole('ADMIN')")
+	@Operation(summary = "Update a product size",
+			description = "Updates the base price and/or the active flag of a size. Both fields are optional. "
+					+ "active=false is a soft delete: the row is kept because historical order items reference it.")
+	public ResponseEntity<ProductSizeResponseDTO> updateSize(
+			@PathVariable Integer id,
+			@PathVariable Integer sizeId,
+			@Valid @RequestBody ProductSizeUpdateRequestDTO dto) {
+		ProductSize updated = productSizeService.update(id, sizeId, dto.getPrice(), dto.getActive());
+		return ResponseEntity.ok(productSizeMapper.toResponseDTO(updated));
+	}
+
+	@PatchMapping("/{id}/sizes/{sizeId}/branch-config")
+	@PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+	@Operation(summary = "Update size price override for a branch",
+			description = "Sets the price override of a size for a specific branch. A null priceOverride clears "
+					+ "the override and the size reverts to its base price.")
+	public ResponseEntity<Void> updateSizeBranchConfig(
+			@PathVariable Integer id,
+			@PathVariable Integer sizeId,
+			@Valid @RequestBody BranchProductSizeConfigRequestDTO dto) {
+		productSizeService.updateBranchOverride(dto.getBranchId(), id, sizeId, dto.getPriceOverride());
+		return ResponseEntity.noContent().build();
 	}
 }

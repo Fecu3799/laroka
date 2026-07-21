@@ -18,6 +18,10 @@ public interface ProductSizeRepository extends JpaRepository<ProductSize, Intege
 	// y del selector del backoffice, pero se conservan por los pedidos históricos.
 	List<ProductSize> findByProductIdAndActiveTrue(Integer productId);
 
+	// US-SIZE-04: todos los tamaños de un producto para el backoffice, activos e inactivos —
+	// el ADMIN tiene que ver el que dio de baja para poder reactivarlo.
+	List<ProductSize> findByProductIdOrderByIdAsc(Integer productId);
+
 	// US-SIZE-01: lookup por (producto, tamaño) — es la clave única de la tabla.
 	Optional<ProductSize> findByProductIdAndSize(Integer productId, ProductSizeName size);
 
