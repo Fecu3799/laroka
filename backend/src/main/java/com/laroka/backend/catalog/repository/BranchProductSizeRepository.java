@@ -20,4 +20,8 @@ public interface BranchProductSizeRepository
 	// US-SIZE-F-02: todos los overrides de una sucursal, para resolver los precios del menú
 	// sin una query por tamaño.
 	List<BranchProductSize> findByBranchId(Integer branchId);
+
+	// US-SIZE-F-01: todos los overrides de un tamaño, uno por sucursal que lo personalizó.
+	// Alimenta la columna de precio del tamaño en la config por sucursal del backoffice.
+	List<BranchProductSize> findByProductSizeId(Integer productSizeId);
 }

@@ -3,6 +3,7 @@ package com.laroka.backend.catalog.service;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.springframework.cache.annotation.CacheEvict;
@@ -165,6 +166,27 @@ public class ProductSizeService {
 			.orElseGet(() -> BranchProductSize.builder().branch(branch).productSize(productSize).build());
 		config.setPriceOverride(priceOverride);
 		return branchProductSizeRepository.save(config);
+	}
+
+	/**
+	 * US-SIZE-F-01: tamaño activo de un producto, si tiene. Optional vacío para todo producto
+	 * sin tamaños (todos los que no son pizza).
+	 *
+	 * Devuelve el primero: hoy sólo puede haber uno activo, porque CHICA es el único tamaño
+	 * cargable y la tabla tiene UNIQUE (product_id, size).
+	 */
+	public Optional<ProductSize> findActiveByProduct(Integer productId) {
+		return productSizeRepository.findByProductIdAndActiveTrue(productId).stream().findFirst();
+	}
+
+	/**
+	 * US-SIZE-F-01: overrides de un tamaño indexados por sucursal. Sin entrada = sin override,
+	 * vale el precio base del tamaño.
+	 */
+	public Map<Integer, BigDecimal> findBranchOverrides(Integer productSizeId) {
+		return branchProductSizeRepository.findByProductSizeId(productSizeId).stream()
+			.filter(bps -> bps.getPriceOverride() != null)
+			.collect(Collectors.toMap(bps -> bps.getBranch().getId(), BranchProductSize::getPriceOverride));
 	}
 
 	/**

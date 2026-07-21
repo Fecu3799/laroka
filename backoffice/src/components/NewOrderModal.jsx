@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import ReactDOM from 'react-dom'
 import useAuth from '../hooks/useAuth'
 import useBranch from '../hooks/useBranch'
@@ -6,6 +6,17 @@ import { createBackofficeOrder } from '../services/ordersService'
 import { fetchBranchMenu } from '../services/catalogService'
 import { fetchBranches } from '../services/branchService'
 import { canConfirmOrder, cartItemKey, halfAndHalfUnitPrice, orderItemDisplayName } from '../utils/ordersUtils'
+
+// Único tamaño alternativo. El grande es implícito: es el producto sin productSizeId, con
+// su precio base — nunca tiene fila propia en product_size (US-SIZE-04).
+const CHICA = 'CHICA'
+
+// Píxeles ocultos por debajo del panel a partir de los cuales vale la pena mostrar la flecha.
+// Con una tolerancia de 1px la flecha aparecía con la lista visualmente completa: el padding
+// inferior del contenedor y el redondeo de las filas desbordan unos pocos píxeles sin
+// esconder nada. Una fila del carrito mide ~40px, así que este umbral queda muy por debajo de
+// media fila —no puede tapar un ítem real— pero por encima del ruido de layout.
+const SCROLL_HINT_THRESHOLD_PX = 16
 import './NewOrderModal.css'
 
 function formatPrice(n) {
@@ -19,6 +30,20 @@ function TrashIcon() {
         d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"
         stroke="currentColor"
         strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+function ChevronDownIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="m6 9 6 6 6-6"
+        stroke="currentColor"
+        strokeWidth="2.2"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
@@ -49,6 +74,15 @@ export default function NewOrderModal({ open, onClose }) {
   const [confirmUnavailable, setConfirmUnavailable] = useState(false)
   // US-HH-F-03: primera mitad elegida, a la espera de la otra. Null = modo normal.
   const [halfPending, setHalfPending] = useState(null)
+  // US-SIZE-F-03: productos marcados para agregarse en tamaño chica. El grande es el modo
+  // por defecto (sin productSizeId), así que sólo se marca lo que se aparta de él.
+  const [chicaMode, setChicaMode] = useState(() => new Set())
+
+  // Indicadores de contenido oculto en el panel de productos seleccionados, uno por borde.
+  // Reflejan el estado real del scroll: aparecen sólo si hay algo tapado de ese lado.
+  const itemsSectionRef = useRef(null)
+  const [hasMoreItemsBelow, setHasMoreItemsBelow] = useState(false)
+  const [hasMoreItemsAbove, setHasMoreItemsAbove] = useState(false)
 
   function resetState() {
     setMenuCategories([])
@@ -64,6 +98,7 @@ export default function NewOrderModal({ open, onClose }) {
     setBranchDeliveryFee(0)
     setBranchServiceFee(0)
     setHalfPending(null)
+    setChicaMode(new Set())
     setConfirmUnavailable(false)
   }
 
@@ -92,6 +127,49 @@ export default function NewOrderModal({ open, onClose }) {
     })
   }, [open, token, branchId])
 
+  // Recalcula si queda contenido oculto abajo en el panel de productos seleccionados.
+  // Depende de cartItems para reevaluar cuando se agrega, quita o cambia la cantidad de un
+  // ítem: agregar uno nuevo puede volver a exceder el alto visible y devolver la flecha.
+  useEffect(() => {
+    const el = itemsSectionRef.current
+    if (!el) {
+      setHasMoreItemsBelow(false)
+      setHasMoreItemsAbove(false)
+      return
+    }
+    function update() {
+      const hiddenBelow = el.scrollHeight - (el.scrollTop + el.clientHeight)
+      setHasMoreItemsBelow(hiddenBelow > SCROLL_HINT_THRESHOLD_PX)
+      // Arriba lo oculto es directamente scrollTop, con el mismo umbral para que las dos
+      // flechas aparezcan y desaparezcan con el mismo criterio.
+      setHasMoreItemsAbove(el.scrollTop > SCROLL_HINT_THRESHOLD_PX)
+    }
+    update()
+    el.addEventListener('scroll', update, { passive: true })
+    window.addEventListener('resize', update)
+    return () => {
+      el.removeEventListener('scroll', update)
+      window.removeEventListener('resize', update)
+    }
+  }, [open, cartItems])
+
+  // Mueve el panel exactamente un ítem, en la dirección indicada (1 = abajo, -1 = arriba).
+  // El paso se mide del DOM (distancia entre dos filas, que ya incluye el gap de la lista)
+  // en vez de hardcodearse, para no desincronizarse del CSS. La animación la da
+  // scroll-behavior: smooth del contenedor.
+  function scrollItemsBy(direction) {
+    const el = itemsSectionRef.current
+    if (!el) return
+    const items = el.querySelectorAll('.nom-cart-item')
+    let step = items.length > 1
+      ? items[1].offsetTop - items[0].offsetTop
+      : items[0]?.offsetHeight ?? 0
+    // Sin layout medible (jsdom, o una sola fila sin alto) se cae a un paso conservador:
+    // moverse de más saltearía ítems, que es peor que quedarse corto.
+    if (!step) step = SCROLL_HINT_THRESHOLD_PX * 2
+    el.scrollTop += direction * step
+  }
+
   // ── Mitad y mitad (US-HH-F-03) ───────────────────────────────
   //
   // Flujo de dos toques: el primer ½ deja el producto "pendiente"; el segundo toque —sobre
@@ -104,8 +182,32 @@ export default function NewOrderModal({ open, onClose }) {
   // no disponibilidad y cae en esa misma advertencia.
   function isHalfCandidate(product, cat) {
     if (!cat.allowsHalfAndHalf) return false
+    // US-SIZE-F-03: un ítem con tamaño no puede ser mitad y mitad — el backend lo rechaza
+    // con 422 (US-SIZE-03). Marcar la chica inhabilita el ½ de esa fila.
+    if (chicaMode.has(product.id)) return false
     if (!halfPending) return true
     return cat.categoryName === halfPending.categoryName && product.id !== halfPending.product.id
+  }
+
+  // ── Tamaño chica (US-SIZE-F-03) ──────────────────────────────
+  //
+  // El grande es implícito: es el producto sin productSizeId, con su precio base. Sólo la
+  // chica se marca, y su precio efectivo de la sucursal ya viene resuelto en sizes[].
+  function chicaSizeOf(product) {
+    return (product.sizes ?? []).find(s => s.size === CHICA) ?? null
+  }
+
+  function canChooseChica(product, cat) {
+    return cat.allowsSizes === true && chicaSizeOf(product) != null
+  }
+
+  function toggleChica(product) {
+    setChicaMode(prev => {
+      const next = new Set(prev)
+      if (next.has(product.id)) next.delete(product.id)
+      else next.add(product.id)
+      return next
+    })
   }
 
   function toggleHalfAndHalf(product, cat) {
@@ -181,11 +283,16 @@ export default function NewOrderModal({ open, onClose }) {
   }
 
   function addToCart(product) {
+    // US-SIZE-F-03: con la chica marcada, el ítem viaja con productSizeId y el precio del
+    // tamaño; sin marcar es el producto entero de siempre.
+    const chica = chicaMode.has(product.id) ? chicaSizeOf(product) : null
     addEntryToCart({
-      productId:   product.id,
-      productName: product.name,
-      unitPrice:   product.price,
-      available:   product.available,
+      productId:     product.id,
+      productName:   product.name,
+      productSizeId: chica ? chica.id : undefined,
+      sizeName:      chica ? chica.size : undefined,
+      unitPrice:     chica ? chica.price : product.price,
+      available:     product.available,
     })
   }
 
@@ -251,6 +358,8 @@ export default function NewOrderModal({ open, onClose }) {
         items:  cartItems.map(i => ({
           productId: i.productId,
           ...(i.secondProductId != null ? { secondProductId: i.secondProductId } : {}),
+          // US-SIZE-F-03: sólo la chica viaja; el grande es la ausencia del campo.
+          ...(i.productSizeId != null ? { productSizeId: i.productSizeId } : {}),
           quantity: i.quantity,
         })),
         origin: 'BACKOFFICE',
@@ -352,8 +461,11 @@ export default function NewOrderModal({ open, onClose }) {
                       <span className="nom-category-count">{cat.products.length}</span>
                     </div>
                     {cat.products.map(product => {
-                      const cartItem = cartItems.find(i => i.key === String(product.id))
                       const isPendingHalf = halfPending?.product.id === product.id
+                      // US-SIZE-F-03: con la chica marcada, la fila opera sobre ese tamaño y
+                      // el precio mostrado sigue al ítem que realmente se agrega.
+                      const isChica = chicaMode.has(product.id)
+                      const chica = isChica ? chicaSizeOf(product) : null
                       // Con una mitad pendiente, todo lo que no sirve para completarla queda
                       // fuera de juego (salvo la propia pendiente, que cancela al tocarla).
                       const dimmed = halfPending != null && !isPendingHalf && !isHalfCandidate(product, cat)
@@ -383,7 +495,27 @@ export default function NewOrderModal({ open, onClose }) {
                               <span className="nom-product-desc">{product.description}</span>
                             )}
                           </div>
-                          <span className="nom-product-price">{formatPrice(product.price)}</span>
+                          <span className="nom-product-price">
+                            {formatPrice(chica ? chica.price : product.price)}
+                          </span>
+                          {/* US-SIZE-F-03: marca la fila para agregarse en tamaño chica. El
+                              grande no se marca — es el comportamiento por defecto. */}
+                          {canChooseChica(product, cat) && (
+                            <button
+                              type="button"
+                              className={`nom-size-btn${isChica ? ' nom-size-btn--active' : ''}`}
+                              onClick={e => { e.stopPropagation(); toggleChica(product) }}
+                              disabled={dimmed}
+                              aria-pressed={isChica}
+                              aria-label={
+                                isChica
+                                  ? `Volver a tamaño grande para ${product.name}`
+                                  : `Elegir tamaño chica para ${product.name}`
+                              }
+                            >
+                              CH
+                            </button>
+                          )}
                           {/* US-HH-F-03: sólo en categorías que admiten mitad y mitad. Un
                               producto no disponible también puede ser mitad — se advierte
                               al confirmar, igual que si se pidiera entero. */}
@@ -392,27 +524,34 @@ export default function NewOrderModal({ open, onClose }) {
                               type="button"
                               className={`nom-half-btn${isPendingHalf ? ' nom-half-btn--active' : ''}`}
                               onClick={e => { e.stopPropagation(); toggleHalfAndHalf(product, cat) }}
-                              disabled={dimmed}
+                              disabled={dimmed || isChica}
                               aria-pressed={isPendingHalf}
+                              title={isChica ? 'Mitad y mitad sólo está disponible en tamaño grande' : undefined}
                               aria-label={
-                                isPendingHalf
-                                  ? `Cancelar mitad y mitad con ${product.name}`
-                                  : halfPending
-                                    ? `Completar mitad y mitad con ${product.name}`
-                                    : `Pedir ${product.name} mitad y mitad`
+                                isChica
+                                  ? `Mitad y mitad no disponible en tamaño chica para ${product.name}`
+                                  : isPendingHalf
+                                    ? `Cancelar mitad y mitad con ${product.name}`
+                                    : halfPending
+                                      ? `Completar mitad y mitad con ${product.name}`
+                                      : `Pedir ${product.name} mitad y mitad`
                               }
                             >
                               ½
                             </button>
                           )}
+                          {/* Sin contador: con tres variantes posibles por producto
+                              (entero, chico, combinado) un badge en el catálogo no puede
+                              representarlas sin confundir. Lo agregado se lee en el panel
+                              "Productos seleccionados", que ya las lista por separado. */}
                           <button
                             type="button"
-                            className={`nom-add-btn${cartItem ? ' nom-add-btn--active' : ''}`}
+                            className="nom-add-btn"
                             onClick={e => { e.stopPropagation(); addToCart(product) }}
                             disabled={dimmed}
                             aria-label={`Agregar ${product.name}`}
                           >
-                            {cartItem ? cartItem.quantity : '+'}
+                            +
                           </button>
                         </div>
                       )
@@ -430,7 +569,22 @@ export default function NewOrderModal({ open, onClose }) {
           <div className="nom-col-right">
 
             {/* Items */}
-            <div className="nom-items-section">
+            <div className="nom-items-wrap">
+            {/* Mismo comportamiento que la flecha de abajo, invertido: aparece sólo si quedó
+                contenido tapado arriba y sube de a un ítem. */}
+            {hasMoreItemsAbove && (
+              <div className="nom-scroll-hint nom-scroll-hint--top">
+                <button
+                  type="button"
+                  className="nom-scroll-hint-btn nom-scroll-hint-btn--up"
+                  onClick={() => scrollItemsBy(-1)}
+                  aria-label="Ver el producto anterior"
+                >
+                  <ChevronDownIcon />
+                </button>
+              </div>
+            )}
+            <div className="nom-items-section" ref={itemsSectionRef}>
               <div className="nom-section-label">PRODUCTOS SELECCIONADOS</div>
               {cartItems.length === 0 ? (
                 <div className="nom-cart-empty">Ningún producto seleccionado</div>
@@ -473,6 +627,21 @@ export default function NewOrderModal({ open, onClose }) {
                   ))}
                 </div>
               )}
+            </div>
+            {/* Sólo mientras haya contenido oculto abajo. El degradado no captura clicks;
+                la flecha sí, y baja de a un ítem. */}
+            {hasMoreItemsBelow && (
+              <div className="nom-scroll-hint nom-scroll-hint--bottom">
+                <button
+                  type="button"
+                  className="nom-scroll-hint-btn"
+                  onClick={() => scrollItemsBy(1)}
+                  aria-label="Ver el siguiente producto"
+                >
+                  <ChevronDownIcon />
+                </button>
+              </div>
+            )}
             </div>
 
             {/* Form */}
