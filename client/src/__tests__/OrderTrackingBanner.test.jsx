@@ -357,3 +357,121 @@ describe('OrderTrackingBanner — status PENDING_PAYMENT', () => {
     expect(screen.getByText(/el pedido será cancelado y no podrá reactivarse/i)).toBeInTheDocument()
   })
 })
+
+describe('OrderTrackingBanner — ítem mitad y mitad (US-HH-F-02)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  const STATUS = {
+    orderId: 'order-hh',
+    status: 'IN_PREPARATION',
+    orderType: 'TAKEAWAY',
+    subtotal: 5900,
+    serviceFee: 0,
+    deliveryFee: 0,
+    totalAmount: 5900,
+    history: [],
+  }
+
+  // GET /orders/{id}/items devuelve secondProductName sólo en los ítems combinados.
+  function mockStatusAndItems(items) {
+    vi.stubGlobal('fetch', vi.fn(url => {
+      if (String(url).includes('/items')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(items) })
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(STATUS) })
+    }))
+  }
+
+  async function openDetail() {
+    seedOrder('order-hh')
+    render(<OrderTrackingBanner branchId={1} />)
+    const btn = await screen.findByRole('button', { name: /ver detalle/i })
+    await act(async () => {
+      await userEvent.click(btn)
+    })
+  }
+
+  it('muestra la combinación completa de un ítem mitad y mitad', async () => {
+    mockStatusAndItems([
+      { name: 'Muzzarella', secondProductName: 'Calabresa', quantity: 1, unitPrice: 3400, subtotal: 3400 },
+    ])
+    await openDetail()
+
+    await waitFor(() => {
+      expect(screen.getByText(/1×\s*½ Muzzarella \+ ½ Calabresa/)).toBeInTheDocument()
+    })
+  })
+
+  it('un ítem simple sigue mostrando sólo su nombre', async () => {
+    mockStatusAndItems([
+      { name: 'Fugazzeta', secondProductName: null, quantity: 2, unitPrice: 2500, subtotal: 5000 },
+    ])
+    await openDetail()
+
+    await waitFor(() => {
+      expect(screen.getByText(/2×\s*Fugazzeta/)).toBeInTheDocument()
+    })
+    expect(screen.queryByText(/½/)).not.toBeInTheDocument()
+  })
+})
+
+describe('OrderTrackingBanner — ítem con tamaño (US-SIZE)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  const STATUS = {
+    orderId: 'order-size',
+    status: 'IN_PREPARATION',
+    orderType: 'TAKEAWAY',
+    subtotal: 1900,
+    serviceFee: 0,
+    deliveryFee: 0,
+    totalAmount: 1900,
+    history: [],
+  }
+
+  function mockStatusAndItems(items) {
+    vi.stubGlobal('fetch', vi.fn(url => {
+      if (String(url).includes('/items')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(items) })
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(STATUS) })
+    }))
+  }
+
+  async function openDetail() {
+    seedOrder('order-size')
+    render(<OrderTrackingBanner branchId={1} />)
+    const btn = await screen.findByRole('button', { name: /ver detalle/i })
+    await act(async () => {
+      await userEvent.click(btn)
+    })
+  }
+
+  it('muestra el tamaño elegido en el ítem', async () => {
+    mockStatusAndItems([
+      { name: 'Muzzarella', secondProductName: null, sizeName: 'CHICA', quantity: 1, unitPrice: 1900, subtotal: 1900 },
+    ])
+    await openDetail()
+
+    await waitFor(() => {
+      expect(screen.getByText(/1×\s*Muzzarella \(Chica\)/)).toBeInTheDocument()
+    })
+  })
+
+  it('un ítem sin tamaño no gana sufijo', async () => {
+    // El grande es implícito: viaja sin sizeName y se muestra como siempre.
+    mockStatusAndItems([
+      { name: 'Muzzarella', secondProductName: null, sizeName: null, quantity: 2, unitPrice: 15000, subtotal: 30000 },
+    ])
+    await openDetail()
+
+    await waitFor(() => {
+      expect(screen.getByText(/2×\s*Muzzarella/)).toBeInTheDocument()
+    })
+    expect(screen.queryByText(/\(/)).not.toBeInTheDocument()
+  })
+})

@@ -1029,6 +1029,15 @@
   white-space: nowrap;
 }
 
+/* US-HH-04: el nombre combinado ("½ A + ½ B") mide el doble que uno simple y el truncado
+   a una línea se come la segunda mitad. Sólo los ítems combinados envuelven; los simples
+   conservan la línea única para no alterar la altura de fila del resto de la tabla. */
+.detail-prod-name--multiline {
+  white-space: normal;
+  overflow: visible;
+  line-height: 1.3;
+}
+
 .detail-prod-price,
 .detail-prod-subtotal {
   font-family: 'JetBrains Mono', monospace;

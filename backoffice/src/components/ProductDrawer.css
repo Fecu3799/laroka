@@ -91,6 +91,13 @@
   gap: 10px;
 }
 
+/* US-SIZE-F-01: con tamaño activo se suma la columna de precio de la chica. La columna de
+   sucursal cede espacio; las de precio mantienen su ancho para que los inputs no se aprieten. */
+.pbc-table--with-size .pbc-thead,
+.pbc-table--with-size .pbc-row {
+  grid-template-columns: 1fr 92px 92px 52px;
+}
+
 .pbc-thead {
   padding: 0 4px 8px;
   border-bottom: 1px solid color-mix(in srgb, var(--border) 16%, transparent);
@@ -263,4 +270,34 @@
 
 .pbc-modal-btn--primary:hover:not(:disabled) {
   filter: brightness(1.08);
+}
+
+/* ── Tamaño chica (US-SIZE-F-01) ────────────────────────────────────────────── */
+
+.psz-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.psz-label {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.psz-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.psz-toggle-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  min-width: 48px;
+  text-align: right;
 }

@@ -27,9 +27,13 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.laroka.backend.catalog.dto.ProductResponseDTO;
 import com.laroka.backend.catalog.entity.Product;
+import com.laroka.backend.catalog.entity.ProductSize;
+import com.laroka.backend.catalog.entity.ProductSizeName;
 import com.laroka.backend.catalog.mapper.BranchProductConfigMapper;
 import com.laroka.backend.catalog.mapper.ProductMapper;
+import com.laroka.backend.catalog.mapper.ProductSizeMapper;
 import com.laroka.backend.catalog.service.ProductService;
+import com.laroka.backend.catalog.service.ProductSizeService;
 import com.laroka.backend.shared.security.JwtAuthenticationFilter;
 import com.laroka.backend.shared.security.JwtService;
 import com.laroka.backend.shared.security.SecurityConfig;
@@ -68,6 +72,13 @@ class ProductControllerAuthorizationTest {
 
 	@MockitoBean
 	private BranchProductConfigMapper branchProductConfigMapper;
+
+	// US-SIZE-04: nuevas dependencias del controller.
+	@MockitoBean
+	private ProductSizeService productSizeService;
+
+	@MockitoBean
+	private ProductSizeMapper productSizeMapper;
 
 	@MockitoBean
 	private SecurityUtils securityUtils;
@@ -139,5 +150,84 @@ class ProductControllerAuthorizationTest {
 			.andExpect(status().isOk());
 
 		verify(service).updateAvailability(1, true, 1);
+	}
+
+	// --- Tamaños (US-SIZE-04) ---
+	//
+	// El precio base del tamaño es del catálogo del tenant, igual que PUT /{id}/price: sólo
+	// ADMIN. El override por sucursal es operativo: MANAGER o ADMIN, mismo criterio que
+	// branch-config del producto.
+
+	@Test
+	void managerToken_createSize_returns403() throws Exception {
+		String body = "{\"size\":\"CHICA\",\"price\":9000.00}";
+
+		mockMvc.perform(post("/backoffice/products/1/sizes")
+				.header("Authorization", "Bearer " + tokenWithRole("MANAGER"))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(body))
+			.andExpect(status().isForbidden());
+
+		verify(productSizeService, never()).create(any(), any(), any());
+	}
+
+	@Test
+	void staffToken_createSize_returns403() throws Exception {
+		String body = "{\"size\":\"CHICA\",\"price\":9000.00}";
+
+		mockMvc.perform(post("/backoffice/products/1/sizes")
+				.header("Authorization", "Bearer " + tokenWithRole("STAFF"))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(body))
+			.andExpect(status().isForbidden());
+
+		verify(productSizeService, never()).create(any(), any(), any());
+	}
+
+	@Test
+	void managerToken_updateSize_returns403() throws Exception {
+		mockMvc.perform(patch("/backoffice/products/1/sizes/10")
+				.header("Authorization", "Bearer " + tokenWithRole("MANAGER"))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"active\":false}"))
+			.andExpect(status().isForbidden());
+
+		verify(productSizeService, never()).update(any(), any(), any(), any());
+	}
+
+	@Test
+	void adminToken_createSize_returns201() throws Exception {
+		when(productSizeService.create(eq(1), eq(ProductSizeName.CHICA), any()))
+			.thenReturn(new ProductSize());
+
+		mockMvc.perform(post("/backoffice/products/1/sizes")
+				.header("Authorization", "Bearer " + tokenWithRole("ADMIN"))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"size\":\"CHICA\",\"price\":9000.00}"))
+			.andExpect(status().isCreated());
+
+		verify(productSizeService).create(eq(1), eq(ProductSizeName.CHICA), any());
+	}
+
+	@Test
+	void managerToken_updateSizeBranchConfig_returns204() throws Exception {
+		mockMvc.perform(patch("/backoffice/products/1/sizes/10/branch-config")
+				.header("Authorization", "Bearer " + tokenWithRole("MANAGER"))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"branchId\":1,\"priceOverride\":9900.00}"))
+			.andExpect(status().isNoContent());
+
+		verify(productSizeService).updateBranchOverride(eq(1), eq(1), eq(10), any());
+	}
+
+	@Test
+	void staffToken_updateSizeBranchConfig_returns403() throws Exception {
+		mockMvc.perform(patch("/backoffice/products/1/sizes/10/branch-config")
+				.header("Authorization", "Bearer " + tokenWithRole("STAFF"))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"branchId\":1,\"priceOverride\":9900.00}"))
+			.andExpect(status().isForbidden());
+
+		verify(productSizeService, never()).updateBranchOverride(any(), any(), any(), any());
 	}
 }

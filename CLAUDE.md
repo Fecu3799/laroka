@@ -89,6 +89,13 @@ Capas obligatorias por módulo:
 | V28     | branch image_url                           |
 | V29     | order order_number + branch_order_sequence |
 | V30     | payment refunded_amount                    |
+| V31     | category_type (tipos de categoría maestros) |
+| V32     | category category_type_id (FK a category_type, nullable) |
+| V33     | order_item second_product_id (FK a product, nullable) |
+| V34     | category_type allows_sizes                  |
+| V35     | product_size (tamaños con precio propio por producto) |
+| V36     | branch_product_size (override de precio por sucursal a nivel tamaño) |
+| V37     | order_item product_size_id (FK a product_size, nullable) |
 
 Toda migración nueva debe ser la siguiente versión disponible en esta tabla.
 Actualizar esta tabla al agregar una migración.

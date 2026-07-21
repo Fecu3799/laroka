@@ -34,6 +34,8 @@ import com.laroka.backend.branch.entity.Branch;
 import com.laroka.backend.branch.exception.BranchNotFoundException;
 import com.laroka.backend.branch.repository.BranchRepository;
 import com.laroka.backend.catalog.entity.BranchProduct;
+import com.laroka.backend.catalog.entity.Category;
+import com.laroka.backend.catalog.entity.CategoryType;
 import com.laroka.backend.catalog.entity.Product;
 import com.laroka.backend.catalog.repository.BranchProductRepository;
 import com.laroka.backend.catalog.repository.ProductRepository;
@@ -43,6 +45,10 @@ import com.laroka.backend.order.entity.OrderOrigin;
 import com.laroka.backend.order.entity.OrderStatus;
 import com.laroka.backend.order.entity.OrderType;
 import com.laroka.backend.order.entity.PaymentMethod;
+import com.laroka.backend.catalog.entity.ProductSize;
+import com.laroka.backend.catalog.entity.ProductSizeName;
+import com.laroka.backend.order.exception.InvalidHalfAndHalfException;
+import com.laroka.backend.order.exception.InvalidProductSizeException;
 import com.laroka.backend.order.exception.OrderNotFoundException;
 import com.laroka.backend.order.exception.ProductUnavailableException;
 import com.laroka.backend.order.mapper.OrderMapper;
@@ -68,6 +74,8 @@ class OrderServiceTest {
     @Mock private BranchRepository branchRepository;
     @Mock private ProductRepository productRepository;
     @Mock private BranchProductRepository branchProductRepository;
+    @Mock private com.laroka.backend.catalog.repository.ProductSizeRepository productSizeRepository;
+    @Mock private com.laroka.backend.catalog.service.ProductSizeService productSizeService;
     @Mock private IdempotencyStore idempotencyStore;
     @Mock private PaymentRepository paymentRepository;
     @Mock private com.laroka.backend.notification.service.NotificationService notificationService;
@@ -168,7 +176,7 @@ class OrderServiceTest {
     private void stubBaseCreation(Branch branch, Product product) {
         when(idempotencyStore.get(any())).thenReturn(Optional.empty());
         when(branchRepository.findById(branch.getId())).thenReturn(Optional.of(branch));
-        when(productRepository.findById(product.getId())).thenReturn(Optional.of(product));
+        when(productRepository.findByIdWithCategoryType(product.getId())).thenReturn(Optional.of(product));
         // US-15-09: para pedidos CLIENT el producto debe estar disponible en la
         // sucursal. priceOverride=null preserva el precio base del producto.
         when(branchProductRepository.findByBranchIdAndProductId(branch.getId(), product.getId()))
@@ -210,7 +218,7 @@ class OrderServiceTest {
 
         when(idempotencyStore.get(any())).thenReturn(Optional.empty());
         when(branchRepository.findById(1)).thenReturn(Optional.of(branch));
-        when(productRepository.findById(1)).thenReturn(Optional.of(product));
+        when(productRepository.findByIdWithCategoryType(1)).thenReturn(Optional.of(product));
         when(branchProductRepository.findByBranchIdAndProductId(1, 1)).thenReturn(Optional.of(bp));
         when(workShiftRepository.findByBranchIdAndStatus(branch.getId(), ShiftStatus.OPEN))
                 .thenReturn(Optional.of(WorkShift.builder().id(UUID.randomUUID()).build()));
@@ -289,7 +297,7 @@ class OrderServiceTest {
 
         when(idempotencyStore.get(any())).thenReturn(Optional.empty());
         when(branchRepository.findById(branch.getId())).thenReturn(Optional.of(branch));
-        when(productRepository.findById(product.getId())).thenReturn(Optional.of(product));
+        when(productRepository.findByIdWithCategoryType(product.getId())).thenReturn(Optional.of(product));
         when(branchProductRepository.findByBranchIdAndProductId(branch.getId(), product.getId()))
                 .thenReturn(Optional.of(availableBranchProduct(branch, product)));
         when(workShiftRepository.findByBranchIdAndStatus(branch.getId(), ShiftStatus.OPEN))
@@ -420,7 +428,7 @@ class OrderServiceTest {
 
         when(idempotencyStore.get(any())).thenReturn(Optional.empty());
         when(branchRepository.findById(branch.getId())).thenReturn(Optional.of(branch));
-        when(productRepository.findById(product.getId())).thenReturn(Optional.of(product));
+        when(productRepository.findByIdWithCategoryType(product.getId())).thenReturn(Optional.of(product));
         when(branchProductRepository.findByBranchIdAndProductId(branch.getId(), product.getId()))
                 .thenReturn(Optional.of(unavailableBranchProduct(branch, product)));
 
@@ -443,7 +451,7 @@ class OrderServiceTest {
 
         when(idempotencyStore.get(any())).thenReturn(Optional.empty());
         when(branchRepository.findById(branch.getId())).thenReturn(Optional.of(branch));
-        when(productRepository.findById(product.getId())).thenReturn(Optional.of(product));
+        when(productRepository.findByIdWithCategoryType(product.getId())).thenReturn(Optional.of(product));
         when(branchProductRepository.findByBranchIdAndProductId(branch.getId(), product.getId()))
                 .thenReturn(Optional.empty());
 
@@ -463,7 +471,7 @@ class OrderServiceTest {
 
         when(idempotencyStore.get(any())).thenReturn(Optional.empty());
         when(branchRepository.findById(branch.getId())).thenReturn(Optional.of(branch));
-        when(productRepository.findById(product.getId())).thenReturn(Optional.of(product));
+        when(productRepository.findByIdWithCategoryType(product.getId())).thenReturn(Optional.of(product));
         when(branchProductRepository.findByBranchIdAndProductId(branch.getId(), product.getId()))
                 .thenReturn(Optional.of(unavailableBranchProduct(branch, product)));
         when(workShiftRepository.findByBranchIdAndStatus(branch.getId(), ShiftStatus.OPEN))
@@ -490,6 +498,373 @@ class OrderServiceTest {
 
         assertThat(result.order()).isNotNull();
         verify(orderRepository).save(any(Order.class));
+    }
+
+    // --- createOrder: mitad y mitad (US-HH-02) ---
+
+    private CategoryType categoryType(int id, boolean allowsHalfAndHalf) {
+        return CategoryType.builder().id(id).name("type-" + id).allowsHalfAndHalf(allowsHalfAndHalf).active(true).build();
+    }
+
+    private Product productWithType(int id, String name, BigDecimal price, CategoryType type) {
+        return Product.builder()
+                .id(id).name(name).price(price)
+                .category(Category.builder().id(id).name("cat-" + id).categoryType(type).build())
+                .build();
+    }
+
+    private OrderItem halfItem(int firstProductId, int secondProductId, int quantity) {
+        return OrderItem.builder()
+                .product(Product.builder().id(firstProductId).build())
+                .secondProduct(Product.builder().id(secondProductId).build())
+                .quantity(quantity)
+                .build();
+    }
+
+    // Stubbea la creación con dos productos (mitad y mitad), ambos disponibles en la sucursal.
+    private void stubHalfAndHalfCreation(Branch branch, Product first, Product second) {
+        when(idempotencyStore.get(any())).thenReturn(Optional.empty());
+        when(branchRepository.findById(branch.getId())).thenReturn(Optional.of(branch));
+        when(productRepository.findByIdWithCategoryType(first.getId())).thenReturn(Optional.of(first));
+        when(productRepository.findByIdWithCategoryType(second.getId())).thenReturn(Optional.of(second));
+        when(branchProductRepository.findByBranchIdAndProductId(branch.getId(), first.getId()))
+                .thenReturn(Optional.of(availableBranchProduct(branch, first)));
+        when(branchProductRepository.findByBranchIdAndProductId(branch.getId(), second.getId()))
+                .thenReturn(Optional.of(availableBranchProduct(branch, second)));
+        when(workShiftRepository.findByBranchIdAndStatus(branch.getId(), ShiftStatus.OPEN))
+                .thenReturn(Optional.of(WorkShift.builder().id(UUID.randomUUID()).build()));
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(orderRepository.findByIdWithDetails(any()))
+                .thenReturn(Optional.of(minimalSavedOrder(OrderStatus.PENDING_PAYMENT)));
+    }
+
+    @Test
+    void createOrder_halfAndHalf_validCombination_createsOrderWithSecondProduct() {
+        Branch branch = branch(tenant());
+        CategoryType pizza = categoryType(7, true);
+        Product first = productWithType(1, "Muzzarella", new BigDecimal("2800.00"), pizza);
+        Product second = productWithType(2, "Napolitana", new BigDecimal("3200.00"), pizza);
+        stubHalfAndHalfCreation(branch, first, second);
+
+        service.createOrder(takeawayOrder(branch), List.of(halfItem(1, 2, 1)), PaymentMethod.MERCADOPAGO, "key-hh-ok");
+
+        ArgumentCaptor<Order> captor = ArgumentCaptor.forClass(Order.class);
+        verify(orderRepository).save(captor.capture());
+        OrderItem saved = captor.getValue().getItems().get(0);
+        assertThat(saved.getProduct().getId()).isEqualTo(1);
+        assertThat(saved.getSecondProduct().getId()).isEqualTo(2);
+    }
+
+    // Stubs mínimos: ambos productos disponibles. La validación mitad y mitad falla después
+    // de las verificaciones de disponibilidad, antes de tocar turno/persistencia.
+    private void stubHalfAndHalfAvailable(Branch branch, Product first, Product second) {
+        when(idempotencyStore.get(any())).thenReturn(Optional.empty());
+        when(branchRepository.findById(branch.getId())).thenReturn(Optional.of(branch));
+        when(productRepository.findByIdWithCategoryType(first.getId())).thenReturn(Optional.of(first));
+        when(productRepository.findByIdWithCategoryType(second.getId())).thenReturn(Optional.of(second));
+        when(branchProductRepository.findByBranchIdAndProductId(branch.getId(), first.getId()))
+                .thenReturn(Optional.of(availableBranchProduct(branch, first)));
+        when(branchProductRepository.findByBranchIdAndProductId(branch.getId(), second.getId()))
+                .thenReturn(Optional.of(availableBranchProduct(branch, second)));
+    }
+
+    @Test
+    void createOrder_halfAndHalf_categoryDoesNotAllow_throwsInvalidHalfAndHalf() {
+        Branch branch = branch(tenant());
+        CategoryType noHalf = categoryType(9, false);
+        Product first = productWithType(1, "Lomo", new BigDecimal("5000.00"), noHalf);
+        Product second = productWithType(2, "Milanesa", new BigDecimal("5200.00"), noHalf);
+        stubHalfAndHalfAvailable(branch, first, second);
+
+        assertThatThrownBy(() ->
+                service.createOrder(takeawayOrder(branch), List.of(halfItem(1, 2, 1)), PaymentMethod.MERCADOPAGO, "key-hh-noallow"))
+                .isInstanceOf(InvalidHalfAndHalfException.class);
+        verify(orderRepository, never()).save(any());
+    }
+
+    private BranchProduct branchProductWithOverride(Branch branch, Product product, BigDecimal override) {
+        return BranchProduct.builder()
+                .branch(branch).product(product)
+                .available(true).priceOverride(override)
+                .build();
+    }
+
+    private OrderItem savedFirstItem() {
+        ArgumentCaptor<Order> captor = ArgumentCaptor.forClass(Order.class);
+        verify(orderRepository).save(captor.capture());
+        return captor.getValue().getItems().get(0);
+    }
+
+    @Test
+    void createOrder_halfAndHalf_firstHalfMoreExpensive_usesFirstPrice() {
+        Branch branch = branch(tenant());
+        CategoryType pizza = categoryType(7, true);
+        Product first = productWithType(1, "Muzzarella", new BigDecimal("3200.00"), pizza);
+        Product second = productWithType(2, "Napolitana", new BigDecimal("2800.00"), pizza);
+        stubHalfAndHalfCreation(branch, first, second);
+
+        service.createOrder(takeawayOrder(branch), List.of(halfItem(1, 2, 1)), PaymentMethod.MERCADOPAGO, "key-hh-p1");
+
+        OrderItem saved = savedFirstItem();
+        assertThat(saved.getUnitPrice()).isEqualByComparingTo("3200.00");
+        assertThat(saved.getSubtotal()).isEqualByComparingTo("3200.00");
+    }
+
+    @Test
+    void createOrder_halfAndHalf_secondHalfMoreExpensive_usesSecondPrice() {
+        Branch branch = branch(tenant());
+        CategoryType pizza = categoryType(7, true);
+        Product first = productWithType(1, "Muzzarella", new BigDecimal("2800.00"), pizza);
+        Product second = productWithType(2, "Especial", new BigDecimal("3500.00"), pizza);
+        stubHalfAndHalfCreation(branch, first, second);
+
+        service.createOrder(takeawayOrder(branch), List.of(halfItem(1, 2, 2)), PaymentMethod.MERCADOPAGO, "key-hh-p2");
+
+        OrderItem saved = savedFirstItem();
+        assertThat(saved.getUnitPrice()).isEqualByComparingTo("3500.00");
+        // subtotal refleja unitPrice * cantidad (2).
+        assertThat(saved.getSubtotal()).isEqualByComparingTo("7000.00");
+    }
+
+    @Test
+    void createOrder_halfAndHalf_branchPriceOverrideRespectedInComparison() {
+        Branch branch = branch(tenant());
+        CategoryType pizza = categoryType(7, true);
+        // Por precio base la segunda mitad (3200) sería la más cara, pero el override de esta
+        // sucursal la baja a 2000: gana la primera (2800), probando que se compara el efectivo.
+        Product first = productWithType(1, "Muzzarella", new BigDecimal("2800.00"), pizza);
+        Product second = productWithType(2, "Napolitana", new BigDecimal("3200.00"), pizza);
+
+        when(idempotencyStore.get(any())).thenReturn(Optional.empty());
+        when(branchRepository.findById(branch.getId())).thenReturn(Optional.of(branch));
+        when(productRepository.findByIdWithCategoryType(first.getId())).thenReturn(Optional.of(first));
+        when(productRepository.findByIdWithCategoryType(second.getId())).thenReturn(Optional.of(second));
+        when(branchProductRepository.findByBranchIdAndProductId(branch.getId(), first.getId()))
+                .thenReturn(Optional.of(availableBranchProduct(branch, first)));
+        when(branchProductRepository.findByBranchIdAndProductId(branch.getId(), second.getId()))
+                .thenReturn(Optional.of(branchProductWithOverride(branch, second, new BigDecimal("2000.00"))));
+        when(workShiftRepository.findByBranchIdAndStatus(branch.getId(), ShiftStatus.OPEN))
+                .thenReturn(Optional.of(WorkShift.builder().id(UUID.randomUUID()).build()));
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(orderRepository.findByIdWithDetails(any()))
+                .thenReturn(Optional.of(minimalSavedOrder(OrderStatus.PENDING_PAYMENT)));
+
+        service.createOrder(takeawayOrder(branch), List.of(halfItem(1, 2, 1)), PaymentMethod.MERCADOPAGO, "key-hh-override");
+
+        assertThat(savedFirstItem().getUnitPrice()).isEqualByComparingTo("2800.00");
+    }
+
+    @Test
+    void createOrder_halfAndHalf_sameProductBothHalves_throwsInvalidHalfAndHalf() {
+        Branch branch = branch(tenant());
+        Product product = productWithType(1, "Muzzarella", new BigDecimal("2800.00"), categoryType(7, true));
+
+        when(idempotencyStore.get(any())).thenReturn(Optional.empty());
+        when(branchRepository.findById(branch.getId())).thenReturn(Optional.of(branch));
+        when(productRepository.findByIdWithCategoryType(product.getId())).thenReturn(Optional.of(product));
+        when(branchProductRepository.findByBranchIdAndProductId(branch.getId(), product.getId()))
+                .thenReturn(Optional.of(availableBranchProduct(branch, product)));
+
+        assertThatThrownBy(() ->
+                service.createOrder(takeawayOrder(branch), List.of(halfItem(1, 1, 1)), PaymentMethod.MERCADOPAGO, "key-hh-same"))
+                .isInstanceOf(InvalidHalfAndHalfException.class);
+        verify(orderRepository, never()).save(any());
+    }
+
+    @Test
+    void createOrder_halfAndHalf_differentCategoryTypes_throwsInvalidHalfAndHalf() {
+        Branch branch = branch(tenant());
+        Product first = productWithType(1, "Muzzarella", new BigDecimal("2800.00"), categoryType(7, true));
+        Product second = productWithType(2, "Hamburguesa", new BigDecimal("4000.00"), categoryType(8, true));
+        stubHalfAndHalfAvailable(branch, first, second);
+
+        assertThatThrownBy(() ->
+                service.createOrder(takeawayOrder(branch), List.of(halfItem(1, 2, 1)), PaymentMethod.MERCADOPAGO, "key-hh-difftype"))
+                .isInstanceOf(InvalidHalfAndHalfException.class);
+        verify(orderRepository, never()).save(any());
+    }
+
+    @Test
+    void createOrder_halfAndHalf_clientOrder_secondProductUnavailable_throwsProductUnavailable() {
+        Branch branch = branch(tenant());
+        CategoryType pizza = categoryType(7, true);
+        Product first = productWithType(1, "Muzzarella", new BigDecimal("2800.00"), pizza);
+        Product second = productWithType(2, "Napolitana", new BigDecimal("3200.00"), pizza);
+
+        when(idempotencyStore.get(any())).thenReturn(Optional.empty());
+        when(branchRepository.findById(branch.getId())).thenReturn(Optional.of(branch));
+        when(productRepository.findByIdWithCategoryType(first.getId())).thenReturn(Optional.of(first));
+        when(productRepository.findByIdWithCategoryType(second.getId())).thenReturn(Optional.of(second));
+        when(branchProductRepository.findByBranchIdAndProductId(branch.getId(), first.getId()))
+                .thenReturn(Optional.of(availableBranchProduct(branch, first)));
+        when(branchProductRepository.findByBranchIdAndProductId(branch.getId(), second.getId()))
+                .thenReturn(Optional.of(unavailableBranchProduct(branch, second)));
+
+        assertThatThrownBy(() ->
+                service.createOrder(takeawayOrder(branch), List.of(halfItem(1, 2, 1)), PaymentMethod.MERCADOPAGO, "key-hh-unavail"))
+                .isInstanceOf(ProductUnavailableException.class)
+                .extracting(e -> ((ProductUnavailableException) e).getProductId())
+                .isEqualTo(2);
+        verify(orderRepository, never()).save(any());
+    }
+
+    // --- createOrder: tamaños (US-SIZE-03) ---
+
+    private ProductSize size(int id, Product product, ProductSizeName name, BigDecimal price, boolean active) {
+        return ProductSize.builder()
+                .id(id).product(product).size(name).price(price).active(active)
+                .build();
+    }
+
+    private OrderItem sizedItem(int productId, int productSizeId, int quantity) {
+        return OrderItem.builder()
+                .product(Product.builder().id(productId).build())
+                .productSize(ProductSize.builder().id(productSizeId).build())
+                .quantity(quantity)
+                .build();
+    }
+
+    // Stubs de una creación con un único producto disponible en la sucursal.
+    private void stubSingleProductCreation(Branch branch, Product product) {
+        when(idempotencyStore.get(any())).thenReturn(Optional.empty());
+        when(branchRepository.findById(branch.getId())).thenReturn(Optional.of(branch));
+        when(productRepository.findByIdWithCategoryType(product.getId())).thenReturn(Optional.of(product));
+        when(branchProductRepository.findByBranchIdAndProductId(branch.getId(), product.getId()))
+                .thenReturn(Optional.of(availableBranchProduct(branch, product)));
+        when(workShiftRepository.findByBranchIdAndStatus(branch.getId(), ShiftStatus.OPEN))
+                .thenReturn(Optional.of(WorkShift.builder().id(UUID.randomUUID()).build()));
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(orderRepository.findByIdWithDetails(any()))
+                .thenReturn(Optional.of(minimalSavedOrder(OrderStatus.PENDING_PAYMENT)));
+    }
+
+    @Test
+    void createOrder_withSize_usesSizeEffectivePriceAndPersistsChosenSize() {
+        Branch branch = branch(tenant());
+        CategoryType pizza = categoryType(7, true);
+        Product muzza = productWithType(1, "Muzzarella", new BigDecimal("10000.00"), pizza);
+        ProductSize grande = size(50, muzza, ProductSizeName.GRANDE, new BigDecimal("15000.00"), true);
+        stubSingleProductCreation(branch, muzza);
+        when(productSizeRepository.findById(50)).thenReturn(Optional.of(grande));
+        // El override de la sucursal (US-SIZE-02) manda sobre el precio base del tamaño.
+        when(productSizeService.resolveEffectivePrice(branch.getId(), grande))
+                .thenReturn(new BigDecimal("18000.00"));
+
+        service.createOrder(takeawayOrder(branch), List.of(sizedItem(1, 50, 2)),
+                PaymentMethod.MERCADOPAGO, "key-size-ok");
+
+        ArgumentCaptor<Order> captor = ArgumentCaptor.forClass(Order.class);
+        verify(orderRepository).save(captor.capture());
+        OrderItem saved = captor.getValue().getItems().get(0);
+        assertThat(saved.getProductSize().getId()).isEqualTo(50);
+        // El precio del tamaño reemplaza al precio base del producto, no lo suma ni lo promedia.
+        assertThat(saved.getUnitPrice()).isEqualByComparingTo("18000.00");
+        assertThat(saved.getSubtotal()).isEqualByComparingTo("36000.00");
+    }
+
+    @Test
+    void createOrder_withoutSize_keepsBaseProductPricing() {
+        // Retrocompatibilidad: sin productSizeId el ítem se comporta exactamente como antes.
+        Branch branch = branch(tenant());
+        CategoryType pizza = categoryType(7, true);
+        Product muzza = productWithType(1, "Muzzarella", new BigDecimal("10000.00"), pizza);
+        stubSingleProductCreation(branch, muzza);
+
+        service.createOrder(takeawayOrder(branch), List.of(itemFor(1, 1)),
+                PaymentMethod.MERCADOPAGO, "key-size-none");
+
+        ArgumentCaptor<Order> captor = ArgumentCaptor.forClass(Order.class);
+        verify(orderRepository).save(captor.capture());
+        OrderItem saved = captor.getValue().getItems().get(0);
+        assertThat(saved.getProductSize()).isNull();
+        assertThat(saved.getUnitPrice()).isEqualByComparingTo("10000.00");
+        verify(productSizeService, never()).resolveEffectivePrice(any(), any());
+    }
+
+    @Test
+    void createOrder_sizeOfAnotherProduct_throwsInvalidProductSize() {
+        Branch branch = branch(tenant());
+        CategoryType pizza = categoryType(7, true);
+        Product muzza = productWithType(1, "Muzzarella", new BigDecimal("10000.00"), pizza);
+        Product napo = productWithType(2, "Napolitana", new BigDecimal("12000.00"), pizza);
+        // El tamaño 50 pertenece a Napolitana, pero el ítem pide Muzzarella.
+        ProductSize grandeDeNapo = size(50, napo, ProductSizeName.GRANDE, new BigDecimal("17000.00"), true);
+
+        when(idempotencyStore.get(any())).thenReturn(Optional.empty());
+        when(branchRepository.findById(branch.getId())).thenReturn(Optional.of(branch));
+        when(productRepository.findByIdWithCategoryType(muzza.getId())).thenReturn(Optional.of(muzza));
+        when(branchProductRepository.findByBranchIdAndProductId(branch.getId(), muzza.getId()))
+                .thenReturn(Optional.of(availableBranchProduct(branch, muzza)));
+        when(productSizeRepository.findById(50)).thenReturn(Optional.of(grandeDeNapo));
+
+        assertThatThrownBy(() -> service.createOrder(takeawayOrder(branch), List.of(sizedItem(1, 50, 1)),
+                PaymentMethod.MERCADOPAGO, "key-size-wrong-product"))
+                .isInstanceOf(InvalidProductSizeException.class);
+        verify(orderRepository, never()).save(any());
+    }
+
+    @Test
+    void createOrder_sizeDoesNotExist_throwsInvalidProductSize() {
+        Branch branch = branch(tenant());
+        CategoryType pizza = categoryType(7, true);
+        Product muzza = productWithType(1, "Muzzarella", new BigDecimal("10000.00"), pizza);
+
+        when(idempotencyStore.get(any())).thenReturn(Optional.empty());
+        when(branchRepository.findById(branch.getId())).thenReturn(Optional.of(branch));
+        when(productRepository.findByIdWithCategoryType(muzza.getId())).thenReturn(Optional.of(muzza));
+        when(branchProductRepository.findByBranchIdAndProductId(branch.getId(), muzza.getId()))
+                .thenReturn(Optional.of(availableBranchProduct(branch, muzza)));
+        when(productSizeRepository.findById(999)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.createOrder(takeawayOrder(branch), List.of(sizedItem(1, 999, 1)),
+                PaymentMethod.MERCADOPAGO, "key-size-missing"))
+                .isInstanceOf(InvalidProductSizeException.class);
+        verify(orderRepository, never()).save(any());
+    }
+
+    @Test
+    void createOrder_inactiveSize_throwsInvalidProductSize() {
+        // Un tamaño dado de baja por el ADMIN sigue en la tabla por los pedidos históricos,
+        // pero no se puede pedir.
+        Branch branch = branch(tenant());
+        CategoryType pizza = categoryType(7, true);
+        Product muzza = productWithType(1, "Muzzarella", new BigDecimal("10000.00"), pizza);
+        ProductSize chicaDadaDeBaja = size(51, muzza, ProductSizeName.CHICA, new BigDecimal("9000.00"), false);
+
+        when(idempotencyStore.get(any())).thenReturn(Optional.empty());
+        when(branchRepository.findById(branch.getId())).thenReturn(Optional.of(branch));
+        when(productRepository.findByIdWithCategoryType(muzza.getId())).thenReturn(Optional.of(muzza));
+        when(branchProductRepository.findByBranchIdAndProductId(branch.getId(), muzza.getId()))
+                .thenReturn(Optional.of(availableBranchProduct(branch, muzza)));
+        when(productSizeRepository.findById(51)).thenReturn(Optional.of(chicaDadaDeBaja));
+
+        assertThatThrownBy(() -> service.createOrder(takeawayOrder(branch), List.of(sizedItem(1, 51, 1)),
+                PaymentMethod.MERCADOPAGO, "key-size-inactive"))
+                .isInstanceOf(InvalidProductSizeException.class);
+        verify(orderRepository, never()).save(any());
+    }
+
+    @Test
+    void createOrder_sizeCombinedWithHalfAndHalf_throwsInvalidProductSizeBeforeResolvingAnything() {
+        // Fuera de alcance por diseño: un ítem con tamaño no puede ser mitad y mitad. Falla
+        // antes de tocar productos, tamaños o disponibilidad — de ahí que no haya más stubs.
+        Branch branch = branch(tenant());
+        OrderItem invalid = OrderItem.builder()
+                .product(Product.builder().id(1).build())
+                .secondProduct(Product.builder().id(2).build())
+                .productSize(ProductSize.builder().id(50).build())
+                .quantity(1)
+                .build();
+
+        when(idempotencyStore.get(any())).thenReturn(Optional.empty());
+        when(branchRepository.findById(branch.getId())).thenReturn(Optional.of(branch));
+
+        assertThatThrownBy(() -> service.createOrder(takeawayOrder(branch), List.of(invalid),
+                PaymentMethod.MERCADOPAGO, "key-size-and-hh"))
+                .isInstanceOf(InvalidProductSizeException.class);
+        verify(productRepository, never()).findByIdWithCategoryType(any());
+        verify(productSizeRepository, never()).findById(any());
+        verify(orderRepository, never()).save(any());
     }
 
     // --- createOrder: idempotencia ---

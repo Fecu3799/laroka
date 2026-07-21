@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import ReactDOM from 'react-dom'
 import useAuth from '../hooks/useAuth'
-import { createCategory, updateCategory } from '../services/catalogService'
+import { createCategory, updateCategory, fetchCategoryTypes } from '../services/catalogService'
+import CustomSelect from './CustomSelect'
 import './StaffUserDrawer.css'
 
 export default function CategoryDrawer({ open, mode, category, onClose, onSaved }) {
@@ -9,6 +10,9 @@ export default function CategoryDrawer({ open, mode, category, onClose, onSaved 
   const isEdit = mode === 'edit'
 
   const [name, setName] = useState('')
+  const [categoryTypeId, setCategoryTypeId] = useState('')
+  const [types, setTypes] = useState([])
+  const [typesError, setTypesError] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
 
@@ -17,15 +21,34 @@ export default function CategoryDrawer({ open, mode, category, onClose, onSaved 
     if (!open) return
     setError(null)
     setName(isEdit && category ? (category.name ?? '') : '')
+    setCategoryTypeId(isEdit && category?.categoryTypeId != null ? String(category.categoryTypeId) : '')
   }, [open, isEdit, category])
+
+  // US-CAT-03: los tipos maestros activos alimentan el selector. Se cargan al abrir.
+  useEffect(() => {
+    if (!open || !token) return
+    setTypesError(false)
+    fetchCategoryTypes(token)
+      .then(setTypes)
+      .catch(() => setTypesError(true))
+  }, [open, token])
 
   function handleClose() {
     if (submitting) return
     onClose()
   }
 
+  // Al elegir un tipo, el nombre se precarga con el nombre del tipo pero queda editable
+  // (US-CAT-03). El ADMIN puede modificarlo antes de guardar.
+  function handleTypeChange(val) {
+    setCategoryTypeId(val)
+    const selected = types.find(t => String(t.id) === String(val))
+    if (selected) setName(selected.name)
+  }
+
   const nameValid = name.trim().length > 0
-  const canSubmit = nameValid && !submitting
+  const typeValid = categoryTypeId !== ''
+  const canSubmit = nameValid && typeValid && !submitting
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -33,7 +56,7 @@ export default function CategoryDrawer({ open, mode, category, onClose, onSaved 
     setSubmitting(true)
     setError(null)
     try {
-      const payload = { name: name.trim(), tenantId }
+      const payload = { name: name.trim(), tenantId, categoryTypeId: Number(categoryTypeId) }
       if (isEdit) {
         await updateCategory(category.id, payload, token)
       } else {
@@ -68,6 +91,19 @@ export default function CategoryDrawer({ open, mode, category, onClose, onSaved 
 
         <form className="sud-form" onSubmit={handleSubmit}>
           <div className="sud-field">
+            <span className="sud-label" id="cat-type-label">Tipo</span>
+            <CustomSelect
+              id="cat-type"
+              ariaLabelledBy="cat-type-label"
+              value={categoryTypeId}
+              onChange={handleTypeChange}
+              options={types.map(t => ({ value: String(t.id), label: t.name }))}
+              placeholder="Seleccionar tipo…"
+            />
+            {typesError && <span className="sud-hint">No se pudieron cargar los tipos.</span>}
+          </div>
+
+          <div className="sud-field">
             <label className="sud-label" htmlFor="cat-name">Nombre</label>
             <input
               id="cat-name"
@@ -76,7 +112,6 @@ export default function CategoryDrawer({ open, mode, category, onClose, onSaved 
               placeholder="Nombre de la categoría"
               value={name}
               onChange={e => setName(e.target.value)}
-              autoFocus
             />
           </div>
 

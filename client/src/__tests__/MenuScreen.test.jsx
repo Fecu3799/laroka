@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { MenuScreen } from '../pages/MenuScreen'
 
 // getTenantProfile: sin perfil → no modal de bienvenida ni botón "Sobre nosotros".
@@ -78,5 +78,103 @@ describe('MenuScreen — productos no disponibles (US-15-CF-05)', () => {
     await waitFor(() =>
       expect(screen.getByLabelText('Volver al menú')).toBeInTheDocument()
     )
+  })
+})
+
+describe('MenuScreen — botón (+) con confirmación y contador', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn(routedFetch))
+  })
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.useRealTimers()
+  })
+
+  // El label cambia a "Agregar otro …" una vez que hay unidades en el carrito.
+  const addBtn = () => screen.getByLabelText(/Agregar (otro )?Muzzarella/)
+
+  it('confirma con un check y después muestra las unidades en el carrito', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    renderMenu()
+    await screen.findByText('Muzzarella')
+
+    fireEvent.click(addBtn())
+
+    // Durante la confirmación el botón muestra el check con el pulso.
+    expect(document.querySelector('.product-add-btn--added')).toBeInTheDocument()
+    expect(document.querySelector('.product-add-qty')).toBeNull()
+
+    await act(async () => { vi.advanceTimersByTime(700) })
+
+    // Pasado el pulso queda el contador.
+    expect(document.querySelector('.product-add-btn--added')).toBeNull()
+    expect(document.querySelector('.product-add-qty').textContent).toBe('1')
+  })
+
+  it('seguir tocando suma unidades', async () => {
+    renderMenu()
+    await screen.findByText('Muzzarella')
+
+    fireEvent.click(addBtn())
+    fireEvent.click(addBtn())
+    fireEvent.click(addBtn())
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/3 en el carrito/)).toBeInTheDocument()
+    })
+  })
+
+  it('sin nada en el carrito el botón no muestra contador', async () => {
+    renderMenu()
+    await screen.findByText('Muzzarella')
+
+    expect(document.querySelector('.product-add-qty')).toBeNull()
+    expect(addBtn()).toHaveAccessibleName('Agregar Muzzarella')
+  })
+})
+
+describe('MenuScreen — vuelta al menú desde el detalle', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn(routedFetch))
+  })
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  const detail = () => document.querySelector('.detail-screen')
+
+  // El detalle muestra "¡Agregado!" un segundo antes de cerrarse, más la animación de
+  // salida: el waitFor por defecto (1s) se queda corto.
+  const waitForClose = () =>
+    waitFor(() => expect(detail()).not.toBeInTheDocument(), { timeout: 3000 })
+
+  it('agregar desde el detalle confirma y después vuelve al menú', async () => {
+    renderMenu()
+    fireEvent.click(await screen.findByText('Muzzarella'))
+    expect(detail()).toBeInTheDocument()
+
+    fireEvent.click(screen.getByText('Agregar al carrito'))
+
+    // Primero la confirmación, sin cerrar.
+    expect(screen.getByText('¡Agregado!')).toBeInTheDocument()
+    expect(detail()).toBeInTheDocument()
+
+    await waitForClose()
+  })
+
+  it('el menú conserva la posición de scroll al volver del detalle', async () => {
+    // El detalle es un overlay sobre el menú, que nunca se desmonta: por eso el scroll se
+    // conserva solo, sin guardar ni restaurar nada. Este test lo fija como contrato.
+    renderMenu()
+    await screen.findByText('Muzzarella')
+    const main = document.querySelector('.menu-main')
+    main.scrollTop = 420
+
+    fireEvent.click(screen.getByText('Muzzarella'))
+    fireEvent.click(screen.getByText('Agregar al carrito'))
+    await waitForClose()
+
+    expect(document.querySelector('.menu-main')).toBe(main)
+    expect(main.scrollTop).toBe(420)
   })
 })

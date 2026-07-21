@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.util.UUID;
 
 import com.laroka.backend.catalog.entity.Product;
+import com.laroka.backend.catalog.entity.ProductSize;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -44,4 +45,18 @@ public class OrderItem {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "product_id", nullable = false)
     private Product product;
+
+    // US-HH-01: segunda mitad de un ítem mitad y mitad. Null en ítems simples (comportamiento
+    // actual sin cambios). La validación y el pricing de la combinación son US-HH-02 / US-HH-03.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "second_product_id")
+    private Product secondProduct;
+
+    // US-SIZE-03: tamaño elegido para este ítem. Null → ítem sin tamaño (precio base del
+    // producto, comportamiento previo). Mutuamente excluyente con secondProduct: un ítem
+    // con tamaño no puede ser mitad y mitad. unitPrice ya viene resuelto con el precio
+    // efectivo del tamaño en la sucursal (US-SIZE-02).
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "product_size_id")
+    private ProductSize productSize;
 }

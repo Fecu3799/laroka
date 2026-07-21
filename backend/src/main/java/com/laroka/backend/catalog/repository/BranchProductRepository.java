@@ -36,6 +36,10 @@ public interface BranchProductRepository extends JpaRepository<BranchProduct, Br
     // category cargados (open-in-view=false), ordenados para agrupar por categoría en el front.
     @Query("SELECT bp FROM BranchProduct bp "
         + "JOIN FETCH bp.product p JOIN FETCH p.category c "
+        // US-HH-F-01: el menú expone allowsHalfAndHalf por categoría, que vive en
+        // category_type. LEFT (no INNER) porque el FK es nullable: las categorías sin tipo
+        // asignado deben seguir apareciendo en el menú.
+        + "LEFT JOIN FETCH c.categoryType "
         + "WHERE bp.branch.id = :branchId "
         + "ORDER BY c.name ASC, p.name ASC")
     List<BranchProduct> findByBranchIdWithProductAndCategory(@Param("branchId") Integer branchId);

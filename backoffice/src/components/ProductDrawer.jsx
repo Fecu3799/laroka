@@ -7,6 +7,11 @@ import {
   fetchProductBranchConfig,
   updateProductBranchConfig,
   updateProductPrice,
+  fetchCategoryTypes,
+  fetchProductSizes,
+  createProductSize,
+  updateProductSize,
+  updateProductSizeBranchConfig,
 } from '../services/catalogService'
 import { formatCurrency } from '../utils/shiftsUtils'
 import CustomSelect from './CustomSelect'
@@ -16,6 +21,10 @@ import './StaffUserDrawer.css'
 import './ProductDrawer.css'
 
 const EMPTY_FORM = { name: '', description: '', categoryId: '', price: '', imageUrl: '' }
+
+// Único tamaño cargable. El grande es implícito: su precio es siempre product.price y nunca
+// tiene fila propia en product_size, para no tener dos fuentes de verdad del mismo precio.
+const CHICA = 'CHICA'
 
 // Normaliza un valor numérico a string para el input de precio (sin decimales sobrantes).
 function priceStr(value) {
@@ -43,6 +52,18 @@ export default function ProductDrawer({ open, mode, product, categories, onClose
   const [levelBusy, setLevelBusy] = useState(false)
   const [levelError, setLevelError] = useState(null)
 
+  // ── Tamaño chica (US-SIZE-F-01) ─────────────────────────────────
+  //
+  // Sólo existe el tamaño CHICA: el grande es implícito y su precio es siempre el precio
+  // base del producto. Por eso la UI no ofrece elegir tamaño en ningún punto — el POST
+  // manda 'CHICA' fijo y el backend rechaza cualquier otro con 422.
+  const [categoryTypes, setCategoryTypes] = useState([])
+  const [sizes, setSizes] = useState([])
+  const [sizeDraft, setSizeDraft] = useState('')       // input del precio base del tamaño
+  const [sizeBusy, setSizeBusy] = useState(false)
+  const [sizeError, setSizeError] = useState(null)
+  const [sizePriceDraft, setSizePriceDraft] = useState({})  // branchId → string del input
+
   // Precio base persistido del producto: referencia para limpiar el override.
   const productId = product?.id ?? null
   const basePrice = product?.price != null ? Number(product.price) : null
@@ -56,9 +77,23 @@ export default function ProductDrawer({ open, mode, product, categories, onClose
       .then(rows => {
         setConfig(rows)
         setPriceDraft(Object.fromEntries(rows.map(r => [r.branchId, priceStr(r.effectivePrice)])))
+        // US-SIZE-F-01: el precio del tamaño por sucursal viene en la misma respuesta.
+        setSizePriceDraft(Object.fromEntries(rows.map(r => [r.branchId, priceStr(r.sizeEffectivePrice)])))
       })
       .catch(() => setBcError(true))
       .finally(() => setBcLoading(false))
+  }, [productId, token])
+
+  const loadSizes = useCallback(() => {
+    if (!productId || !token) return
+    setSizeError(null)
+    fetchProductSizes(productId, token)
+      .then(rows => {
+        setSizes(rows)
+        const chica = rows.find(s => s.size === CHICA)
+        setSizeDraft(chica ? priceStr(chica.price) : '')
+      })
+      .catch(() => setSizeError('No se pudieron cargar los tamaños.'))
   }, [productId, token])
 
   // Precarga / reset al abrir.
@@ -84,12 +119,32 @@ export default function ProductDrawer({ open, mode, product, categories, onClose
     if (!open || !isEdit || !productId) {
       setConfig([])
       setPriceDraft({})
+      setSizePriceDraft({})
       setBcError(false)
       setBcRowError(null)
       return
     }
     loadBranchConfig()
   }, [open, isEdit, productId, loadBranchConfig])
+
+  // US-SIZE-F-01: los tipos de categoría dicen si la categoría admite tamaños. Se cargan al
+  // abrir, igual que hace CategoryDrawer — es un catálogo maestro chico.
+  useEffect(() => {
+    if (!open || !token) return
+    fetchCategoryTypes(token)
+      .then(setCategoryTypes)
+      .catch(() => setCategoryTypes([]))
+  }, [open, token])
+
+  useEffect(() => {
+    if (!open || !isEdit || !productId) {
+      setSizes([])
+      setSizeDraft('')
+      setSizeError(null)
+      return
+    }
+    loadSizes()
+  }, [open, isEdit, productId, loadSizes])
 
   function setField(key, value) {
     setForm(prev => ({ ...prev, [key]: value }))
@@ -99,6 +154,16 @@ export default function ProductDrawer({ open, mode, product, categories, onClose
     if (submitting) return
     onClose()
   }
+
+  // La categoría elegida en el formulario (no la persistida) decide si se ofrecen tamaños:
+  // así la sección aparece o desaparece al cambiar de categoría, antes de guardar.
+  const selectedCategory = categories.find(c => String(c.id) === String(form.categoryId)) ?? null
+  const selectedType = selectedCategory?.categoryTypeId != null
+    ? categoryTypes.find(t => t.id === selectedCategory.categoryTypeId)
+    : null
+  const allowsSizes = selectedType?.allowsSizes === true
+  const chicaSize = sizes.find(s => s.size === CHICA) ?? null
+  const hasActiveChica = chicaSize != null && chicaSize.active
 
   const nameValid = form.name.trim().length > 0
   const categoryValid = form.categoryId !== ''
@@ -214,6 +279,89 @@ export default function ProductDrawer({ open, mode, product, categories, onClose
       .finally(() => stopSaving(row.branchId))
   }
 
+  // ── Handlers del tamaño chica (US-SIZE-F-01) ────────────────────
+
+  // Alta o edición del precio base del tamaño, según exista o no la fila.
+  function commitSizePrice() {
+    const value = Number(sizeDraft)
+    if (sizeDraft === '' || !Number.isFinite(value) || value <= 0) {
+      setSizeDraft(chicaSize ? priceStr(chicaSize.price) : '')
+      return
+    }
+    if (chicaSize && Number(chicaSize.price) === value) return
+
+    setSizeBusy(true)
+    setSizeError(null)
+    const request = chicaSize
+      ? updateProductSize(product.id, chicaSize.id, { price: value }, token)
+      : createProductSize(product.id, { size: CHICA, price: value }, token)
+    request
+      .then(() => {
+        loadSizes()
+        // El precio del tamaño por sucursal cambia con el precio base, así que se relee.
+        loadBranchConfig()
+      })
+      .catch(err => {
+        setSizeDraft(chicaSize ? priceStr(chicaSize.price) : '')
+        setSizeError(err?.message ?? 'No se pudo guardar el tamaño.')
+      })
+      .finally(() => setSizeBusy(false))
+  }
+
+  // Baja lógica: la fila se conserva porque los pedidos históricos la referencian.
+  function toggleSizeActive() {
+    if (!chicaSize) return
+    setSizeBusy(true)
+    setSizeError(null)
+    updateProductSize(product.id, chicaSize.id, { active: !chicaSize.active }, token)
+      .then(() => {
+        loadSizes()
+        loadBranchConfig()
+      })
+      .catch(err => setSizeError(err?.message ?? 'No se pudo actualizar el tamaño.'))
+      .finally(() => setSizeBusy(false))
+  }
+
+  // Override del precio del tamaño en una sucursal, mismo criterio que commitPrice: igualar
+  // el precio base limpia el override.
+  function commitSizeBranchPrice(row) {
+    if (!hasActiveChica) return
+    const raw = sizePriceDraft[row.branchId] ?? ''
+    const value = Number(raw)
+    if (raw === '' || !Number.isFinite(value) || value <= 0) {
+      setSizePriceDraft(d => ({ ...d, [row.branchId]: priceStr(row.sizeEffectivePrice) }))
+      return
+    }
+    const sizeBasePrice = Number(chicaSize.price)
+    const newOverride = value === sizeBasePrice ? null : value
+    const currentOverride = row.sizePriceOverride != null ? Number(row.sizePriceOverride) : null
+    if (newOverride === currentOverride) {
+      setSizePriceDraft(d => ({ ...d, [row.branchId]: priceStr(value) }))
+      return
+    }
+    startSaving(row.branchId)
+    setBcRowError(null)
+    updateProductSizeBranchConfig(
+      product.id,
+      row.productSizeId,
+      { branchId: row.branchId, priceOverride: newOverride },
+      token,
+    )
+      .then(() => {
+        setConfig(cfg => cfg.map(r =>
+          r.branchId === row.branchId
+            ? { ...r, sizePriceOverride: newOverride, sizeEffectivePrice: value }
+            : r,
+        ))
+        setSizePriceDraft(d => ({ ...d, [row.branchId]: priceStr(value) }))
+      })
+      .catch(err => {
+        setSizePriceDraft(d => ({ ...d, [row.branchId]: priceStr(row.sizeEffectivePrice) }))
+        setBcRowError(err?.message ?? 'No se pudo actualizar el precio del tamaño.')
+      })
+      .finally(() => stopSaving(row.branchId))
+  }
+
   function handleLevelPrice() {
     if (basePrice == null) return
     setLevelBusy(true)
@@ -323,6 +471,60 @@ export default function ProductDrawer({ open, mode, product, categories, onClose
             </button>
           </div>
 
+          {/* ── Tamaño chica (US-SIZE-F-01) ── solo en edición y si la categoría lo admite ── */}
+          {isEdit && allowsSizes && (
+            <section className="pbc-section">
+              <div className="pbc-head">
+                <div>
+                  <h3 className="pbc-title">Tamaño chica</h3>
+                  <p className="pbc-sub">
+                    El tamaño grande usa siempre el precio base del producto. Acá se define el
+                    precio de la versión chica.
+                  </p>
+                </div>
+              </div>
+
+              <div className="psz-row">
+                <label className="psz-label" htmlFor="prod-size-price">Precio chica</label>
+                <input
+                  id="prod-size-price"
+                  className="pbc-price-input"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  inputMode="decimal"
+                  placeholder="Sin cargar"
+                  value={sizeDraft}
+                  onChange={e => setSizeDraft(e.target.value)}
+                  onBlur={commitSizePrice}
+                  onKeyDown={handlePriceKeyDown}
+                  disabled={!isAdmin || sizeBusy}
+                  title={isAdmin ? undefined : 'Solo un ADMIN puede editar el precio del tamaño'}
+                />
+                {chicaSize && (
+                  <div className="psz-toggle">
+                    <span className="psz-toggle-label">
+                      {chicaSize.active ? 'Activo' : 'Inactivo'}
+                    </span>
+                    <ToggleSwitch
+                      checked={chicaSize.active}
+                      onChange={toggleSizeActive}
+                      disabled={!isAdmin || sizeBusy}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {chicaSize && !chicaSize.active && (
+                <p className="pbc-sub">
+                  El tamaño está dado de baja: no aparece en el menú, pero se conserva porque
+                  hay pedidos que lo referencian.
+                </p>
+              )}
+              {sizeError && <p className="pbc-row-error">{sizeError}</p>}
+            </section>
+          )}
+
           {/* ── Configuración por sucursal (US-14-F-03) ── solo en edición ── */}
           {isEdit && (
             <section className="pbc-section">
@@ -350,10 +552,12 @@ export default function ProductDrawer({ open, mode, product, categories, onClose
               ) : config.length === 0 ? (
                 <div className="pbc-state">No hay sucursales para configurar.</div>
               ) : (
-                <div className="pbc-table">
+                <div className={`pbc-table${hasActiveChica ? ' pbc-table--with-size' : ''}`}>
                   <div className="pbc-thead">
                     <span className="pbc-th">Sucursal</span>
-                    <span className="pbc-th pbc-th--center">Precio</span>
+                    <span className="pbc-th pbc-th--center">{hasActiveChica ? 'Grande' : 'Precio'}</span>
+                    {/* US-SIZE-F-01: la columna del tamaño sólo existe si hay tamaño activo. */}
+                    {hasActiveChica && <span className="pbc-th pbc-th--center">Chica</span>}
                     <span className="pbc-th pbc-th--center">Disponible</span>
                   </div>
                   {config.map(row => {
@@ -380,6 +584,29 @@ export default function ProductDrawer({ open, mode, product, categories, onClose
                           />
                           {hasOverride && <span className="pbc-override-dot" aria-hidden="true" />}
                         </div>
+                        {hasActiveChica && (
+                          <div className="pbc-price-wrap">
+                            <input
+                              className={`pbc-price-input${row.sizePriceOverride != null ? ' pbc-price-input--override' : ''}`}
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              inputMode="decimal"
+                              value={sizePriceDraft[row.branchId] ?? ''}
+                              onChange={e => setSizePriceDraft(d => ({ ...d, [row.branchId]: e.target.value }))}
+                              onBlur={() => commitSizeBranchPrice(row)}
+                              onKeyDown={handlePriceKeyDown}
+                              disabled={!editable || saving}
+                              aria-label={`Precio chica en ${row.branchName}`}
+                              title={row.sizePriceOverride != null
+                                ? 'Precio de la chica personalizado para esta sucursal'
+                                : undefined}
+                            />
+                            {row.sizePriceOverride != null && (
+                              <span className="pbc-override-dot" aria-hidden="true" />
+                            )}
+                          </div>
+                        )}
                         <div className="pbc-cell--center">
                           <ToggleSwitch
                             checked={!!row.available}

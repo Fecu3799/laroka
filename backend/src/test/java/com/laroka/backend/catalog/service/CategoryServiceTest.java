@@ -18,8 +18,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.laroka.backend.catalog.entity.Category;
+import com.laroka.backend.catalog.entity.CategoryType;
 import com.laroka.backend.catalog.exception.CategoryNotFoundException;
+import com.laroka.backend.catalog.exception.CategoryTypeNotFoundException;
 import com.laroka.backend.catalog.repository.CategoryRepository;
+import com.laroka.backend.catalog.repository.CategoryTypeRepository;
 import com.laroka.backend.catalog.repository.ProductRepository;
 import com.laroka.backend.catalog.repository.ProductRepository.CategoryProductCount;
 import com.laroka.backend.tenant.entity.Tenant;
@@ -38,6 +41,9 @@ class CategoryServiceTest {
 	@Mock
 	private TenantRepository tenantRepository;
 
+	@Mock
+	private CategoryTypeRepository categoryTypeRepository;
+
 	@InjectMocks
 	private CategoryService service;
 
@@ -45,8 +51,12 @@ class CategoryServiceTest {
 		return Tenant.builder().id(1).name("LaRoka").build();
 	}
 
+	private CategoryType categoryType() {
+		return CategoryType.builder().id(5).name("Pizza").allowsHalfAndHalf(true).active(true).build();
+	}
+
 	private Category category(Tenant tenant) {
-		return Category.builder().id(1).name("Pizzas").tenant(tenant).build();
+		return Category.builder().id(1).name("Pizzas").tenant(tenant).categoryType(categoryType()).build();
 	}
 
 	@Test
@@ -112,19 +122,23 @@ class CategoryServiceTest {
 	@Test
 	void create_validCategory_savesAndReturns() {
 		Tenant p = tenant();
+		CategoryType type = categoryType();
 		Category category = category(p);
 		when(tenantRepository.findById(1)).thenReturn(Optional.of(p));
+		when(categoryTypeRepository.findById(5)).thenReturn(Optional.of(type));
 		when(categoryRepository.save(any(Category.class))).thenReturn(category);
 
 		Category result = service.create(category);
 
 		assertThat(result.getName()).isEqualTo("Pizzas");
+		assertThat(result.getCategoryType().getId()).isEqualTo(5);
 		verify(categoryRepository).save(category);
 	}
 
 	@Test
 	void create_invalidTenant_throwsTenantNotFoundException() {
-		Category category = Category.builder().id(1).name("Test").tenant(Tenant.builder().id(99).build()).build();
+		Category category = Category.builder().id(1).name("Test")
+			.tenant(Tenant.builder().id(99).build()).categoryType(categoryType()).build();
 		when(tenantRepository.findById(99)).thenReturn(Optional.empty());
 
 		assertThatThrownBy(() -> service.create(category))
@@ -132,17 +146,45 @@ class CategoryServiceTest {
 	}
 
 	@Test
+	void create_invalidCategoryType_throwsCategoryTypeNotFoundException() {
+		Tenant p = tenant();
+		Category category = Category.builder().id(1).name("Test").tenant(p)
+			.categoryType(CategoryType.builder().id(99).build()).build();
+		when(tenantRepository.findById(1)).thenReturn(Optional.of(p));
+		when(categoryTypeRepository.findById(99)).thenReturn(Optional.empty());
+
+		assertThatThrownBy(() -> service.create(category))
+			.isInstanceOf(CategoryTypeNotFoundException.class);
+	}
+
+	@Test
 	void update_existingCategory_updatesAndReturns() {
 		Tenant p = tenant();
+		CategoryType type = categoryType();
 		Category existing = category(p);
-		Category updates = Category.builder().name("Empanadas").tenant(p).build();
+		Category updates = Category.builder().name("Empanadas").tenant(p).categoryType(type).build();
 		when(categoryRepository.findById(1)).thenReturn(Optional.of(existing));
 		when(tenantRepository.findById(1)).thenReturn(Optional.of(p));
+		when(categoryTypeRepository.findById(5)).thenReturn(Optional.of(type));
 		when(categoryRepository.save(any(Category.class))).thenReturn(existing);
 
 		Category result = service.update(1, updates);
 
 		assertThat(result.getName()).isEqualTo("Empanadas");
+	}
+
+	@Test
+	void update_invalidCategoryType_throwsCategoryTypeNotFoundException() {
+		Tenant p = tenant();
+		Category existing = category(p);
+		Category updates = Category.builder().name("Empanadas").tenant(p)
+			.categoryType(CategoryType.builder().id(99).build()).build();
+		when(categoryRepository.findById(1)).thenReturn(Optional.of(existing));
+		when(tenantRepository.findById(1)).thenReturn(Optional.of(p));
+		when(categoryTypeRepository.findById(99)).thenReturn(Optional.empty());
+
+		assertThatThrownBy(() -> service.update(1, updates))
+			.isInstanceOf(CategoryTypeNotFoundException.class);
 	}
 
 	@Test

@@ -45,6 +45,7 @@ class ProductServiceTest {
 	@Mock private CategoryRepository categoryRepository;
 	@Mock private BranchRepository branchRepository;
 	@Mock private BranchProductRepository branchProductRepository;
+	@Mock private com.laroka.backend.catalog.service.ProductSizeService productSizeService;
 	@Mock private TenantRepository tenantRepository;
 
 	@InjectMocks
@@ -129,7 +130,7 @@ class ProductServiceTest {
 		when(branchProductRepository.findByBranchIdWithProductAndCategory(1))
 			.thenReturn(List.of(availableBp, unavailableBp));
 
-		List<BranchProduct> result = service.getMenuForBranch(1);
+		List<BranchProduct> result = service.getMenuForBranch(1).branchProducts();
 
 		assertThat(result).hasSize(2);
 		assertThat(result).extracting(BranchProduct::getAvailable)
@@ -145,7 +146,7 @@ class ProductServiceTest {
 		when(branchRepository.findById(1)).thenReturn(Optional.of(b));
 		when(branchProductRepository.findByBranchIdWithProductAndCategory(1)).thenReturn(List.of(bp));
 
-		List<BranchProduct> result = service.getMenuForBranch(1);
+		List<BranchProduct> result = service.getMenuForBranch(1).branchProducts();
 
 		assertThat(result.get(0).getPriceOverride()).isNull();
 		assertThat(result.get(0).getProduct().getPrice()).isEqualByComparingTo("2800.00");
@@ -160,7 +161,7 @@ class ProductServiceTest {
 		when(branchRepository.findById(1)).thenReturn(Optional.of(b));
 		when(branchProductRepository.findByBranchIdWithProductAndCategory(1)).thenReturn(List.of(bp));
 
-		List<BranchProduct> result = service.getMenuForBranch(1);
+		List<BranchProduct> result = service.getMenuForBranch(1).branchProducts();
 
 		assertThat(result.get(0).getPriceOverride()).isEqualByComparingTo("3100.00");
 	}
@@ -366,7 +367,7 @@ class ProductServiceTest {
 		when(productRepository.findById(1)).thenReturn(Optional.of(product));
 		when(branchProductRepository.findConfigByProductId(1)).thenReturn(List.of(bp));
 
-		List<BranchProduct> result = service.getBranchProductConfig(1);
+		List<BranchProduct> result = service.getBranchProductConfig(1).branchProducts();
 
 		assertThat(result).hasSize(1);
 		assertThat(result.get(0).getPriceOverride()).isEqualByComparingTo("3100.00");
@@ -394,7 +395,7 @@ class ProductServiceTest {
 		when(productRepository.findById(1)).thenReturn(Optional.of(product));
 		when(branchProductRepository.findConfigByProductId(1)).thenReturn(List.of(bpActive, bpInactive));
 
-		List<BranchProduct> result = service.getBranchProductConfig(1);
+		List<BranchProduct> result = service.getBranchProductConfig(1).branchProducts();
 
 		assertThat(result).hasSize(1);
 		assertThat(result.get(0).getBranch().getId()).isEqualTo(1);
@@ -412,12 +413,12 @@ class ProductServiceTest {
 		when(branchProductRepository.findConfigByProductId(1)).thenReturn(List.of(bp));
 
 		// Sucursal inactiva → no aparece.
-		assertThat(service.getBranchProductConfig(1)).isEmpty();
+		assertThat(service.getBranchProductConfig(1).branchProducts()).isEmpty();
 
 		// Se reactiva la sucursal (el mismo BranchProduct, sin resetear valores).
 		branch.setActive(true);
 
-		List<BranchProduct> result = service.getBranchProductConfig(1);
+		List<BranchProduct> result = service.getBranchProductConfig(1).branchProducts();
 		assertThat(result).hasSize(1);
 		assertThat(result.get(0).getPriceOverride()).isEqualByComparingTo("4200.00");
 		assertThat(result.get(0).getAvailable()).isFalse();

@@ -32,7 +32,7 @@
   box-shadow: 0 28px 80px rgba(0, 0, 0, 0.85);
   transform: scale(0.96);
   transition: transform 0.18s ease;
-  font-family: 'Inter', sans-serif;
+  font-family: "Inter", sans-serif;
 }
 
 .nom-backdrop--open .nom-dialog {
@@ -57,7 +57,7 @@
 }
 
 .nom-title {
-  font-family: 'Barlow Condensed', sans-serif;
+  font-family: "Barlow Condensed", sans-serif;
   font-size: 1.85rem;
   font-weight: 800;
   color: var(--color-accent);
@@ -84,7 +84,9 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: border-color 0.15s, color 0.15s;
+  transition:
+    border-color 0.15s,
+    color 0.15s;
   line-height: 1;
   flex-shrink: 0;
 }
@@ -136,7 +138,7 @@
   border: none;
   outline: none;
   color: #d4e8d6;
-  font-family: 'Inter', sans-serif;
+  font-family: "Inter", sans-serif;
   font-size: 0.85rem;
   width: 100%;
 }
@@ -175,7 +177,7 @@
 }
 
 .nom-category-name {
-  font-family: 'Barlow Condensed', sans-serif;
+  font-family: "Barlow Condensed", sans-serif;
   font-size: 0.78rem;
   font-weight: 700;
   color: rgba(212, 232, 214, 0.45);
@@ -250,7 +252,10 @@
   justify-content: center;
   cursor: pointer;
   flex-shrink: 0;
-  transition: border-color 0.12s, background 0.12s, color 0.12s;
+  transition:
+    border-color 0.12s,
+    background 0.12s,
+    color 0.12s;
   line-height: 1;
   padding: 0;
 }
@@ -258,22 +263,6 @@
 .nom-add-btn:hover {
   border-color: rgba(101, 163, 105, 0.55);
   color: #ffffff;
-}
-
-.nom-add-btn--active {
-  border-color: var(--color-accent);
-  background: var(--color-accent);
-  color: #0a1810;
-  font-family: 'Inter', sans-serif;
-  font-size: 0.78rem;
-  font-weight: 800;
-}
-
-.nom-add-btn--active:hover {
-  border-color: var(--color-accent);
-  background: var(--color-accent);
-  color: #0a1810;
-  filter: brightness(1.08);
 }
 
 /* ── Divider ─────────────────────────────────────────────────── */
@@ -297,13 +286,126 @@
 
 /* ── Items section ───────────────────────────────────────────── */
 
+/* El wrapper toma el espacio flexible y sirve de ancla para la flecha, que debe quedar fija
+   al pie del panel: dentro del contenedor con scroll se iría con el contenido. */
+.nom-items-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .nom-items-section {
   flex: 1;
   overflow-y: auto;
   padding: 0.875rem 1.25rem;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(101, 163, 105, 0.18) transparent;
   min-height: 0;
+  /* La barra es un control con el que se puede arrastrar, no sólo un indicador: el gutter
+     reserva su espacio siempre, así no aparece y desaparece corriendo el contenido. */
+  scrollbar-gutter: stable;
+  scroll-behavior: smooth;
+}
+
+/* OJO: acá NO van scrollbar-width ni scrollbar-color. Desde Chrome 121 esas propiedades
+   estándar tienen prioridad y, cuando están presentes, el navegador ignora por completo los
+   pseudo-elementos ::-webkit-scrollbar-*. Con scrollbar-width: thin puesto, estas reglas no
+   se aplicaban y la barra seguía siendo overlay (se desvanecía ~1s después de scrollear).
+   Definir sólo los pseudo-elementos la vuelve clásica y permanente, que es lo que la hace
+   clickeable. Firefox no soporta estos selectores, pero ahí la barra ya es persistente. */
+.nom-items-section::-webkit-scrollbar {
+  width: 8px;
+}
+
+.nom-items-section::-webkit-scrollbar-track {
+  background: rgba(101, 163, 105, 0.07);
+  border-radius: 4px;
+}
+
+.nom-items-section::-webkit-scrollbar-thumb {
+  background: rgba(101, 163, 105, 0.3);
+  border-radius: 4px;
+}
+
+.nom-items-section::-webkit-scrollbar-thumb:hover {
+  background: rgba(101, 163, 105, 0.5);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nom-items-section {
+    scroll-behavior: auto;
+  }
+}
+
+/* Indicador de contenido oculto: degradado corto que desvanece el último ítem y la flecha
+   sobre él. El degradado no captura clicks (pointer-events: none) para no robarle el click
+   al ítem que tapa; sólo la flecha, que sí es un botón, los recibe. */
+.nom-scroll-hint {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 34px;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+  animation: nom-scroll-hint-in 0.18s ease;
+  /* No tapa la barra de scroll: es un control que tiene que quedar alcanzable. */
+  padding-right: 10px;
+  z-index: 1;
+}
+
+.nom-scroll-hint--bottom {
+  bottom: 0;
+  align-items: flex-end;
+  padding-bottom: 2px;
+  background: linear-gradient(to bottom, transparent, rgba(6, 26, 15, 0.92));
+}
+
+.nom-scroll-hint--top {
+  top: 0;
+  align-items: flex-start;
+  padding-top: 2px;
+  background: linear-gradient(to top, transparent, rgba(6, 26, 15, 0.92));
+}
+
+.nom-scroll-hint-btn {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-accent);
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.nom-scroll-hint-btn:hover {
+  background: rgba(254, 205, 24, 0.14);
+}
+
+/* Mismo icono rotado: una sola definición de chevron para las dos direcciones. */
+.nom-scroll-hint-btn--up svg {
+  transform: rotate(180deg);
+}
+
+@keyframes nom-scroll-hint-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nom-scroll-hint {
+    animation: none;
+  }
 }
 
 .nom-section-label {
@@ -335,6 +437,12 @@
   border-bottom: 1px solid rgba(101, 163, 105, 0.075);
 }
 
+/* El separador del último ítem no separa nada y suma 1px de desborde al contenedor con
+   scroll, que era parte de por qué la flecha aparecía sin contenido oculto real. */
+.nom-cart-item:last-child {
+  border-bottom: none;
+}
+
 .nom-cart-qty-ctrl {
   display: flex;
   align-items: stretch;
@@ -355,7 +463,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.1s, color 0.1s;
+  transition:
+    background 0.1s,
+    color 0.1s;
   line-height: 1;
   padding: 0;
 }
@@ -405,7 +515,9 @@
   align-items: center;
   padding: 4px;
   border-radius: 4px;
-  transition: color 0.15s, background 0.15s;
+  transition:
+    color 0.15s,
+    background 0.15s;
   flex-shrink: 0;
 }
 
@@ -480,12 +592,15 @@
   border-radius: 8px;
   background: rgba(101, 163, 105, 0.04);
   color: rgba(212, 232, 214, 0.45);
-  font-family: 'Inter', sans-serif;
+  font-family: "Inter", sans-serif;
   font-size: 0.72rem;
   font-weight: 600;
   letter-spacing: 0.04em;
   cursor: pointer;
-  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  transition:
+    border-color 0.15s,
+    color 0.15s,
+    background 0.15s;
 }
 
 .nom-toggle-btn:hover {
@@ -504,7 +619,7 @@
   border: 1px solid rgba(101, 163, 105, 0.16);
   border-radius: 8px;
   color: #d4e8d6;
-  font-family: 'Inter', sans-serif;
+  font-family: "Inter", sans-serif;
   font-size: 0.85rem;
   padding: 0.5rem 0.875rem;
   outline: none;
@@ -524,7 +639,7 @@
   border: 1px solid rgba(101, 163, 105, 0.16);
   border-radius: 8px;
   color: #d4e8d6;
-  font-family: 'Inter', sans-serif;
+  font-family: "Inter", sans-serif;
   font-size: 0.85rem;
   padding: 0.5rem 0.875rem;
   resize: none;
@@ -582,7 +697,7 @@
 }
 
 .nom-total-grand-label {
-  font-family: 'Barlow Condensed', sans-serif;
+  font-family: "Barlow Condensed", sans-serif;
   font-size: 0.82rem;
   font-weight: 700;
   color: rgba(212, 232, 214, 0.6);
@@ -590,7 +705,7 @@
 }
 
 .nom-total-grand-value {
-  font-family: 'Barlow Condensed', sans-serif;
+  font-family: "Barlow Condensed", sans-serif;
   font-size: 1.55rem;
   font-weight: 800;
   color: var(--color-accent);
@@ -619,12 +734,14 @@
   border: none;
   border-radius: 8px;
   color: #0a1810;
-  font-family: 'Barlow Condensed', sans-serif;
+  font-family: "Barlow Condensed", sans-serif;
   font-size: 1rem;
   font-weight: 800;
   letter-spacing: 0.04em;
   cursor: pointer;
-  transition: filter 0.15s, opacity 0.15s;
+  transition:
+    filter 0.15s,
+    opacity 0.15s;
   white-space: nowrap;
 }
 
@@ -681,7 +798,7 @@
   border-radius: 12px;
   padding: 1.25rem 1.4rem 1.1rem;
   box-shadow: 0 28px 80px rgba(0, 0, 0, 0.85);
-  font-family: 'Inter', sans-serif;
+  font-family: "Inter", sans-serif;
 }
 
 .nom-confirm-title {
@@ -723,8 +840,11 @@
   font-size: 0.82rem;
   font-weight: 700;
   cursor: pointer;
-  font-family: 'Inter', sans-serif;
-  transition: filter 0.12s, background 0.12s, border-color 0.12s;
+  font-family: "Inter", sans-serif;
+  transition:
+    filter 0.12s,
+    background 0.12s,
+    border-color 0.12s;
 }
 
 .nom-confirm-cancel-btn {
@@ -750,4 +870,134 @@
 .nom-confirm-force-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+/* ── Mitad y mitad (US-HH-F-03) ─────────────────────────────────────────────
+   El ½ comparte la caja y la paleta del (+): es una acción del mismo rango, no una
+   destacada. Sólo cambia el radio (cuadrado redondeado) para distinguirlos de un vistazo.
+   El acento sólo marca estado en curso (mitad pendiente, chica marcada); el (+) no tiene
+   estado activo: lo agregado se lee en el panel de productos seleccionados. */
+.nom-half-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1.5px solid rgba(101, 163, 105, 0.28);
+  background: rgba(101, 163, 105, 0.07);
+  color: rgba(212, 232, 214, 0.65);
+  font-size: 0.95rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    border-color 0.12s,
+    background 0.12s,
+    color 0.12s;
+  line-height: 1;
+  padding: 0;
+}
+
+.nom-half-btn:hover:not(:disabled) {
+  border-color: rgba(101, 163, 105, 0.55);
+  color: #ffffff;
+}
+
+.nom-half-btn--active {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: #0a1810;
+  font-weight: 800;
+}
+
+.nom-half-btn--active:hover {
+  filter: brightness(1.08);
+}
+
+.nom-half-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* US-SIZE-F-03: selector de tamaño chica. Misma caja y paleta que el ½ y el (+): es una
+   acción del mismo rango. Activo = la fila opera sobre el tamaño chica. */
+.nom-size-btn {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  border: 1.5px solid rgba(101, 163, 105, 0.28);
+  background: rgba(101, 163, 105, 0.07);
+  color: rgba(212, 232, 214, 0.65);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition:
+    border-color 0.12s,
+    background 0.12s,
+    color 0.12s;
+  line-height: 1;
+  padding: 0;
+}
+
+.nom-size-btn:hover:not(:disabled) {
+  border-color: rgba(101, 163, 105, 0.55);
+  color: #ffffff;
+}
+
+.nom-size-btn--active {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: #0a1810;
+  font-weight: 800;
+}
+
+.nom-size-btn--active:hover {
+  filter: brightness(1.08);
+}
+
+.nom-size-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* Fila fuera de juego mientras se completa una combinación: no es candidata válida. */
+.nom-product-row--dimmed {
+  opacity: 0.32;
+  pointer-events: none;
+}
+
+/* Fila de la mitad ya elegida: queda marcada mientras se busca la otra. */
+.nom-product-row--half-pending {
+  background: rgba(254, 205, 24, 0.1);
+  box-shadow: inset 2px 0 0 var(--color-accent);
+}
+
+/* Aviso de la combinación en curso, sobre la lista del catálogo. */
+.nom-half-hint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(254, 205, 24, 0.35);
+  background: rgba(254, 205, 24, 0.08);
+  font-family: "Inter", sans-serif;
+  font-size: 12px;
+  color: #e8f0ea;
+}
+
+.nom-half-hint-cancel {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: #fecd18;
+  font-size: 12px;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
 }

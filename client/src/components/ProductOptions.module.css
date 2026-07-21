@@ -1,0 +1,186 @@
+/* Misma línea sutil que .detail-separator en App.css: es el separador estándar del detalle
+   de producto. Sin cajas — el espaciado y estas líneas separan el contenido. */
+.block {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid color-mix(in srgb, var(--border) 9%, transparent);
+}
+
+/* Cada grupo se separa del anterior con la misma línea. El primero no la lleva: ya la
+   aporta el borde superior del bloque. */
+.group + .group {
+  border-top: 1px solid color-mix(in srgb, var(--border) 9%, transparent);
+}
+
+.groupTitle {
+  margin: 0;
+  padding-top: 14px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 800;
+  font-size: 15px;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--text-primary);
+}
+
+/* --- Acordeón --- */
+
+.accordionRow {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  color: var(--text-primary);
+}
+
+.accordionRowDisabled {
+  cursor: not-allowed;
+}
+
+.accordionRowDisabled .accordionLabel,
+.accordionRowDisabled .chevron {
+  opacity: 0.4;
+}
+
+/* Motivo por el que la opción quedó deshabilitada. Sin él, la opción atenuada no explica
+   nada; con él, el cliente entiende que depende del tamaño elegido arriba. */
+.accordionReason {
+  flex: 1;
+  text-align: right;
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--text-secondary);
+}
+
+.accordionRow:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.accordionLabel {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 800;
+  font-size: 16px;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--text-primary);
+}
+
+.chevron {
+  display: flex;
+  flex-shrink: 0;
+  color: var(--accent);
+  transition: transform 0.22s ease;
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
+}
+
+.accordionPanel {
+  padding-bottom: 14px;
+}
+
+/* --- Radios --- */
+
+.fieldset {
+  border: none;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.legend {
+  padding: 0 0 6px 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
+.radioList {
+  display: flex;
+  flex-direction: column;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.radioRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  cursor: pointer;
+  border-top: 1px solid color-mix(in srgb, var(--border) 9%, transparent);
+}
+
+/* Input nativo oculto visualmente pero accesible: mantiene foco, teclado y label. */
+.radioInput {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.radioDot {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--text-primary) 35%, transparent);
+  position: relative;
+  transition: border-color 0.15s;
+}
+
+.radioRowSelected .radioDot {
+  border-color: var(--accent);
+}
+
+/* Opción única y fija: el producto sólo viene en ese tamaño. Se muestra elegida pero sin
+   cursor de acción, para que no parezca que se puede cambiar y no responde. */
+.radioRowFixed {
+  cursor: default;
+}
+
+.radioRowSelected .radioDot::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.radioInput:focus-visible + .radioDot {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.radioLabel {
+  flex: 1;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.radioRowSelected .radioLabel {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.radioHint {
+  font-size: 13px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chevron,
+  .radioDot {
+    transition: none;
+  }
+}

@@ -2,6 +2,7 @@ package com.laroka.backend.catalog.service;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
@@ -14,6 +15,7 @@ import com.laroka.backend.branch.repository.BranchRepository;
 import com.laroka.backend.catalog.entity.BranchProduct;
 import com.laroka.backend.catalog.entity.Category;
 import com.laroka.backend.catalog.entity.Product;
+import com.laroka.backend.catalog.entity.ProductSize;
 import com.laroka.backend.catalog.exception.BranchProductNotFoundException;
 import com.laroka.backend.catalog.exception.CategoryNotFoundException;
 import com.laroka.backend.catalog.exception.ProductNotFoundException;
@@ -35,6 +37,7 @@ public class ProductService {
 	private final CategoryRepository categoryRepository;
 	private final BranchRepository branchRepository;
 	private final BranchProductRepository branchProductRepository;
+	private final ProductSizeService productSizeService;
 	private final TenantRepository tenantRepository;
 
 	public Product findById(Integer id) {
@@ -43,11 +46,15 @@ public class ProductService {
 	}
 
 	@Cacheable(value = "menu", key = "#branchId")
-	public List<BranchProduct> getMenuForBranch(Integer branchId) {
+	public BranchMenu getMenuForBranch(Integer branchId) {
 		validateBranchExists(branchId);
 		// US-15-11: el menú retorna todos los productos de la sucursal (disponibles y no).
 		// El campo available viaja en el DTO; el mapper ordena disponibles primero.
-		return branchProductRepository.findByBranchIdWithProductAndCategory(branchId);
+		// US-SIZE-F-02: los tamaños con precio ya resuelto por sucursal viajan en el mismo
+		// valor cacheado, para no duplicar los seis puntos de evicción de este cache.
+		return new BranchMenu(
+			branchProductRepository.findByBranchIdWithProductAndCategory(branchId),
+			productSizeService.resolveSizesForBranch(branchId));
 	}
 
 	public List<Product> findByCategory(Integer categoryId) {
@@ -140,14 +147,23 @@ public class ProductService {
 	// US-14-03: configuración por sucursal de un producto. Una entrada por cada sucursal
 	// del tenant (cada sucursal tiene su BranchProduct, garantizado por US-14-04), con
 	// branch y product cargados para resolver branchName y precio efectivo en el mapper.
-	public List<BranchProduct> getBranchProductConfig(Integer productId) {
+	public ProductBranchConfig getBranchProductConfig(Integer productId) {
 		findById(productId);
 		// US-15-06: se excluyen las sucursales inactivas de la config por sucursal. El
 		// BranchProduct NO se borra ni modifica: sigue en DB con su priceOverride/available;
 		// al reactivar la sucursal reaparece con esos mismos valores (solo se filtra al leer).
-		return branchProductRepository.findConfigByProductId(productId).stream()
+		List<BranchProduct> rows = branchProductRepository.findConfigByProductId(productId).stream()
 			.filter(bp -> bp.getBranch().isActive())
 			.toList();
+
+		// US-SIZE-F-01: el tamaño y sus overrides viajan en la misma respuesta para que el
+		// backoffice pueda mostrar el precio del tamaño por sucursal sin una segunda llamada.
+		ProductSize activeSize = productSizeService.findActiveByProduct(productId).orElse(null);
+		Map<Integer, BigDecimal> sizeOverrides = activeSize == null
+			? Map.of()
+			: productSizeService.findBranchOverrides(activeSize.getId());
+
+		return new ProductBranchConfig(rows, activeSize, sizeOverrides);
 	}
 
 	@CacheEvict(value = "menu", key = "#branchId")

@@ -14,5 +14,10 @@ import lombok.NoArgsConstructor;
 public class MenuCategoryDTO {
 	private Integer categoryId;
 	private String categoryName;
+	// US-HH-F-01: habilita la opción "mitad y mitad" en el detalle de producto del client.
+	// false cuando la categoría no tiene tipo asignado (FK nullable, ver US-CAT-02).
+	private boolean allowsHalfAndHalf;
+	// US-SIZE-F-02: independiente de allowsHalfAndHalf (ver US-SIZE-01).
+	private boolean allowsSizes;
 	private List<MenuProductDTO> products;
 }

@@ -6,6 +6,7 @@ import { usePreferredBranch } from '../hooks/usePreferredBranch'
 import { usePushSubscription } from '../hooks/usePushSubscription'
 import { PushPermissionSheet } from '../components/PushPermissionSheet'
 import { addActiveOrder } from '../utils/activeOrders'
+import { cartItemProductId, isHalfAndHalfItem } from '../utils/halfAndHalf'
 import { initiatePayment } from '../services/paymentsService'
 import { apiFetch, showToast } from '../services/http'
 
@@ -86,7 +87,11 @@ function CartItemRow({ item, onRemoveRequest, onUpdateQty }) {
         <CartItemImage src={item.imageUrl} alt={item.name} />
       </div>
       <div className="cart-item-info">
-        <span className="cart-item-name">{item.name}</span>
+        <span
+          className={`cart-item-name${isHalfAndHalfItem(item) ? ' cart-item-name--multiline' : ''}`}
+        >
+          {item.name}
+        </span>
         {item.description && (
           <span className="cart-item-desc">{item.description}</span>
         )}
@@ -254,7 +259,15 @@ export function CartScreen({ items, extras = [], onBack, onRemove, onUpdateQty, 
       customerName: formData.nombre || null,
       customerPhone: formData.telefono || null,
       paymentMethod: formData.paymentMethod,
-      items: items.map(i => ({ productId: i.id, quantity: i.qty })),
+      // US-HH-F-01: un ítem combinado viaja como productId + secondProductId. El id del
+      // ítem simple sigue siendo el del producto (carritos ya persistidos incluidos).
+      items: items.map(i => ({
+        productId: cartItemProductId(i),
+        ...(i.secondProductId != null ? { secondProductId: i.secondProductId } : {}),
+        // US-SIZE-F-02: sólo los tamaños alternativos viajan; "Grande" es la ausencia del campo.
+        ...(i.productSizeId != null ? { productSizeId: i.productSizeId } : {}),
+        quantity: i.qty,
+      })),
       ...(pushSubscriptionId ? { pushSubscriptionId } : {}),
     }
     let res
@@ -270,7 +283,13 @@ export function CartScreen({ items, extras = [], onBack, onRemove, onUpdateQty, 
       // productId como campo estructurado (US-15-CF-05): lo removemos del carrito
       // para que el reintento no vuelva a fallar por lo mismo.
       if (err?.status === 422 && err.body?.productId != null) {
-        onRemove(err.body.productId)
+        // US-HH-F-01: el backend responde con el productId, pero un ítem combinado vive en
+        // el carrito bajo un id sintético. Se remueve toda línea que use ese producto en
+        // cualquiera de sus dos mitades; si no, el reintento fallaría por lo mismo.
+        const unavailableId = err.body.productId
+        items
+          .filter(i => cartItemProductId(i) === unavailableId || i.secondProductId === unavailableId)
+          .forEach(i => onRemove(i.id))
         // US-17-CF-01: además de removerlo, volver a la pantalla del carrito
         // (no quedarse en checkout) para que el cliente vea el error y reintente
         // desde el carrito ya corregido.
@@ -288,6 +307,14 @@ export function CartScreen({ items, extras = [], onBack, onRemove, onUpdateQty, 
         items: items.map(i => ({
           id: i.id, name: i.name, price: i.price, qty: i.qty,
           imageUrl: i.imageUrl || null, description: i.description || null,
+          // Sin estos campos, un ítem combinado recuperado tras un pago fallido volvería
+          // al backend con el id sintético del carrito como productId.
+          productId: i.productId ?? null,
+          secondProductId: i.secondProductId ?? null,
+          productSizeId: i.productSizeId ?? null,
+          sizeName: i.sizeName ?? null,
+          productName: i.productName ?? null,
+          secondProductName: i.secondProductName ?? null,
         })),
         formData: {
           orderType: formData.orderType,

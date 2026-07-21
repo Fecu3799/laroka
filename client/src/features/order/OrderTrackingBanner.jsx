@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { usePreferredBranch } from '../../hooks/usePreferredBranch'
 import { readActiveOrders, removeActiveOrder } from '../../utils/activeOrders'
+import { orderItemDisplayName } from '../../utils/halfAndHalf'
 import { cancelOrder } from '../../services/ordersService'
 import { initiatePayment } from '../../services/paymentsService'
 import styles from './OrderTrackingBanner.module.css'
@@ -209,7 +210,9 @@ function OrderDetailModal({
                 <ul className={styles.itemsList}>
                   {items.map((item, i) => (
                     <li key={i} className={styles.itemRow}>
-                      <span className={styles.itemQtyName}>{item.quantity}× {item.name}</span>
+                      <span className={styles.itemQtyName}>
+                        {item.quantity}× {orderItemDisplayName(item)}
+                      </span>
                       <span className={styles.itemPrice}>{formatPrice(item.subtotal)}</span>
                     </li>
                   ))}

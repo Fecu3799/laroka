@@ -8,6 +8,7 @@ import { OrderTrackingBanner } from '../features/order/OrderTrackingBanner'
 import { WelcomeModal } from '../components/WelcomeModal'
 import { useCart } from '../hooks/useCart'
 import { getTenantProfile } from '../services/tenantService'
+import { buildHalfAndHalfItem, buildSizedItem } from '../utils/halfAndHalf'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080'
 const INTRO_SEEN_KEY = 'laroka_intro_seen'
@@ -81,11 +82,34 @@ function ProductImage({ src, alt }) {
   )
 }
 
-function ProductCard({ product, onSelect, onAdd }) {
+function CheckIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="m5 12 5 5 9-10" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  )
+}
+
+function ProductCard({ product, onSelect, onAdd, cartQty = 0 }) {
   // US-15-CF-05: un producto no disponible en la sucursal (available=false) se
   // muestra atenuado, con badge "No disponible" y precio visible, pero no es
   // clickeable: el tap no abre el detalle ni lo agrega al carrito.
   const unavailable = product.available === false
+
+  // Confirmación breve del agregado: check + pulso, y después el botón queda mostrando
+  // cuántas unidades hay en el carrito. El contador sigue sumando al volver a tocarlo.
+  const [justAdded, setJustAdded] = useState(false)
+  const addedTimer = useRef(null)
+
+  useEffect(() => () => clearTimeout(addedTimer.current), [])
+
+  const handleAdd = (e) => {
+    e.stopPropagation()
+    onAdd(product)
+    setJustAdded(true)
+    clearTimeout(addedTimer.current)
+    addedTimer.current = setTimeout(() => setJustAdded(false), 600)
+  }
 
   return (
     <li
@@ -111,11 +135,18 @@ function ProductCard({ product, onSelect, onAdd }) {
       </div>
       {!unavailable && (
         <button
-          className="product-add-btn"
-          aria-label={`Agregar ${product.name}`}
-          onClick={e => { e.stopPropagation(); onAdd(product) }}
+          className={`product-add-btn${justAdded ? ' product-add-btn--added' : ''}`
+            + `${cartQty > 0 ? ' product-add-btn--active' : ''}`}
+          aria-label={cartQty > 0
+            ? `Agregar otro ${product.name} (${cartQty} en el carrito)`
+            : `Agregar ${product.name}`}
+          onClick={handleAdd}
         >
-          <AddIcon />
+          {justAdded
+            ? <CheckIcon />
+            : cartQty > 0
+              ? <span className="product-add-qty">{cartQty}</span>
+              : <AddIcon />}
         </button>
       )}
     </li>
@@ -213,15 +244,48 @@ export function MenuScreen({ branchId, branchName, onChangeBranch, paymentFailur
 
   const handleSelectProduct = useCallback((product) => {
     const cat = categories.find(c => c.products.some(p => p.id === product.id))
-    setSelectedProduct({ ...product, categoryName: cat?.categoryName || '' })
+    setSelectedProduct({
+      ...product,
+      categoryName: cat?.categoryName || '',
+      // US-HH-F-01: candidatos para la otra mitad — productos disponibles de la MISMA
+      // categoría, excluyendo el propio (el backend rechaza combinar un producto consigo
+      // mismo, US-HH-02). El flag viene del menú (allowsHalfAndHalf por categoría).
+      allowsHalfAndHalf: cat?.allowsHalfAndHalf === true,
+      // US-SIZE-F-02: los tamaños ya vienen en el producto del menú, con el precio de la
+      // sucursal resuelto; sólo falta saber si la categoría los habilita.
+      allowsSizes: cat?.allowsSizes === true,
+      halfAndHalfCandidates: (cat?.products ?? []).filter(
+        p => p.id !== product.id && p.available !== false,
+      ),
+    })
   }, [categories])
 
   const handleCloseDetail = useCallback(() => {
     setSelectedProduct(null)
   }, [])
 
+  // Unidades de una línea del carrito, por su id. Para el (+) de la lista ese id es el del
+  // producto suelto; en el detalle, el de la variante elegida (entero o tamaño). Los ítems
+  // con opciones tienen id propio, así que nunca se mezclan entre sí.
+  const cartQtyById = useCallback(
+    cartItemId => items.find(i => i.id === cartItemId)?.qty ?? 0,
+    [items],
+  )
+
   const handleAddToCart = useCallback((product, qty) => {
     addItem(product, qty)
+  }, [addItem])
+
+  // US-HH-F-01: el ítem combinado entra al carrito con identidad propia (no se fusiona con
+  // el producto suelto) y con el precio ya resuelto por la regla del mayor precio.
+  const handleAddHalfAndHalf = useCallback((first, second, qty) => {
+    addItem(buildHalfAndHalfItem(first, second), qty)
+  }, [addItem])
+
+  // US-SIZE-F-02: el ítem con tamaño entra con identidad propia y con el precio del tamaño
+  // ya resuelto por la sucursal, para no fusionarse con el mismo producto en otro tamaño.
+  const handleAddSized = useCallback((product, size, qty) => {
+    addItem(buildSizedItem(product, size), qty)
   }, [addItem])
 
   // Perfil del negocio (US-13-F-02): se carga al montar la pantalla del menú.
@@ -561,6 +625,7 @@ export function MenuScreen({ branchId, branchName, onChangeBranch, paymentFailur
                       product={product}
                       onSelect={handleSelectProduct}
                       onAdd={p => addItem(p, 1)}
+                      cartQty={cartQtyById(product.id)}
                     />
                   ))}
                 </ul>
@@ -600,6 +665,7 @@ export function MenuScreen({ branchId, branchName, onChangeBranch, paymentFailur
                               product={product}
                               onSelect={handleSelectProduct}
                               onAdd={p => addItem(p, 1)}
+                              cartQty={cartQtyById(product.id)}
                             />
                           ))}
                         </ul>
@@ -629,6 +695,11 @@ export function MenuScreen({ branchId, branchName, onChangeBranch, paymentFailur
               product={selectedProduct}
               onBack={handleCloseDetail}
               onAddToCart={handleAddToCart}
+              onAddHalfAndHalf={handleAddHalfAndHalf}
+              onAddSized={handleAddSized}
+              getCartQty={cartQtyById}
+              onUpdateCartQty={updateQty}
+              onRemoveFromCart={removeItem}
             />
           </Motion.div>
         )}

@@ -60,3 +60,59 @@ export function formatOrderNumber(order) {
   const id = String(order?.id ?? '')
   return id ? `#ORDER-${id.slice(0, 8)}` : ''
 }
+
+/**
+ * Nombre a mostrar de un ítem del pedido (US-HH-04). Un ítem mitad y mitad se muestra como
+ * "½ A + ½ B"; uno simple, con su nombre tal cual. Consume `productName` /
+ * `secondProductName` de BackofficeOrderItemDTO.
+ *
+ * El formato es el mismo que usa el client en carrito, checkout y seguimiento
+ * (client/src/utils/halfAndHalf.js). Es duplicación deliberada entre las dos apps: son
+ * bundles Vite independientes, sin paquete compartido donde alojar el helper. Si el formato
+ * cambia, hay que cambiarlo en los dos lados.
+ */
+export function orderItemDisplayName(item) {
+  const name = item?.productName ?? ''
+  const second = item?.secondProductName
+  if (second) return `½ ${name} + ½ ${second}`
+  // US-SIZE-F-03: el tamaño se muestra entre paréntesis, igual que en el client. Sólo
+  // aparece con tamaño alternativo: el grande es implícito y no lleva sufijo.
+  return item?.sizeName ? `${name} (${sizeLabel(item.sizeName)})` : name
+}
+
+/**
+ * Etiqueta visible de un tamaño. El backend lo expone como enum (CHICA).
+ */
+export function sizeLabel(size) {
+  if (size === 'CHICA') return 'Chica'
+  if (size === 'GRANDE') return 'Grande'
+  return size
+}
+
+/**
+ * Precio unitario de un ítem mitad y mitad (US-HH-03): el mayor de los dos precios
+ * efectivos de la sucursal. El menú ya expone `price` resuelto (priceOverride ?? price),
+ * así que comparar esos valores da lo mismo que resuelve el backend al crear el pedido —
+ * el precio mostrado antes de confirmar nunca difiere del cobrado.
+ */
+export function halfAndHalfUnitPrice(priceA, priceB) {
+  return Math.max(Number(priceA ?? 0), Number(priceB ?? 0))
+}
+
+/**
+ * Identidad de un ítem dentro del carrito del pedido manual. Un ítem simple se identifica
+ * por su productId; uno combinado, por el par ordenado de ids — así elegir A+B o B+A cae en
+ * la misma línea del carrito, y un combinado nunca se fusiona con el producto suelto.
+ *
+ * US-SIZE-F-03: un ítem con tamaño lleva su propia identidad para no fusionarse con el mismo
+ * producto sin tamaño ("Grande", que es el comportamiento por defecto) ni con otro tamaño.
+ * Tamaño y mitad y mitad son excluyentes, así que nunca coinciden en el mismo ítem.
+ */
+export function cartItemKey({ productId, secondProductId, productSizeId }) {
+  if (secondProductId != null) {
+    const [a, b] = [Number(productId), Number(secondProductId)].sort((x, y) => x - y)
+    return `hh-${a}-${b}`
+  }
+  if (productSizeId != null) return `size-${productId}-${productSizeId}`
+  return String(productId)
+}

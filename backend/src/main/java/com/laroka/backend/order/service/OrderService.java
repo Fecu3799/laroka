@@ -34,10 +34,14 @@ import com.laroka.backend.branch.entity.Branch;
 import com.laroka.backend.branch.exception.BranchNotFoundException;
 import com.laroka.backend.branch.repository.BranchRepository;
 import com.laroka.backend.catalog.entity.BranchProduct;
+import com.laroka.backend.catalog.entity.CategoryType;
 import com.laroka.backend.catalog.entity.Product;
+import com.laroka.backend.catalog.entity.ProductSize;
 import com.laroka.backend.catalog.exception.ProductNotFoundException;
 import com.laroka.backend.catalog.repository.BranchProductRepository;
 import com.laroka.backend.catalog.repository.ProductRepository;
+import com.laroka.backend.catalog.repository.ProductSizeRepository;
+import com.laroka.backend.catalog.service.ProductSizeService;
 import com.laroka.backend.order.domain.OrderStateMachine;
 import com.laroka.backend.order.entity.Order;
 import com.laroka.backend.order.entity.OrderItem;
@@ -46,6 +50,8 @@ import com.laroka.backend.order.entity.OrderStatus;
 import com.laroka.backend.order.entity.OrderStatusHistory;
 import com.laroka.backend.order.entity.OrderType;
 import com.laroka.backend.order.entity.PaymentMethod;
+import com.laroka.backend.order.exception.InvalidHalfAndHalfException;
+import com.laroka.backend.order.exception.InvalidProductSizeException;
 import com.laroka.backend.order.exception.OrderNotFoundException;
 import com.laroka.backend.order.exception.ProductUnavailableException;
 import com.laroka.backend.order.repository.BranchOrderSequenceRepository;
@@ -72,6 +78,8 @@ public class OrderService {
     private final BranchRepository branchRepository;
     private final ProductRepository productRepository;
     private final BranchProductRepository branchProductRepository;
+    private final ProductSizeRepository productSizeRepository;
+    private final ProductSizeService productSizeService;
     private final IdempotencyStore idempotencyStore;
     private final PaymentRepository paymentRepository;
     private final WorkShiftRepository workShiftRepository;
@@ -579,6 +587,74 @@ public class OrderService {
         return orderItemRepository.findByOrderIdWithProduct(orderId);
     }
 
+    // US-15-09: criterio de disponibilidad para pedidos del client (el backoffice puede forzar).
+    // Un producto es no disponible si no tiene BranchProduct en la sucursal o si available != true.
+    private boolean isUnavailableForClient(OrderOrigin origin, Optional<BranchProduct> branchProduct) {
+        return origin == OrderOrigin.CLIENT
+                && branchProduct.map(bp -> !Boolean.TRUE.equals(bp.getAvailable())).orElse(true);
+    }
+
+    // US-HH-02: valida una combinación mitad y mitad. Ambos productos deben pertenecer a
+    // categorías cuyo category_type permita la combinación (allows_half_and_half) y ambos
+    // deben ser del mismo category_type (no se combina pizza con hamburguesa). La
+    // disponibilidad en la sucursal se valida aparte, en el loop. Rechaza con 422.
+    private void validateHalfAndHalf(Product first, Product second) {
+        // Combinar un producto consigo mismo no tiene sentido de negocio: es un ítem simple.
+        if (first.getId().equals(second.getId())) {
+            throw new InvalidHalfAndHalfException(
+                    "Una combinación mitad y mitad requiere dos productos distintos: " + first.getName());
+        }
+
+        CategoryType firstType = categoryTypeOf(first);
+        CategoryType secondType = categoryTypeOf(second);
+
+        if (firstType == null || !firstType.isAllowsHalfAndHalf()) {
+            throw new InvalidHalfAndHalfException(
+                    "La categoría del producto no permite mitad y mitad: " + first.getName());
+        }
+        if (secondType == null || !secondType.isAllowsHalfAndHalf()) {
+            throw new InvalidHalfAndHalfException(
+                    "La categoría del producto no permite mitad y mitad: " + second.getName());
+        }
+        if (!firstType.getId().equals(secondType.getId())) {
+            throw new InvalidHalfAndHalfException(
+                    "No se pueden combinar productos de distinto tipo: "
+                            + first.getName() + " y " + second.getName());
+        }
+    }
+
+    private CategoryType categoryTypeOf(Product product) {
+        return product.getCategory() != null ? product.getCategory().getCategoryType() : null;
+    }
+
+    // US-SIZE-03: el tamaño pedido debe existir y pertenecer al producto del ítem — no se
+    // puede pedir el tamaño de un producto distinto al elegido. Un tamaño dado de baja por el
+    // ADMIN (active=false) tampoco es pedible: sigue en la tabla solo por los pedidos
+    // históricos que lo referencian.
+    private ProductSize resolveProductSize(Integer productSizeId, Product product) {
+        ProductSize productSize = productSizeRepository.findById(productSizeId)
+                .orElseThrow(() -> new InvalidProductSizeException(
+                        "El tamaño seleccionado no existe: " + productSizeId));
+
+        if (!productSize.getProduct().getId().equals(product.getId())) {
+            throw new InvalidProductSizeException(
+                    "El tamaño seleccionado no pertenece al producto: " + product.getName());
+        }
+        if (!Boolean.TRUE.equals(productSize.getActive())) {
+            throw new InvalidProductSizeException(
+                    "El tamaño seleccionado no está disponible: " + productSize.getSize());
+        }
+        return productSize;
+    }
+
+    // Precio efectivo de un producto en la sucursal: priceOverride si existe, si no el precio
+    // base del producto. Sin BranchProduct (backoffice forzando), cae al precio base.
+    private BigDecimal effectivePrice(Product product, Optional<BranchProduct> branchProduct) {
+        return branchProduct
+                .map(bp -> bp.getPriceOverride() != null ? bp.getPriceOverride() : product.getPrice())
+                .orElse(product.getPrice());
+    }
+
     private OrderCreationResult doCreateOrder(Order order, List<OrderItem> items,
                                               PaymentMethod paymentMethod, String idempotencyKey) {
         if (items == null || items.isEmpty()) {
@@ -605,7 +681,17 @@ public class OrderService {
         BigDecimal subtotal = BigDecimal.ZERO;
 
         for (OrderItem item : items) {
-            Product product = productRepository.findById(item.getProduct().getId())
+            // US-SIZE-03: tamaño y mitad y mitad son excluyentes en el mismo ítem. Se valida
+            // antes de resolver nada para que la combinación inválida falle igual, sin depender
+            // de si los productos existen o están disponibles en la sucursal.
+            if (item.getProductSize() != null && item.getSecondProduct() != null) {
+                throw new InvalidProductSizeException("Un ítem mitad y mitad no puede llevar tamaño");
+            }
+
+            // Se carga con el grafo category.categoryType para poder validar mitad y mitad
+            // (US-HH-02) sin depender del lazy loading. Para ítems simples el grafo es un
+            // ManyToOne extra sin uso, costo despreciable.
+            Product product = productRepository.findByIdWithCategoryType(item.getProduct().getId())
                     .orElseThrow(() -> new ProductNotFoundException(item.getProduct().getId()));
 
             Optional<BranchProduct> branchProduct =
@@ -615,16 +701,49 @@ public class OrderService {
             // sucursal (BranchProduct inexistente o available=false). El backoffice
             // (ADMIN/STAFF) puede forzar el pedido igual — ya fue advertido en el
             // frontend (US-15-F-09). Rechaza el pedido completo antes de persistir nada.
-            if (order.getOrigin() == OrderOrigin.CLIENT
-                    && branchProduct.map(bp -> !Boolean.TRUE.equals(bp.getAvailable())).orElse(true)) {
+            if (isUnavailableForClient(order.getOrigin(), branchProduct)) {
                 log.warn("Order rejected — product not available | branchId={} productId={} productName={}",
                         branch.getId(), product.getId(), product.getName());
                 throw new ProductUnavailableException(product.getId(), product.getName());
             }
 
-            BigDecimal unitPrice = branchProduct
-                    .map(bp -> bp.getPriceOverride() != null ? bp.getPriceOverride() : product.getPrice())
-                    .orElse(product.getPrice());
+            // US-HH-02: ítem mitad y mitad. Se resuelve y valida la segunda mitad antes de
+            // construir el ítem combinado.
+            Product secondProduct = null;
+            Optional<BranchProduct> secondBranchProduct = Optional.empty();
+            if (item.getSecondProduct() != null) {
+                secondProduct = productRepository.findByIdWithCategoryType(item.getSecondProduct().getId())
+                        .orElseThrow(() -> new ProductNotFoundException(item.getSecondProduct().getId()));
+
+                secondBranchProduct =
+                        branchProductRepository.findByBranchIdAndProductId(branch.getId(), secondProduct.getId());
+                if (isUnavailableForClient(order.getOrigin(), secondBranchProduct)) {
+                    log.warn("Order rejected — second product not available | branchId={} productId={} productName={}",
+                            branch.getId(), secondProduct.getId(), secondProduct.getName());
+                    throw new ProductUnavailableException(secondProduct.getId(), secondProduct.getName());
+                }
+
+                validateHalfAndHalf(product, secondProduct);
+            }
+
+            // US-SIZE-03: tamaño del ítem. La disponibilidad en la sucursal ya quedó cubierta
+            // por el BranchProduct.available del producto base — el tamaño no tiene flag propio.
+            ProductSize productSize = null;
+            if (item.getProductSize() != null) {
+                productSize = resolveProductSize(item.getProductSize().getId(), product);
+            }
+
+            // US-HH-03: el precio efectivo de cada mitad es priceOverride ?? product.price (por
+            // sucursal). El del ítem combinado es el mayor de las dos mitades. Un ítem simple
+            // (secondProduct == null) conserva el precio efectivo de su único producto.
+            // US-SIZE-03: con tamaño, el precio sale de la fórmula por tamaño (US-SIZE-02) en
+            // vez del precio base. Nunca coexiste con secondProduct (validado arriba).
+            BigDecimal unitPrice = productSize != null
+                    ? productSizeService.resolveEffectivePrice(branch.getId(), productSize)
+                    : effectivePrice(product, branchProduct);
+            if (secondProduct != null) {
+                unitPrice = unitPrice.max(effectivePrice(secondProduct, secondBranchProduct));
+            }
 
             BigDecimal lineSubtotal = unitPrice.multiply(BigDecimal.valueOf(item.getQuantity()));
             subtotal = subtotal.add(lineSubtotal);
@@ -632,6 +751,8 @@ public class OrderService {
             resolvedItems.add(OrderItem.builder()
                     .id(UUID.randomUUID())
                     .product(product)
+                    .secondProduct(secondProduct)
+                    .productSize(productSize)
                     .quantity(item.getQuantity())
                     .unitPrice(unitPrice)
                     .subtotal(lineSubtotal)

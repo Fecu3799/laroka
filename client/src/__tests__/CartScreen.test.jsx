@@ -318,3 +318,27 @@ describe('CartScreen — iOS Safari no instalado (US-09-F-04)', () => {
     expect(globalThis.Notification.requestPermission).not.toHaveBeenCalled()
   })
 })
+
+describe('CartScreen — ítem mitad y mitad (US-HH-F-02)', () => {
+  const COMBO = {
+    id: 'hh-1-4', productId: 1, secondProductId: 4,
+    productName: 'Muzzarella', secondProductName: 'Calabresa',
+    name: '½ Muzzarella + ½ Calabresa', price: 3400, qty: 1, imageUrl: null,
+  }
+
+  it('muestra el nombre completo de la combinación', () => {
+    renderCart([COMBO])
+
+    expect(screen.getByText('½ Muzzarella + ½ Calabresa')).toBeInTheDocument()
+  })
+
+  it('el nombre combinado se muestra en dos líneas y el simple no', () => {
+    // El truncado a una línea de .cart-item-name se comía la segunda mitad, que es
+    // justamente lo que la historia pide mostrar.
+    renderCart([COMBO, { id: 7, name: 'Fugazzeta', price: 2500, qty: 1, imageUrl: null }])
+
+    expect(screen.getByText('½ Muzzarella + ½ Calabresa'))
+      .toHaveClass('cart-item-name--multiline')
+    expect(screen.getByText('Fugazzeta')).not.toHaveClass('cart-item-name--multiline')
+  })
+})

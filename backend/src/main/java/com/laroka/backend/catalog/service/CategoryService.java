@@ -9,10 +9,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.laroka.backend.catalog.entity.Category;
+import com.laroka.backend.catalog.entity.CategoryType;
 import com.laroka.backend.catalog.entity.Product;
 import com.laroka.backend.catalog.exception.CategoryNotFoundException;
+import com.laroka.backend.catalog.exception.CategoryTypeNotFoundException;
 import com.laroka.backend.catalog.repository.BranchProductRepository;
 import com.laroka.backend.catalog.repository.CategoryRepository;
+import com.laroka.backend.catalog.repository.CategoryTypeRepository;
 import com.laroka.backend.catalog.repository.ProductRepository;
 import com.laroka.backend.catalog.repository.ProductRepository.CategoryProductCount;
 import com.laroka.backend.tenant.entity.Tenant;
@@ -29,6 +32,7 @@ public class CategoryService {
 	private final ProductRepository productRepository;
 	private final BranchProductRepository branchProductRepository;
 	private final TenantRepository tenantRepository;
+	private final CategoryTypeRepository categoryTypeRepository;
 
 	public Category findById(Integer id) {
 		return repository.findById(id)
@@ -54,6 +58,7 @@ public class CategoryService {
 	public Category create(Category category) {
 		Tenant tenant = validateTenantExists(category.getTenant().getId());
 		category.setTenant(tenant);
+		category.setCategoryType(validateCategoryTypeExists(category.getCategoryType().getId()));
 		return repository.save(category);
 	}
 
@@ -62,6 +67,7 @@ public class CategoryService {
 		Tenant tenant = validateTenantExists(updates.getTenant().getId());
 		category.setName(updates.getName());
 		category.setTenant(tenant);
+		category.setCategoryType(validateCategoryTypeExists(updates.getCategoryType().getId()));
 		return repository.save(category);
 	}
 
@@ -84,5 +90,12 @@ public class CategoryService {
 	private Tenant validateTenantExists(Integer tenantId) {
 		return tenantRepository.findById(tenantId)
 			.orElseThrow(() -> new TenantNotFoundException(tenantId));
+	}
+
+	// US-CAT-03: resuelve la entidad gestionada del tipo maestro para persistir la FK y para
+	// que el mapper pueda exponer su name sin tocar un proxy lazy.
+	private CategoryType validateCategoryTypeExists(Integer categoryTypeId) {
+		return categoryTypeRepository.findById(categoryTypeId)
+			.orElseThrow(() -> new CategoryTypeNotFoundException(categoryTypeId));
 	}
 }
