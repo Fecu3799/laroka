@@ -82,11 +82,34 @@ function ProductImage({ src, alt }) {
   )
 }
 
-function ProductCard({ product, onSelect, onAdd }) {
+function CheckIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="m5 12 5 5 9-10" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  )
+}
+
+function ProductCard({ product, onSelect, onAdd, cartQty = 0 }) {
   // US-15-CF-05: un producto no disponible en la sucursal (available=false) se
   // muestra atenuado, con badge "No disponible" y precio visible, pero no es
   // clickeable: el tap no abre el detalle ni lo agrega al carrito.
   const unavailable = product.available === false
+
+  // Confirmación breve del agregado: check + pulso, y después el botón queda mostrando
+  // cuántas unidades hay en el carrito. El contador sigue sumando al volver a tocarlo.
+  const [justAdded, setJustAdded] = useState(false)
+  const addedTimer = useRef(null)
+
+  useEffect(() => () => clearTimeout(addedTimer.current), [])
+
+  const handleAdd = (e) => {
+    e.stopPropagation()
+    onAdd(product)
+    setJustAdded(true)
+    clearTimeout(addedTimer.current)
+    addedTimer.current = setTimeout(() => setJustAdded(false), 600)
+  }
 
   return (
     <li
@@ -112,11 +135,18 @@ function ProductCard({ product, onSelect, onAdd }) {
       </div>
       {!unavailable && (
         <button
-          className="product-add-btn"
-          aria-label={`Agregar ${product.name}`}
-          onClick={e => { e.stopPropagation(); onAdd(product) }}
+          className={`product-add-btn${justAdded ? ' product-add-btn--added' : ''}`
+            + `${cartQty > 0 ? ' product-add-btn--active' : ''}`}
+          aria-label={cartQty > 0
+            ? `Agregar otro ${product.name} (${cartQty} en el carrito)`
+            : `Agregar ${product.name}`}
+          onClick={handleAdd}
         >
-          <AddIcon />
+          {justAdded
+            ? <CheckIcon />
+            : cartQty > 0
+              ? <span className="product-add-qty">{cartQty}</span>
+              : <AddIcon />}
         </button>
       )}
     </li>
@@ -233,6 +263,14 @@ export function MenuScreen({ branchId, branchName, onChangeBranch, paymentFailur
   const handleCloseDetail = useCallback(() => {
     setSelectedProduct(null)
   }, [])
+
+  // Unidades de una línea del carrito, por su id. Para el (+) de la lista ese id es el del
+  // producto suelto; en el detalle, el de la variante elegida (entero o tamaño). Los ítems
+  // con opciones tienen id propio, así que nunca se mezclan entre sí.
+  const cartQtyById = useCallback(
+    cartItemId => items.find(i => i.id === cartItemId)?.qty ?? 0,
+    [items],
+  )
 
   const handleAddToCart = useCallback((product, qty) => {
     addItem(product, qty)
@@ -587,6 +625,7 @@ export function MenuScreen({ branchId, branchName, onChangeBranch, paymentFailur
                       product={product}
                       onSelect={handleSelectProduct}
                       onAdd={p => addItem(p, 1)}
+                      cartQty={cartQtyById(product.id)}
                     />
                   ))}
                 </ul>
@@ -626,6 +665,7 @@ export function MenuScreen({ branchId, branchName, onChangeBranch, paymentFailur
                               product={product}
                               onSelect={handleSelectProduct}
                               onAdd={p => addItem(p, 1)}
+                              cartQty={cartQtyById(product.id)}
                             />
                           ))}
                         </ul>
@@ -657,6 +697,9 @@ export function MenuScreen({ branchId, branchName, onChangeBranch, paymentFailur
               onAddToCart={handleAddToCart}
               onAddHalfAndHalf={handleAddHalfAndHalf}
               onAddSized={handleAddSized}
+              getCartQty={cartQtyById}
+              onUpdateCartQty={updateQty}
+              onRemoveFromCart={removeItem}
             />
           </Motion.div>
         )}

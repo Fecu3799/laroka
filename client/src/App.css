@@ -660,13 +660,15 @@
   letter-spacing: 0.3px;
 }
 
+/* Estado base sobrio: el amarillo se reserva para el producto ya agregado, así el acento
+   señala algo (hay unidades en el carrito) en vez de pintar toda la lista por igual. */
 .product-add-btn {
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: var(--accent);
-  border: none;
-  color: var(--bg-primary);
+  background: color-mix(in srgb, var(--border) 12%, transparent);
+  border: 1.5px solid color-mix(in srgb, var(--border) 45%, transparent);
+  color: var(--text-secondary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -676,13 +678,52 @@
   bottom: 8px;
   right: 10px;
   font-weight: 700;
-  box-shadow: 0 0 16px rgba(254, 205, 24, 0.35), 0 2px 8px rgba(0, 0, 0, 0.4);
-  transition: box-shadow 0.2s, filter 0.12s;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.2s;
 }
 
 .product-add-btn:active {
   filter: brightness(0.85);
+}
+
+/* Con unidades en el carrito y durante la confirmación: acento pleno. Es el único punto
+   amarillo de la tarjeta, por eso destaca. */
+.product-add-btn--active,
+.product-add-btn--added {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg-primary);
+  box-shadow: 0 0 16px rgba(254, 205, 24, 0.35), 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.product-add-btn--active:active,
+.product-add-btn--added:active {
   box-shadow: 0 0 20px rgba(254, 205, 24, 0.5), 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+/* Confirmación del agregado: pulso corto con el check, antes de pasar al contador. */
+.product-add-btn--added {
+  animation: product-add-pulse 0.45s ease;
+}
+
+@keyframes product-add-pulse {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.22); }
+  100% { transform: scale(1); }
+}
+
+/* Unidades ya en el carrito. Misma caja que el (+): sólo cambia el contenido, así la fila
+   del producto no se mueve al pasar de ícono a número. */
+.product-add-qty {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 800;
+  font-size: 17px;
+  line-height: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .product-add-btn--added {
+    animation: none;
+  }
 }
 
 /* Loading / error / empty states */

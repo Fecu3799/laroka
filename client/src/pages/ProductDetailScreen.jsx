@@ -1,6 +1,9 @@
-import { useState, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { ProductOptions, OptionGroup, OptionAccordion, OptionRadioList } from '../components/ProductOptions'
-import { halfAndHalfPrice, sizeLabel } from '../utils/halfAndHalf'
+import { halfAndHalfPrice, sizeLabel, sizedCartId } from '../utils/halfAndHalf'
+
+// Cuánto queda visible el "¡Agregado!" antes de volver al menú.
+const CLOSE_DELAY_MS = 1000
 
 function formatPrice(price) {
   return `$${Number(price).toLocaleString('es-AR')}`
@@ -40,17 +43,38 @@ function SizeIcon() {
   )
 }
 
-export function ProductDetailScreen({ product, onBack, onAddToCart, onAddHalfAndHalf, onAddSized }) {
-  const [qty, setQty] = useState(1)
-  const [added, setAdded] = useState(false)
+export function ProductDetailScreen({
+  product,
+  onBack,
+  onAddToCart,
+  onAddHalfAndHalf,
+  onAddSized,
+  getCartQty = () => 0,
+  onUpdateCartQty,
+  onRemoveFromCart,
+}) {
+  // Cantidad ya en el carrito para una variante. "Grande" es el producto suelto; los tamaños
+  // alternativos tienen id propio para no fusionarse entre sí ni con el entero.
+  const cartQtyOf = (size) => getCartQty(size ? sizedCartId(product.id, size.id) : product.id)
+
+  // El stepper arranca en la cantidad que esa variante ya tiene en el carrito. Sin línea
+  // previa arranca en 1: no tiene sentido "agregar 0".
+  const [qty, setQty] = useState(() => cartQtyOf(null) || 1)
+  // Confirmación visible antes de volver al menú: el CTA muestra el resultado durante un
+  // segundo y recién ahí se cierra el detalle. Guarda el texto en vez de derivarlo, porque
+  // la acción cambia el carrito y el estado derivado ya no describe lo que acaba de pasar
+  // (tras agregar, la línea existe y "agregado" se leería como "actualizado").
+  const [confirmation, setConfirmation] = useState(null)
+  const closeTimer = useRef(null)
   const [halfAndHalf, setHalfAndHalf] = useState(false)
   const [secondHalfId, setSecondHalfId] = useState(null)
   // US-SIZE-F-02: null = "Grande", que es el comportamiento por defecto (precio base del
   // producto y sin productSizeId). Sólo los tamaños alternativos llevan id.
   const [sizeId, setSizeId] = useState(null)
 
-  const increment = useCallback(() => setQty(q => Math.min(99, q + 1)), [])
-  const decrement = useCallback(() => setQty(q => Math.max(1, q - 1)), [])
+  // Si el cliente vuelve con la flecha durante la confirmación, el timer no debe cerrar un
+  // detalle que ya se cerró.
+  useEffect(() => () => clearTimeout(closeTimer.current), [])
 
   // US-HH-F-01: la opción no reemplaza el flujo normal — extiende el mismo CTA. Sólo aparece
   // si la categoría del producto lo permite (allowsHalfAndHalf del menú) y hay al menos otro
@@ -77,6 +101,10 @@ export function ProductDetailScreen({ product, onBack, onAddToCart, onAddHalfAnd
 
   function handleSelectSize(nextSizeId) {
     setSizeId(nextSizeId)
+    // El stepper se recalcula para la variante nueva: muestra lo que esa otra línea ya tiene
+    // en el carrito, o 1 si todavía no existe.
+    const nextSize = sizes.find(s => s.id === nextSizeId) ?? null
+    setQty(cartQtyOf(nextSize) || 1)
     // Pasar a un tamaño alternativo cierra y limpia mitad y mitad: son excluyentes.
     if (nextSizeId != null) {
       setHalfAndHalf(false)
@@ -86,25 +114,72 @@ export function ProductDetailScreen({ product, onBack, onAddToCart, onAddHalfAnd
 
   // Al colapsar el acordeón se limpia la selección: volver a expandirlo no debe arrastrar la
   // mitad elegida antes.
-  const handleToggleHalfAndHalf = useCallback((expanded) => {
+  //
+  // El stepper también se reinicia: armar una combinación es siempre un alta nueva, así que
+  // no debe arrastrar las unidades que la variante base tuviera en el carrito. Al colapsar
+  // sin confirmar, vuelve a reflejar el carrito real — mismo criterio que el cambio de
+  // variante.
+  function handleToggleHalfAndHalf(expanded) {
     setHalfAndHalf(expanded)
-    if (!expanded) setSecondHalfId(null)
-  }, [])
+    if (expanded) {
+      setQty(1)
+    } else {
+      setSecondHalfId(null)
+      setQty(cartQtyOf(selectedSize) || 1)
+    }
+  }
+
+  // Elegir la otra mitad deja el stepper en el mismo estado de alta nueva. Ajustar la
+  // cantidad antes de elegir no tiene sentido —el CTA está bloqueado hasta entonces—, así
+  // que reiniciarlo acá no pisa nada que el cliente haya decidido.
+  function handleSelectSecondHalf(candidateId) {
+    setSecondHalfId(candidateId)
+    setQty(1)
+  }
 
   const isHalfAndHalfReady = halfAndHalf && secondHalf != null
   // Falta elegir la otra mitad: el CTA se bloquea en vez de agregar el producto entero por
   // error, que sería lo contrario a lo que el cliente marcó.
   const ctaBlocked = halfAndHalf && !secondHalf
 
+  // Mitad y mitad no se ata al carrito: cada combinación es un alta nueva, no la edición de
+  // una línea existente. Aplica desde que se abre el acordeón, no recién al elegir la otra
+  // mitad, para que el CTA no ofrezca "confirmar cambio" sobre una línea que no se va a
+  // tocar. El resto de las variantes sí edita la línea que ya tengan.
+  const cartQty = halfAndHalf ? 0 : cartQtyOf(selectedSize)
+  const editingExisting = cartQty > 0
+  // Sólo se puede bajar a 0 cuando hay algo que quitar; si no, el mínimo es 1.
+  const minQty = editingExisting ? 0 : 1
+  const removing = editingExisting && qty === 0
+
+  // Funciones planas: dependen de minQty, que cambia con la variante seleccionada.
+  const increment = () => setQty(q => Math.min(99, q + 1))
+  const decrement = () => setQty(q => Math.max(minQty, q - 1))
+
+  const ctaLabel = ctaBlocked
+    ? 'Elegí la otra mitad'
+    : removing
+      ? 'Quitar del carrito'
+      : editingExisting
+        ? 'Confirmar cambio'
+        : 'Agregar al carrito'
+
+  const currentCartId = selectedSize ? sizedCartId(product.id, selectedSize.id) : product.id
+
   // Función plana, no useCallback: depende de valores derivados en cada render (selectedSize,
   // secondHalf) que el compilador de React no puede memoizar de forma estable.
   function handleAdd() {
-    if (ctaBlocked) return
+    // `confirmation` bloquea el doble alta: durante el segundo de confirmación el botón sigue
+    // en pantalla, y sin esto un segundo toque volvería a aplicar el cambio.
+    if (ctaBlocked || confirmation) return
     if (isHalfAndHalfReady) onAddHalfAndHalf?.(product, secondHalf, qty)
+    else if (removing) onRemoveFromCart?.(currentCartId)
+    else if (editingExisting) onUpdateCartQty?.(currentCartId, qty)
     else if (selectedSize) onAddSized?.(product, selectedSize, qty)
     else onAddToCart?.(product, qty)
-    setAdded(true)
-    setTimeout(() => setAdded(false), 1800)
+    // El mensaje describe la acción recién ejecutada, no el estado posterior del carrito.
+    setConfirmation(removing ? '¡Quitado!' : editingExisting ? '¡Actualizado!' : '¡Agregado!')
+    closeTimer.current = setTimeout(() => onBack?.(), CLOSE_DELAY_MS)
   }
 
   // Preview de precio: con la combinación armada vale el mayor de las dos mitades (misma
@@ -190,7 +265,7 @@ export function ProductDetailScreen({ product, onBack, onAddToCart, onAddHalfAnd
                     hint: formatPrice(c.price),
                   }))}
                   selectedId={secondHalfId}
-                  onSelect={setSecondHalfId}
+                  onSelect={handleSelectSecondHalf}
                 />
               </OptionAccordion>
               )}
@@ -213,7 +288,7 @@ export function ProductDetailScreen({ product, onBack, onAddToCart, onAddHalfAnd
               <button
                 className="detail-qty-btn"
                 onClick={decrement}
-                disabled={qty <= 1}
+                disabled={qty <= minQty}
                 aria-label="Reducir cantidad"
               >
                 −
@@ -231,22 +306,12 @@ export function ProductDetailScreen({ product, onBack, onAddToCart, onAddHalfAnd
             </div>
           </div>
           <button
-            className={`detail-cta-btn${added ? ' detail-cta-btn--added' : ''}`}
+            className={`detail-cta-btn${confirmation ? ' detail-cta-btn--added' : ''}`}
             onClick={handleAdd}
             disabled={ctaBlocked}
           >
-            {added ? (
-              <span className="detail-cta-check">✓</span>
-            ) : (
-              <CartIcon />
-            )}
-            <span className="detail-cta-label">
-              {added
-                ? '¡Agregado!'
-                : ctaBlocked
-                  ? 'Elegí la otra mitad'
-                  : 'Agregar al carrito'}
-            </span>
+            {confirmation ? <span className="detail-cta-check">✓</span> : <CartIcon />}
+            <span className="detail-cta-label">{confirmation ?? ctaLabel}</span>
           </button>
         </div>
       </div>
