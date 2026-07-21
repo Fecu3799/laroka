@@ -317,7 +317,7 @@ class ProductServiceTest {
 		// La evicción del menú viaja por el evento, no por @CacheEvict: MenuCacheEvictionListener
 		// lo consume en AFTER_COMMIT para no evictar antes de que el commit esté confirmado.
 		verify(eventPublisher).publishEvent(
-			new com.laroka.backend.catalog.event.ProductDeletedEvent(1));
+			com.laroka.backend.catalog.event.MenuCacheEvictionEvent.productDeleted(1));
 	}
 
 	@Test
@@ -596,6 +596,8 @@ class ProductServiceTest {
 		assertThat(bp1.getPriceOverride()).isNull();
 		assertThat(bp2.getPriceOverride()).isNull();
 		verify(branchProductRepository).saveAll(List.of(bp1, bp2));
+		verify(eventPublisher).publishEvent(
+			com.laroka.backend.catalog.event.MenuCacheEvictionEvent.productPriceUpdated(1));
 	}
 
 	@Test
@@ -610,5 +612,9 @@ class ProductServiceTest {
 		assertThat(result.getPrice()).isEqualByComparingTo("3500.00");
 		verify(branchProductRepository, never()).findByProductId(any());
 		verify(branchProductRepository, never()).saveAll(any());
+		// El precio base afecta a las sucursales sin override, así que el menú se evicta
+		// también con applyToAllBranches=false.
+		verify(eventPublisher).publishEvent(
+			com.laroka.backend.catalog.event.MenuCacheEvictionEvent.productPriceUpdated(1));
 	}
 }

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -43,6 +44,9 @@ class CategoryServiceTest {
 
 	@Mock
 	private CategoryTypeRepository categoryTypeRepository;
+
+	@Mock
+	private org.springframework.context.ApplicationEventPublisher eventPublisher;
 
 	@InjectMocks
 	private CategoryService service;
@@ -203,6 +207,10 @@ class CategoryServiceTest {
 		service.delete(1);
 
 		verify(categoryRepository).delete(category);
+		// La evicción del menú viaja por el evento, no por @CacheEvict: el borrado en cascada
+		// necesita @Transactional y MenuCacheEvictionListener lo consume en AFTER_COMMIT.
+		verify(eventPublisher).publishEvent(
+			com.laroka.backend.catalog.event.MenuCacheEvictionEvent.categoryDeleted(1));
 	}
 
 	@Test
@@ -211,5 +219,6 @@ class CategoryServiceTest {
 
 		assertThatThrownBy(() -> service.delete(99))
 			.isInstanceOf(CategoryNotFoundException.class);
+		verify(eventPublisher, never()).publishEvent(any(Object.class));
 	}
 }
