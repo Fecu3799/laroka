@@ -18,6 +18,7 @@ import {
   canGoBack as goBackAllowed,
   canCancel as cancelAllowed,
   formatOrderNumber,
+  orderItemDisplayName,
 } from "../utils/ordersUtils";
 import NewOrderModal from "../components/NewOrderModal";
 import OperatorStatusBar from "../components/OperatorStatusBar";
@@ -996,7 +997,7 @@ function OrderRow({
           {order.items?.slice(0, 2).map((item, i) => (
             <span key={i} className="item-line">
               <span className="item-qty">{item.quantity}×</span>{" "}
-              {item.productName}
+              {orderItemDisplayName(item)}
             </span>
           ))}
           {order.items?.length > 2 && (
@@ -1624,7 +1625,11 @@ function OrderDetail({
               className={`detail-product-row${i % 2 === 1 ? " detail-product-row--odd" : ""}`}
             >
               <span className="detail-prod-qty">x{item.quantity}</span>
-              <span className="detail-prod-name">{item.productName}</span>
+              <span
+                className={`detail-prod-name${item.secondProductName ? " detail-prod-name--multiline" : ""}`}
+              >
+                {orderItemDisplayName(item)}
+              </span>
               <span className="detail-prod-price">
                 {formatPrice(item.unitPrice)}
               </span>

@@ -1,5 +1,5 @@
 import { createElement as h } from 'react'
-import { formatOrderNumber } from '../utils/ordersUtils'
+import { formatOrderNumber, orderItemDisplayName } from '../utils/ordersUtils'
 
 /**
  * Servicio de impresión y descarga de tickets de compra (US-16-01).
@@ -101,9 +101,10 @@ export function buildTicketModel(order, branch) {
     // en retiro en local no aplica y no se muestra.
     isDelivery,
     deliveryAddress: isDelivery ? (o.deliveryAddress ?? '') : '',
+    // US-HH-04: un ítem combinado se lista como "½ A + ½ B" en vez de una sola mitad.
     items: items.map(it => ({
       quantity: it.quantity ?? 0,
-      name: it.productName ?? '',
+      name: orderItemDisplayName(it),
       unitPrice: formatMoney(it.unitPrice),
     })),
     total: formatMoney(o.totalAmount),
@@ -293,9 +294,11 @@ export function buildComandaModel(order) {
     orderNumber: formatOrderNumber(o),
     orderTypeLabel: ORDER_TYPE_LABELS[o.orderType] ?? o.orderType ?? '',
     receivedAt: formatTime(o.createdAt),
+    // US-HH-04: en cocina la combinación completa es crítica — un ítem mitad y mitad que
+    // se lea como una sola mitad se prepara mal.
     items: items.map(it => ({
       quantity: it.quantity ?? 0,
-      name: it.productName ?? '',
+      name: orderItemDisplayName(it),
     })),
     notes: (o.notes ?? '').trim(),
   }
@@ -336,7 +339,7 @@ function renderComandaHtml(model) {
     /* Ítems: cantidad y nombre grandes, sin precios */
     .item { display: flex; align-items: baseline; padding: 6px 0; }
     .item-qty { font-size: 30px; font-weight: bold; width: 56px; flex-shrink: 0; }
-    .item-name { font-size: 26px; }
+    .item-name { font-size: 26px; flex: 1; min-width: 0; }
     /* Notas destacadas */
     .notes { margin-top: 14px; border: 3px solid #000; border-radius: 8px; padding: 10px 12px;
       background: #ffe9a8; -webkit-print-color-adjust: exact; print-color-adjust: exact; }

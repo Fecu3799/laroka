@@ -16,7 +16,12 @@ import com.laroka.backend.order.entity.OrderStatus;
 public interface OrderItemRepository extends JpaRepository<OrderItem, UUID> {
     List<OrderItem> findByOrderId(UUID orderId);
 
-    @Query("SELECT i FROM OrderItem i JOIN FETCH i.product WHERE i.order.id = :orderId")
+    // US-HH-F-02: LEFT JOIN FETCH sobre secondProduct (nullable en ítems simples) para que el
+    // mapper lea su nombre sin disparar un lazy load por ítem combinado. Medido con show-sql:
+    // sin el fetch son 3 SELECT sobre product en vez de 2. El lazy load resuelve igual (no
+    // lanza LazyInitializationException), así que esto es N+1, no una corrección de bug.
+    @Query("SELECT i FROM OrderItem i JOIN FETCH i.product "
+        + "LEFT JOIN FETCH i.secondProduct WHERE i.order.id = :orderId")
     List<OrderItem> findByOrderIdWithProduct(@Param("orderId") UUID orderId);
 
     @Query("SELECT oi.product.id, oi.product.name, SUM(oi.quantity) " +

@@ -60,3 +60,19 @@ export function formatOrderNumber(order) {
   const id = String(order?.id ?? '')
   return id ? `#ORDER-${id.slice(0, 8)}` : ''
 }
+
+/**
+ * Nombre a mostrar de un ítem del pedido (US-HH-04). Un ítem mitad y mitad se muestra como
+ * "½ A + ½ B"; uno simple, con su nombre tal cual. Consume `productName` /
+ * `secondProductName` de BackofficeOrderItemDTO.
+ *
+ * El formato es el mismo que usa el client en carrito, checkout y seguimiento
+ * (client/src/utils/halfAndHalf.js). Es duplicación deliberada entre las dos apps: son
+ * bundles Vite independientes, sin paquete compartido donde alojar el helper. Si el formato
+ * cambia, hay que cambiarlo en los dos lados.
+ */
+export function orderItemDisplayName(item) {
+  const name = item?.productName ?? ''
+  const second = item?.secondProductName
+  return second ? `½ ${name} + ½ ${second}` : name
+}

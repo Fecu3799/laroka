@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import PRINT_CHILD_JS from '../../public/print-child.js?raw'
-import { printTicket, printComanda, buildComandaModel } from '../services/ticketService'
+import { printTicket, printComanda, buildComandaModel, buildTicketModel } from '../services/ticketService'
 
 /**
  * Regresión del bug de impresión (US-16B-04/05): la pestaña del backoffice se
@@ -164,5 +164,48 @@ describe('printComanda — misma impresión no bloqueante que el ticket', () => 
   it('omite el recuadro de notas si el pedido no tiene notas', async () => {
     printComanda({ ...comandaOrder, notes: '' })
     expect(await cap.html()).not.toContain('class="notes"')
+  })
+})
+
+describe('ítem mitad y mitad en ticket y comanda (US-HH-04)', () => {
+  let cap
+  beforeEach(() => { cap = installCapture() })
+  afterEach(() => { vi.restoreAllMocks() })
+
+  const COMBO = { quantity: 1, productName: 'Muzzarella', secondProductName: 'Calabresa', unitPrice: 3400 }
+  const SIMPLE = { quantity: 2, productName: 'Fugazzeta', secondProductName: null, unitPrice: 2500 }
+
+  it('buildTicketModel lista la combinación completa', () => {
+    const model = buildTicketModel({ items: [COMBO, SIMPLE] }, {})
+
+    expect(model.items[0].name).toBe('½ Muzzarella + ½ Calabresa')
+    expect(model.items[1].name).toBe('Fugazzeta')
+  })
+
+  it('buildComandaModel lista la combinación completa', () => {
+    // Es el caso crítico de la historia: en cocina, leer sólo la primera mitad
+    // significa preparar la pizza equivocada.
+    const model = buildComandaModel({ items: [COMBO, SIMPLE] })
+
+    expect(model.items).toEqual([
+      { quantity: 1, name: '½ Muzzarella + ½ Calabresa' },
+      { quantity: 2, name: 'Fugazzeta' },
+    ])
+  })
+
+  it('la comanda impresa muestra la combinación con la misma tipografía que el resto', async () => {
+    printComanda({ orderNumber: 47, orderType: 'TAKEAWAY', createdAt: '2026-07-10T20:34:00', items: [COMBO] })
+    const html = await cap.html()
+
+    expect(html).toContain('½ Muzzarella + ½ Calabresa')
+    // Sin clase propia ni tamaño reducido: usa item-name como cualquier otro ítem.
+    expect(html).toContain('<span class="item-name">½ Muzzarella + ½ Calabresa</span>')
+  })
+
+  it('el ticket impreso muestra la combinación en la columna de detalle', async () => {
+    printTicket({ orderNumber: 47, orderType: 'TAKEAWAY', createdAt: '2026-07-10T20:34:00', items: [COMBO] }, {})
+    const html = await cap.html()
+
+    expect(html).toContain('<td class="name">½ Muzzarella + ½ Calabresa</td>')
   })
 })

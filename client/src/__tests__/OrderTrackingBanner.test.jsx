@@ -357,3 +357,62 @@ describe('OrderTrackingBanner — status PENDING_PAYMENT', () => {
     expect(screen.getByText(/el pedido será cancelado y no podrá reactivarse/i)).toBeInTheDocument()
   })
 })
+
+describe('OrderTrackingBanner — ítem mitad y mitad (US-HH-F-02)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  const STATUS = {
+    orderId: 'order-hh',
+    status: 'IN_PREPARATION',
+    orderType: 'TAKEAWAY',
+    subtotal: 5900,
+    serviceFee: 0,
+    deliveryFee: 0,
+    totalAmount: 5900,
+    history: [],
+  }
+
+  // GET /orders/{id}/items devuelve secondProductName sólo en los ítems combinados.
+  function mockStatusAndItems(items) {
+    vi.stubGlobal('fetch', vi.fn(url => {
+      if (String(url).includes('/items')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(items) })
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(STATUS) })
+    }))
+  }
+
+  async function openDetail() {
+    seedOrder('order-hh')
+    render(<OrderTrackingBanner branchId={1} />)
+    const btn = await screen.findByRole('button', { name: /ver detalle/i })
+    await act(async () => {
+      await userEvent.click(btn)
+    })
+  }
+
+  it('muestra la combinación completa de un ítem mitad y mitad', async () => {
+    mockStatusAndItems([
+      { name: 'Muzzarella', secondProductName: 'Calabresa', quantity: 1, unitPrice: 3400, subtotal: 3400 },
+    ])
+    await openDetail()
+
+    await waitFor(() => {
+      expect(screen.getByText(/1×\s*½ Muzzarella \+ ½ Calabresa/)).toBeInTheDocument()
+    })
+  })
+
+  it('un ítem simple sigue mostrando sólo su nombre', async () => {
+    mockStatusAndItems([
+      { name: 'Fugazzeta', secondProductName: null, quantity: 2, unitPrice: 2500, subtotal: 5000 },
+    ])
+    await openDetail()
+
+    await waitFor(() => {
+      expect(screen.getByText(/2×\s*Fugazzeta/)).toBeInTheDocument()
+    })
+    expect(screen.queryByText(/½/)).not.toBeInTheDocument()
+  })
+})

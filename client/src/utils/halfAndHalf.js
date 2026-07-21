@@ -25,6 +25,15 @@ export function halfAndHalfName(first, second) {
   return `½ ${first.name} + ½ ${second.name}`
 }
 
+// US-HH-F-02: nombre a mostrar para un ítem que viene del backend
+// (GET /orders/{id}/items), cuya forma es { name, secondProductName } en vez de dos
+// productos. Delega en halfAndHalfName para no duplicar el formato "½ A + ½ B".
+export function orderItemDisplayName(item) {
+  return item.secondProductName
+    ? halfAndHalfName({ name: item.name }, { name: item.secondProductName })
+    : item.name
+}
+
 export function buildHalfAndHalfItem(first, second) {
   return {
     id: halfAndHalfCartId(first.id, second.id),

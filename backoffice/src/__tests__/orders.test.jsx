@@ -237,3 +237,44 @@ describe('botón Cancelar', () => {
     }
   )
 })
+
+// ── Ítem mitad y mitad (US-HH-04) ─────────────────────────────
+
+describe('ítem mitad y mitad', () => {
+  const ORDER_COMBO = {
+    ...BASE_ORDER,
+    id: 'cccc0000-0000-0000-0000-000000000003',
+    items: [
+      { productName: 'Muzzarella', secondProductName: 'Calabresa', quantity: 1, unitPrice: 3400 },
+      { productName: 'Fugazzeta', secondProductName: null, quantity: 2, unitPrice: 2500 },
+    ],
+  }
+
+  test('la columna de productos del listado muestra la combinación completa', () => {
+    renderOrders([ORDER_COMBO])
+
+    const items = document.querySelector('.col-items')
+    expect(items.textContent).toContain('½ Muzzarella + ½ Calabresa')
+    expect(items.textContent).toContain('Fugazzeta')
+  })
+
+  test('la tabla del panel de detalle muestra la combinación completa', () => {
+    renderOrders([ORDER_COMBO])
+    fireEvent.click(document.querySelector('.orders-row'))
+
+    const panel = document.querySelector('.orders-detail-col')
+    expect(within(panel).getByText('½ Muzzarella + ½ Calabresa')).toBeInTheDocument()
+    expect(within(panel).getByText('Fugazzeta')).toBeInTheDocument()
+  })
+
+  test('sólo el nombre combinado envuelve en varias líneas', () => {
+    renderOrders([ORDER_COMBO])
+    fireEvent.click(document.querySelector('.orders-row'))
+
+    const panel = document.querySelector('.orders-detail-col')
+    expect(within(panel).getByText('½ Muzzarella + ½ Calabresa'))
+      .toHaveClass('detail-prod-name--multiline')
+    expect(within(panel).getByText('Fugazzeta'))
+      .not.toHaveClass('detail-prod-name--multiline')
+  })
+})

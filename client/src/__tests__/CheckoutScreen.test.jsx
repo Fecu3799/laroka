@@ -90,3 +90,36 @@ describe('CheckoutScreen — validation', () => {
     expect(screen.getByRole('button', { name: /ir a pagar/i })).toBeInTheDocument()
   })
 })
+
+describe('CheckoutScreen — ítem mitad y mitad (US-HH-F-02)', () => {
+  const COMBO = {
+    id: 'hh-1-4', productId: 1, secondProductId: 4,
+    productName: 'Muzzarella', secondProductName: 'Calabresa',
+    name: '½ Muzzarella + ½ Calabresa', price: 3400, qty: 1,
+  }
+
+  it('el resumen muestra la combinación con el nombre de las dos mitades', () => {
+    renderCheckout({ items: [COMBO] })
+    fireEvent.click(screen.getByText('Resumen del pedido'))
+
+    expect(screen.getByText('1× ½ Muzzarella + ½ Calabresa')).toBeInTheDocument()
+  })
+
+  it('el precio del ítem es el resuelto al armarlo, no un cálculo del checkout', () => {
+    // 3400 es el mayor de las dos mitades, ya resuelto en el detalle de producto con la
+    // misma regla del backend. El checkout sólo lo multiplica por la cantidad.
+    renderCheckout({ items: [{ ...COMBO, qty: 2 }] })
+    fireEvent.click(screen.getByText('Resumen del pedido'))
+
+    expect(screen.getByText('2× ½ Muzzarella + ½ Calabresa')).toBeInTheDocument()
+    expect(screen.getAllByText('$6.800').length).toBeGreaterThan(0)
+  })
+
+  it('el subtotal suma la combinación junto a los ítems simples', () => {
+    renderCheckout({ items: [COMBO, { id: 7, name: 'Fugazzeta', price: 2500, qty: 2 }] })
+    fireEvent.click(screen.getByText('Resumen del pedido'))
+
+    // 3400 + (2500 × 2) = 8400
+    expect(screen.getAllByText('$8.400').length).toBeGreaterThan(0)
+  })
+})

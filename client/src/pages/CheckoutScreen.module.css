@@ -255,19 +255,27 @@
   display: flex;
   justify-content: space-between;
   align-items: baseline;
+  gap: 10px;
   padding: 3px 0;
 }
 
+/* US-HH-F-02: el nombre combinado ("½ A + ½ B") duplica el largo de uno simple. Sin
+   min-width: 0 el nombre no puede encogerse y termina empujando el precio fuera de la fila;
+   con flex + wrap, se reparte en dos líneas y el precio se mantiene alineado a la derecha. */
 .summaryItemQtyName {
   font-family: 'Inria Sans', sans-serif;
   font-size: 14px;
   color: #fff;
+  flex: 1;
+  min-width: 0;
 }
 
 .summaryItemPrice {
   font-family: 'Inria Sans', sans-serif;
   font-size: 14px;
   color: #fff;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .summarySeparator {

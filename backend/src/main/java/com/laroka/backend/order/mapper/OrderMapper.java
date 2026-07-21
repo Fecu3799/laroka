@@ -108,8 +108,12 @@ public class OrderMapper {
     }
 
     private OrderItemStatusDTO toItemStatusDTO(OrderItem item) {
+        // US-HH-F-02: secondProduct debe venir inicializado desde la query
+        // (LEFT JOIN FETCH en findByOrderIdWithProduct) para leer su name fuera de sesión.
+        Product secondProduct = item.getSecondProduct();
         return OrderItemStatusDTO.builder()
                 .name(item.getProduct().getName())
+                .secondProductName(secondProduct != null ? secondProduct.getName() : null)
                 .quantity(item.getQuantity())
                 .unitPrice(item.getUnitPrice())
                 .subtotal(item.getSubtotal())

@@ -6,7 +6,7 @@ import { usePreferredBranch } from '../hooks/usePreferredBranch'
 import { usePushSubscription } from '../hooks/usePushSubscription'
 import { PushPermissionSheet } from '../components/PushPermissionSheet'
 import { addActiveOrder } from '../utils/activeOrders'
-import { cartItemProductId } from '../utils/halfAndHalf'
+import { cartItemProductId, isHalfAndHalfItem } from '../utils/halfAndHalf'
 import { initiatePayment } from '../services/paymentsService'
 import { apiFetch, showToast } from '../services/http'
 
@@ -87,7 +87,11 @@ function CartItemRow({ item, onRemoveRequest, onUpdateQty }) {
         <CartItemImage src={item.imageUrl} alt={item.name} />
       </div>
       <div className="cart-item-info">
-        <span className="cart-item-name">{item.name}</span>
+        <span
+          className={`cart-item-name${isHalfAndHalfItem(item) ? ' cart-item-name--multiline' : ''}`}
+        >
+          {item.name}
+        </span>
         {item.description && (
           <span className="cart-item-desc">{item.description}</span>
         )}

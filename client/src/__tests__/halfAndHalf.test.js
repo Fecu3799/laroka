@@ -6,6 +6,7 @@ import {
   halfAndHalfName,
   halfAndHalfPrice,
   isHalfAndHalfItem,
+  orderItemDisplayName,
 } from '../utils/halfAndHalf'
 
 const MUZZA = { id: 1, name: 'Muzzarella', price: 2800, imageUrl: 'muzza.jpg' }
@@ -84,5 +85,23 @@ describe('cartItemProductId', () => {
 
   it('un ítem simple no se considera mitad y mitad', () => {
     expect(isHalfAndHalfItem({ id: 7, name: 'Fugazzeta' })).toBe(false)
+  })
+})
+
+describe('orderItemDisplayName', () => {
+  // Los ítems de GET /orders/{id}/items vienen como { name, secondProductName }, no como
+  // dos productos — pero el formato mostrado debe ser el mismo que en carrito y checkout.
+  it('arma la combinación con el mismo formato que el carrito', () => {
+    const apiItem = { name: 'Muzzarella', secondProductName: 'Calabresa', quantity: 1 }
+
+    expect(orderItemDisplayName(apiItem)).toBe('½ Muzzarella + ½ Calabresa')
+    expect(orderItemDisplayName(apiItem)).toBe(
+      halfAndHalfName({ name: 'Muzzarella' }, { name: 'Calabresa' }),
+    )
+  })
+
+  it('deja el nombre tal cual en un ítem simple', () => {
+    expect(orderItemDisplayName({ name: 'Fugazzeta', secondProductName: null })).toBe('Fugazzeta')
+    expect(orderItemDisplayName({ name: 'Fugazzeta' })).toBe('Fugazzeta')
   })
 })

@@ -1405,6 +1405,19 @@
   text-overflow: ellipsis;
 }
 
+/* US-HH-F-02: el nombre combinado ("½ A + ½ B") es del doble de largo que uno simple y el
+   truncado a una línea se comía la segunda mitad, que es justo el dato que la historia pide
+   mostrar. Sólo los ítems combinados pasan a dos líneas: los simples conservan la línea
+   única con ellipsis. */
+.cart-item-name--multiline {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  line-height: 1.15;
+}
+
 .cart-item-desc {
   font-family: 'Inria Sans', sans-serif;
   font-size: 11px;
