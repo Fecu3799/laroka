@@ -5,7 +5,7 @@ import useBranch from '../hooks/useBranch'
 import { createBackofficeOrder } from '../services/ordersService'
 import { fetchBranchMenu } from '../services/catalogService'
 import { fetchBranches } from '../services/branchService'
-import { canConfirmOrder } from '../utils/ordersUtils'
+import { canConfirmOrder, cartItemKey, halfAndHalfUnitPrice, orderItemDisplayName } from '../utils/ordersUtils'
 import './NewOrderModal.css'
 
 function formatPrice(n) {
@@ -47,6 +47,8 @@ export default function NewOrderModal({ open, onClose }) {
   // US-15-F-09: confirmación explícita cuando el pedido manual incluye productos
   // marcados como no disponibles en la sucursal (el backend BACKOFFICE no bloquea).
   const [confirmUnavailable, setConfirmUnavailable] = useState(false)
+  // US-HH-F-03: primera mitad elegida, a la espera de la otra. Null = modo normal.
+  const [halfPending, setHalfPending] = useState(null)
 
   function resetState() {
     setMenuCategories([])
@@ -61,6 +63,7 @@ export default function NewOrderModal({ open, onClose }) {
     setError(null)
     setBranchDeliveryFee(0)
     setBranchServiceFee(0)
+    setHalfPending(null)
     setConfirmUnavailable(false)
   }
 
@@ -88,6 +91,47 @@ export default function NewOrderModal({ open, onClose }) {
       setMenuLoading(false)
     })
   }, [open, token, branchId])
+
+  // ── Mitad y mitad (US-HH-F-03) ───────────────────────────────
+  //
+  // Flujo de dos toques: el primer ½ deja el producto "pendiente"; el segundo toque —sobre
+  // el ½ o sobre la fila de otra pizza— cierra la combinación. Mientras hay pendiente, sólo
+  // quedan habilitados los productos de la MISMA categoría: el backend valida que ambas
+  // mitades compartan tipo de categoría (US-HH-02) y el menú no expone el categoryTypeId,
+  // así que la categoría es el único alcance que garantiza que el pedido no vuelva con 422.
+  // Un producto no disponible puede ser mitad, igual que puede pedirse entero: el backoffice
+  // no lo bloquea, sólo advierte antes de confirmar (US-15-F-09). El combinado hereda la
+  // no disponibilidad y cae en esa misma advertencia.
+  function isHalfCandidate(product, cat) {
+    if (!cat.allowsHalfAndHalf) return false
+    if (!halfPending) return true
+    return cat.categoryName === halfPending.categoryName && product.id !== halfPending.product.id
+  }
+
+  function toggleHalfAndHalf(product, cat) {
+    if (!halfPending) {
+      setHalfPending({ product, categoryName: cat.categoryName })
+      return
+    }
+    // Volver a tocar la misma pizza cancela: es el gesto de "me arrepentí".
+    if (product.id === halfPending.product.id) {
+      setHalfPending(null)
+      return
+    }
+    if (!isHalfCandidate(product, cat)) return
+    addHalfAndHalfToCart(halfPending.product, product)
+    setHalfPending(null)
+  }
+
+  // Click sobre la fila: con pendiente activo completa la combinación (o la cancela si es la
+  // misma pizza); sin pendiente, agrega el producto suelto como siempre.
+  function handleProductRowClick(product, cat) {
+    if (!halfPending) {
+      addToCart(product)
+      return
+    }
+    toggleHalfAndHalf(product, cat)
+  }
 
   // ── Computed ─────────────────────────────────────────────────
 
@@ -122,41 +166,59 @@ export default function NewOrderModal({ open, onClose }) {
 
   // ── Cart operations ──────────────────────────────────────────
 
-  function addToCart(product) {
+  // Alta genérica: `entry` ya viene con productId/secondProductId resueltos. Los ítems se
+  // identifican por key (US-HH-F-03) porque un combinado no debe fusionarse con el producto
+  // suelto de su primera mitad, que comparte productId.
+  function addEntryToCart(entry) {
+    const key = cartItemKey(entry)
     setCartItems(prev => {
-      const existing = prev.find(i => i.productId === product.id)
+      const existing = prev.find(i => i.key === key)
       if (existing) {
-        return prev.map(i =>
-          i.productId === product.id ? { ...i, quantity: i.quantity + 1 } : i
-        )
+        return prev.map(i => (i.key === key ? { ...i, quantity: i.quantity + 1 } : i))
       }
-      return [...prev, {
-        productId:   product.id,
-        productName: product.name,
-        unitPrice:   product.price,
-        quantity:    1,
-        available:   product.available,
-      }]
+      return [...prev, { ...entry, key, quantity: 1 }]
     })
   }
 
-  function decreaseQuantity(productId) {
+  function addToCart(product) {
+    addEntryToCart({
+      productId:   product.id,
+      productName: product.name,
+      unitPrice:   product.price,
+      available:   product.available,
+    })
+  }
+
+  // US-HH-F-03: ítem combinado. El precio es el mayor de las dos mitades (US-HH-03) y la
+  // disponibilidad, la peor de las dos: si cualquiera está no disponible, el ítem lo está.
+  function addHalfAndHalfToCart(first, second) {
+    addEntryToCart({
+      productId:         first.id,
+      productName:       first.name,
+      secondProductId:   second.id,
+      secondProductName: second.name,
+      unitPrice:         halfAndHalfUnitPrice(first.price, second.price),
+      available:         first.available !== false && second.available !== false,
+    })
+  }
+
+  function decreaseQuantity(key) {
     setCartItems(prev => {
-      const item = prev.find(i => i.productId === productId)
+      const item = prev.find(i => i.key === key)
       if (!item) return prev
-      if (item.quantity <= 1) return prev.filter(i => i.productId !== productId)
-      return prev.map(i => i.productId === productId ? { ...i, quantity: i.quantity - 1 } : i)
+      if (item.quantity <= 1) return prev.filter(i => i.key !== key)
+      return prev.map(i => (i.key === key ? { ...i, quantity: i.quantity - 1 } : i))
     })
   }
 
-  function increaseQuantity(productId) {
+  function increaseQuantity(key) {
     setCartItems(prev =>
-      prev.map(i => i.productId === productId ? { ...i, quantity: i.quantity + 1 } : i)
+      prev.map(i => (i.key === key ? { ...i, quantity: i.quantity + 1 } : i))
     )
   }
 
-  function removeFromCart(productId) {
-    setCartItems(prev => prev.filter(i => i.productId !== productId))
+  function removeFromCart(key) {
+    setCartItems(prev => prev.filter(i => i.key !== key))
   }
 
   // ── Submit ───────────────────────────────────────────────────
@@ -185,7 +247,12 @@ export default function NewOrderModal({ open, onClose }) {
         customerName: customerName || null,
         customerPhone: customerPhone || null,
         notes: notes || null,
-        items:  cartItems.map(i => ({ productId: i.productId, quantity: i.quantity })),
+        // US-HH-F-03: un ítem combinado viaja con secondProductId; el simple, sin el campo.
+        items:  cartItems.map(i => ({
+          productId: i.productId,
+          ...(i.secondProductId != null ? { secondProductId: i.secondProductId } : {}),
+          quantity: i.quantity,
+        })),
         origin: 'BACKOFFICE',
       }, token)
       window.dispatchEvent(new Event('laroka:order-created'))
@@ -254,6 +321,22 @@ export default function NewOrderModal({ open, onClose }) {
               />
             </div>
 
+            {/* US-HH-F-03: estado de la combinación en curso + salida explícita. */}
+            {halfPending && (
+              <div className="nom-half-hint" role="status">
+                <span>
+                  ½ {halfPending.product.name} — elegí la otra mitad
+                </span>
+                <button
+                  type="button"
+                  className="nom-half-hint-cancel"
+                  onClick={() => setHalfPending(null)}
+                >
+                  Cancelar
+                </button>
+              </div>
+            )}
+
             <div className="nom-catalog">
               {menuLoading ? (
                 <div className="nom-catalog-state">Cargando menú...</div>
@@ -269,12 +352,19 @@ export default function NewOrderModal({ open, onClose }) {
                       <span className="nom-category-count">{cat.products.length}</span>
                     </div>
                     {cat.products.map(product => {
-                      const cartItem = cartItems.find(i => i.productId === product.id)
+                      const cartItem = cartItems.find(i => i.key === String(product.id))
+                      const isPendingHalf = halfPending?.product.id === product.id
+                      // Con una mitad pendiente, todo lo que no sirve para completarla queda
+                      // fuera de juego (salvo la propia pendiente, que cancela al tocarla).
+                      const dimmed = halfPending != null && !isPendingHalf && !isHalfCandidate(product, cat)
                       return (
                         <div
                           key={product.id}
-                          className={`nom-product-row${product.available === false ? ' nom-product-row--unavailable' : ''}`}
-                          onClick={() => addToCart(product)}
+                          className={`nom-product-row${product.available === false ? ' nom-product-row--unavailable' : ''}`
+                            + `${dimmed ? ' nom-product-row--dimmed' : ''}`
+                            + `${isPendingHalf ? ' nom-product-row--half-pending' : ''}`}
+                          onClick={dimmed ? undefined : () => handleProductRowClick(product, cat)}
+                          aria-disabled={dimmed || undefined}
                         >
                           <div className="nom-product-info">
                             <span className="nom-product-name">
@@ -294,10 +384,32 @@ export default function NewOrderModal({ open, onClose }) {
                             )}
                           </div>
                           <span className="nom-product-price">{formatPrice(product.price)}</span>
+                          {/* US-HH-F-03: sólo en categorías que admiten mitad y mitad. Un
+                              producto no disponible también puede ser mitad — se advierte
+                              al confirmar, igual que si se pidiera entero. */}
+                          {cat.allowsHalfAndHalf && (
+                            <button
+                              type="button"
+                              className={`nom-half-btn${isPendingHalf ? ' nom-half-btn--active' : ''}`}
+                              onClick={e => { e.stopPropagation(); toggleHalfAndHalf(product, cat) }}
+                              disabled={dimmed}
+                              aria-pressed={isPendingHalf}
+                              aria-label={
+                                isPendingHalf
+                                  ? `Cancelar mitad y mitad con ${product.name}`
+                                  : halfPending
+                                    ? `Completar mitad y mitad con ${product.name}`
+                                    : `Pedir ${product.name} mitad y mitad`
+                              }
+                            >
+                              ½
+                            </button>
+                          )}
                           <button
                             type="button"
                             className={`nom-add-btn${cartItem ? ' nom-add-btn--active' : ''}`}
                             onClick={e => { e.stopPropagation(); addToCart(product) }}
+                            disabled={dimmed}
                             aria-label={`Agregar ${product.name}`}
                           >
                             {cartItem ? cartItem.quantity : '+'}
@@ -325,12 +437,12 @@ export default function NewOrderModal({ open, onClose }) {
               ) : (
                 <div className="nom-cart-list">
                   {cartItems.map(item => (
-                    <div key={item.productId} className="nom-cart-item">
+                    <div key={item.key} className="nom-cart-item">
                       <div className="nom-cart-qty-ctrl">
                         <button
                           type="button"
                           className="nom-qty-btn"
-                          onClick={() => decreaseQuantity(item.productId)}
+                          onClick={() => decreaseQuantity(item.key)}
                           aria-label="Disminuir cantidad"
                         >
                           −
@@ -339,21 +451,21 @@ export default function NewOrderModal({ open, onClose }) {
                         <button
                           type="button"
                           className="nom-qty-btn"
-                          onClick={() => increaseQuantity(item.productId)}
+                          onClick={() => increaseQuantity(item.key)}
                           aria-label="Aumentar cantidad"
                         >
                           +
                         </button>
                       </div>
-                      <span className="nom-cart-name">{item.productName}</span>
+                      <span className="nom-cart-name">{orderItemDisplayName(item)}</span>
                       <span className="nom-cart-subtotal">
                         {formatPrice(item.unitPrice * item.quantity)}
                       </span>
                       <button
                         type="button"
                         className="nom-cart-trash"
-                        onClick={() => removeFromCart(item.productId)}
-                        aria-label={`Eliminar ${item.productName}`}
+                        onClick={() => removeFromCart(item.key)}
+                        aria-label={`Eliminar ${orderItemDisplayName(item)}`}
                       >
                         <TrashIcon />
                       </button>
@@ -544,7 +656,7 @@ export default function NewOrderModal({ open, onClose }) {
             </p>
             <ul className="nom-confirm-list">
               {unavailableItems.map(i => (
-                <li key={i.productId}>{i.productName}</li>
+                <li key={i.key}>{orderItemDisplayName(i)}</li>
               ))}
             </ul>
             <p className="nom-confirm-text">¿Confirmar de todas formas?</p>

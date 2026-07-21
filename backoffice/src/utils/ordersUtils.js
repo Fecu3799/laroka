@@ -76,3 +76,24 @@ export function orderItemDisplayName(item) {
   const second = item?.secondProductName
   return second ? `½ ${name} + ½ ${second}` : name
 }
+
+/**
+ * Precio unitario de un ítem mitad y mitad (US-HH-03): el mayor de los dos precios
+ * efectivos de la sucursal. El menú ya expone `price` resuelto (priceOverride ?? price),
+ * así que comparar esos valores da lo mismo que resuelve el backend al crear el pedido —
+ * el precio mostrado antes de confirmar nunca difiere del cobrado.
+ */
+export function halfAndHalfUnitPrice(priceA, priceB) {
+  return Math.max(Number(priceA ?? 0), Number(priceB ?? 0))
+}
+
+/**
+ * Identidad de un ítem dentro del carrito del pedido manual. Un ítem simple se identifica
+ * por su productId; uno combinado, por el par ordenado de ids — así elegir A+B o B+A cae en
+ * la misma línea del carrito, y un combinado nunca se fusiona con el producto suelto.
+ */
+export function cartItemKey({ productId, secondProductId }) {
+  if (secondProductId == null) return String(productId)
+  const [a, b] = [Number(productId), Number(secondProductId)].sort((x, y) => x - y)
+  return `hh-${a}-${b}`
+}

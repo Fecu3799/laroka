@@ -101,3 +101,161 @@ describe('NewOrderModal · advertencia de productos no disponibles (US-15-F-09)'
     )
   })
 })
+
+describe('NewOrderModal · mitad y mitad (US-HH-F-03)', () => {
+  // Dos categorías: una admite mitad y mitad, la otra no. Ambas con productos disponibles.
+  const MENU_HH = [
+    {
+      categoryName: 'Pizzas',
+      allowsHalfAndHalf: true,
+      products: [
+        { id: 10, name: 'Muzzarella', price: 2800, available: true },
+        { id: 11, name: 'Calabresa', price: 3400, available: true },
+        { id: 12, name: 'Napolitana', price: 3200, available: false },
+      ],
+    },
+    {
+      categoryName: 'Bebidas',
+      allowsHalfAndHalf: false,
+      products: [{ id: 30, name: 'Gaseosa', price: 1500, available: true }],
+    },
+  ]
+
+  // Scopeadas al catálogo: una vez que el producto está en el carrito, su nombre aparece
+  // dos veces en el DOM.
+  const catalog = () => within(document.querySelector('.nom-col-left'))
+
+  const row = name => catalog().getByText(name).closest('.nom-product-row')
+
+  const halfBtn = name =>
+    within(row(name)).queryByRole('button', { name: /mitad y mitad/i })
+
+  async function renderHH() {
+    fetchBranchMenu.mockResolvedValue(MENU_HH)
+    render(<NewOrderModal open onClose={vi.fn()} />)
+    await screen.findByText('Muzzarella')
+  }
+
+  test('el botón ½ aparece sólo en categorías que admiten mitad y mitad', async () => {
+    await renderHH()
+
+    expect(halfBtn('Muzzarella')).toBeInTheDocument()
+    expect(halfBtn('Calabresa')).toBeInTheDocument()
+    expect(halfBtn('Gaseosa')).toBeNull()
+    // Un producto no disponible sí puede ser mitad: el backoffice advierte, no bloquea.
+    expect(halfBtn('Napolitana')).toBeInTheDocument()
+  })
+
+  test('una mitad no disponible se puede combinar y cae en la advertencia al confirmar', async () => {
+    await renderHH()
+    fireEvent.click(halfBtn('Muzzarella'))
+    fireEvent.click(halfBtn('Napolitana'))   // Napolitana está marcada no disponible
+
+    expect(screen.getByText('½ Muzzarella + ½ Napolitana')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /confirmar pedido/i }))
+
+    // Mismo flujo que un producto entero no disponible (US-15-F-09): advierte y no postea.
+    const dialog = screen.getByRole('alertdialog')
+    expect(within(dialog).getByText('½ Muzzarella + ½ Napolitana')).toBeInTheDocument()
+    expect(createBackofficeOrder).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: /confirmar de todas formas/i }))
+    await waitFor(() => expect(createBackofficeOrder).toHaveBeenCalledTimes(1))
+    expect(createBackofficeOrder.mock.calls[0][0].items).toEqual([
+      { productId: 10, secondProductId: 12, quantity: 1 },
+    ])
+  })
+
+  test('un combinado con ambas mitades disponibles no dispara la advertencia', async () => {
+    await renderHH()
+    fireEvent.click(halfBtn('Muzzarella'))
+    fireEvent.click(halfBtn('Calabresa'))
+    fireEvent.click(screen.getByRole('button', { name: /confirmar pedido/i }))
+
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    await waitFor(() => expect(createBackofficeOrder).toHaveBeenCalledTimes(1))
+  })
+
+  test('al marcar la primera mitad sólo quedan habilitadas las candidatas', async () => {
+    await renderHH()
+    fireEvent.click(halfBtn('Muzzarella'))
+
+    expect(row('Calabresa')).not.toHaveClass('nom-product-row--dimmed')
+    expect(row('Gaseosa')).toHaveClass('nom-product-row--dimmed')
+    // La pendiente queda marcada, no atenuada: tocarla de nuevo cancela.
+    expect(row('Muzzarella')).toHaveClass('nom-product-row--half-pending')
+    expect(row('Muzzarella')).not.toHaveClass('nom-product-row--dimmed')
+  })
+
+  test('se completa tocando el ½ de la otra pizza', async () => {
+    await renderHH()
+    fireEvent.click(halfBtn('Muzzarella'))
+    fireEvent.click(halfBtn('Calabresa'))
+
+    expect(screen.getByText('½ Muzzarella + ½ Calabresa')).toBeInTheDocument()
+  })
+
+  test('se completa tocando la fila de la otra pizza', async () => {
+    await renderHH()
+    fireEvent.click(halfBtn('Muzzarella'))
+    fireEvent.click(row('Calabresa'))
+
+    expect(screen.getByText('½ Muzzarella + ½ Calabresa')).toBeInTheDocument()
+  })
+
+  test('el precio del combinado es el de la mitad más cara', async () => {
+    await renderHH()
+    fireEvent.click(halfBtn('Muzzarella'))
+    fireEvent.click(halfBtn('Calabresa'))
+
+    // Muzzarella 2800 + Calabresa 3400 → 3400, no la suma ni el promedio.
+    const cartItem = screen.getByText('½ Muzzarella + ½ Calabresa').closest('.nom-cart-item')
+    expect(within(cartItem).getByText('$3.400')).toBeInTheDocument()
+  })
+
+  test('volver a tocar el ½ de la misma pizza cancela la combinación', async () => {
+    await renderHH()
+    fireEvent.click(halfBtn('Muzzarella'))
+    fireEvent.click(halfBtn('Muzzarella'))
+
+    expect(row('Gaseosa')).not.toHaveClass('nom-product-row--dimmed')
+    expect(screen.queryByText(/½ Muzzarella/)).not.toBeInTheDocument()
+  })
+
+  test('el combinado no se fusiona con el producto suelto de su primera mitad', async () => {
+    await renderHH()
+    fireEvent.click(row('Muzzarella'))          // Muzzarella suelta
+    fireEvent.click(halfBtn('Muzzarella'))
+    fireEvent.click(halfBtn('Calabresa'))       // ½ Muzza + ½ Calabresa
+
+    const cart = document.querySelectorAll('.nom-cart-item')
+    expect(cart).toHaveLength(2)
+    const names = [...cart].map(el => el.querySelector('.nom-cart-name').textContent)
+    expect(names).toEqual(['Muzzarella', '½ Muzzarella + ½ Calabresa'])
+  })
+
+  test('el pedido viaja con secondProductId en el ítem combinado', async () => {
+    await renderHH()
+    fireEvent.click(halfBtn('Muzzarella'))
+    fireEvent.click(halfBtn('Calabresa'))
+    fireEvent.click(screen.getByRole('button', { name: /confirmar pedido/i }))
+
+    await waitFor(() => expect(createBackofficeOrder).toHaveBeenCalled())
+    const payload = createBackofficeOrder.mock.calls[0][0]
+    expect(payload.items).toEqual([
+      { productId: 10, secondProductId: 11, quantity: 1 },
+    ])
+  })
+
+  test('un ítem simple sigue viajando sin secondProductId', async () => {
+    await renderHH()
+    fireEvent.click(row('Muzzarella'))
+    fireEvent.click(screen.getByRole('button', { name: /confirmar pedido/i }))
+
+    await waitFor(() => expect(createBackofficeOrder).toHaveBeenCalled())
+    expect(createBackofficeOrder.mock.calls[0][0].items).toEqual([
+      { productId: 10, quantity: 1 },
+    ])
+  })
+})
