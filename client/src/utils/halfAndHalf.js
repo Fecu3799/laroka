@@ -1,5 +1,6 @@
-// US-HH-F-01: helpers del ítem mitad y mitad, compartidos entre el detalle de producto
-// (armado del ítem) y el carrito/checkout (payload al backend).
+// Identidad y armado de los ítems del carrito que llevan opciones: mitad y mitad
+// (US-HH-F-01) y tamaño (US-SIZE-F-02). Compartido entre el detalle de producto (armado) y
+// el carrito/checkout (payload al backend).
 
 // Identidad del ítem combinado dentro del carrito. Se normaliza ordenando los ids para que
 // elegir el mismo par desde el detalle de A o desde el de B caiga en la misma línea del
@@ -46,6 +47,33 @@ export function buildHalfAndHalfItem(first, second) {
     imageUrl: first.imageUrl || second.imageUrl || null,
     description: null,
   }
+}
+
+// US-SIZE-F-02: ítem con tamaño elegido. Identidad propia para que no se fusione con el
+// mismo producto en otro tamaño ni con el producto sin tamaño ("Grande", que es el
+// comportamiento por defecto y no lleva productSizeId).
+export function sizedCartId(productId, productSizeId) {
+  return `size-${productId}-${productSizeId}`
+}
+
+export function buildSizedItem(product, size) {
+  return {
+    id: sizedCartId(product.id, size.id),
+    productId: product.id,
+    productSizeId: size.id,
+    sizeName: size.size,
+    name: `${product.name} (${sizeLabel(size.size)})`,
+    price: Number(size.price),
+    imageUrl: product.imageUrl || null,
+    description: null,
+  }
+}
+
+// Etiqueta visible de un tamaño. El backend lo expone como enum (CHICA / GRANDE).
+export function sizeLabel(size) {
+  if (size === 'CHICA') return 'Chica'
+  if (size === 'GRANDE') return 'Grande'
+  return size
 }
 
 // Id de producto que viaja al backend por ítem del carrito. Los ítems simples no tienen

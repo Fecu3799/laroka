@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.tuple;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
@@ -15,6 +16,9 @@ import com.laroka.backend.catalog.entity.BranchProduct;
 import com.laroka.backend.catalog.entity.Category;
 import com.laroka.backend.catalog.entity.CategoryType;
 import com.laroka.backend.catalog.entity.Product;
+import com.laroka.backend.catalog.entity.ProductSizeName;
+import com.laroka.backend.catalog.service.BranchMenu;
+import com.laroka.backend.catalog.service.ResolvedProductSize;
 
 /**
  * US-14-02: el menú público expone el precio ya resuelto
@@ -24,6 +28,11 @@ import com.laroka.backend.catalog.entity.Product;
 class MenuMapperTest {
 
 	private final MenuMapper mapper = new MenuMapper();
+
+	// Menú sin tamaños: el caso por defecto de casi todos estos tests.
+	private BranchMenu menuOf(List<BranchProduct> branchProducts) {
+		return new BranchMenu(branchProducts, Map.of());
+	}
 
 	private BranchProduct branchProduct(BigDecimal basePrice, BigDecimal priceOverride) {
 		return branchProduct(1, "Muzzarella", basePrice, priceOverride, true);
@@ -51,7 +60,7 @@ class MenuMapperTest {
 	void toMenu_withPriceOverride_resolvesToOverride() {
 		BranchProduct bp = branchProduct(new BigDecimal("2800.00"), new BigDecimal("3100.00"));
 
-		List<MenuCategoryDTO> menu = mapper.toMenu(List.of(bp));
+		List<MenuCategoryDTO> menu = mapper.toMenu(menuOf(List.of(bp)));
 
 		assertThat(menu).hasSize(1);
 		assertThat(menu.get(0).getProducts()).hasSize(1);
@@ -62,7 +71,7 @@ class MenuMapperTest {
 	void toMenu_withoutPriceOverride_resolvesToBasePrice() {
 		BranchProduct bp = branchProduct(new BigDecimal("2800.00"), null);
 
-		List<MenuCategoryDTO> menu = mapper.toMenu(List.of(bp));
+		List<MenuCategoryDTO> menu = mapper.toMenu(menuOf(List.of(bp)));
 
 		assertThat(menu).hasSize(1);
 		assertThat(menu.get(0).getProducts()).hasSize(1);
@@ -77,7 +86,7 @@ class MenuMapperTest {
 		BranchProduct available = branchProduct(1, "Muzzarella", new BigDecimal("2800.00"), null, true);
 		BranchProduct unavailable = branchProduct(2, "Napolitana", new BigDecimal("3200.00"), null, false);
 
-		List<MenuCategoryDTO> menu = mapper.toMenu(List.of(available, unavailable));
+		List<MenuCategoryDTO> menu = mapper.toMenu(menuOf(List.of(available, unavailable)));
 
 		assertThat(menu).hasSize(1);
 		assertThat(menu.get(0).getProducts()).hasSize(2);
@@ -94,7 +103,7 @@ class MenuMapperTest {
 		BranchProduct unavailable = branchProduct(2, "Napolitana", new BigDecimal("3200.00"), null, false);
 		BranchProduct available = branchProduct(1, "Muzzarella", new BigDecimal("2800.00"), null, true);
 
-		List<MenuCategoryDTO> menu = mapper.toMenu(List.of(unavailable, available));
+		List<MenuCategoryDTO> menu = mapper.toMenu(menuOf(List.of(unavailable, available)));
 
 		assertThat(menu).hasSize(1);
 		assertThat(menu.get(0).getProducts())
@@ -121,7 +130,7 @@ class MenuMapperTest {
 	void toMenu_categoryTypeAllowsHalfAndHalf_exposesFlagTrue() {
 		CategoryType pizza = CategoryType.builder().id(7).name("Pizza").allowsHalfAndHalf(true).active(true).build();
 
-		List<MenuCategoryDTO> menu = mapper.toMenu(List.of(branchProductWithType(pizza)));
+		List<MenuCategoryDTO> menu = mapper.toMenu(menuOf(List.of(branchProductWithType(pizza))));
 
 		assertThat(menu.get(0).isAllowsHalfAndHalf()).isTrue();
 	}
@@ -130,7 +139,7 @@ class MenuMapperTest {
 	void toMenu_categoryTypeDoesNotAllowHalfAndHalf_exposesFlagFalse() {
 		CategoryType bebida = CategoryType.builder().id(8).name("Bebida").allowsHalfAndHalf(false).active(true).build();
 
-		List<MenuCategoryDTO> menu = mapper.toMenu(List.of(branchProductWithType(bebida)));
+		List<MenuCategoryDTO> menu = mapper.toMenu(menuOf(List.of(branchProductWithType(bebida))));
 
 		assertThat(menu.get(0).isAllowsHalfAndHalf()).isFalse();
 	}
@@ -139,9 +148,55 @@ class MenuMapperTest {
 	void toMenu_categoryWithoutType_exposesFlagFalseWithoutFailing() {
 		// Categoría anterior a US-CAT-02, sin tipo asignado: el FK es nullable y el menú
 		// debe seguir respondiendo, no romper con NPE.
-		List<MenuCategoryDTO> menu = mapper.toMenu(List.of(branchProductWithType(null)));
+		List<MenuCategoryDTO> menu = mapper.toMenu(menuOf(List.of(branchProductWithType(null))));
 
 		assertThat(menu).hasSize(1);
 		assertThat(menu.get(0).isAllowsHalfAndHalf()).isFalse();
+	}
+
+	// US-SIZE-F-02: el menú expone allowsSizes por categoría y los tamaños por producto, con
+	// el precio de sucursal ya resuelto.
+
+	@Test
+	void toMenu_exposesAllowsSizesIndependentlyOfHalfAndHalf() {
+		CategoryType soloTamanios = CategoryType.builder()
+			.id(9).name("Milanesa").allowsHalfAndHalf(false).allowsSizes(true).active(true).build();
+
+		List<MenuCategoryDTO> menu = mapper.toMenu(menuOf(List.of(branchProductWithType(soloTamanios))));
+
+		assertThat(menu.get(0).isAllowsSizes()).isTrue();
+		assertThat(menu.get(0).isAllowsHalfAndHalf()).isFalse();
+	}
+
+	@Test
+	void toMenu_categoryWithoutType_exposesAllowsSizesFalse() {
+		List<MenuCategoryDTO> menu = mapper.toMenu(menuOf(List.of(branchProductWithType(null))));
+
+		assertThat(menu.get(0).isAllowsSizes()).isFalse();
+	}
+
+	@Test
+	void toMenu_productWithSizes_exposesThemWithResolvedPrice() {
+		BranchProduct bp = branchProduct(1, "Muzzarella", new BigDecimal("15000.00"), null, true);
+		BranchMenu menuData = new BranchMenu(List.of(bp), Map.of(1, List.of(
+			new ResolvedProductSize(50, ProductSizeName.CHICA, new BigDecimal("9000.00")))));
+
+		List<MenuCategoryDTO> menu = mapper.toMenu(menuData);
+
+		var sizes = menu.get(0).getProducts().get(0).getSizes();
+		assertThat(sizes).hasSize(1);
+		assertThat(sizes.get(0).getId()).isEqualTo(50);
+		assertThat(sizes.get(0).getSize()).isEqualTo("CHICA");
+		assertThat(sizes.get(0).getPrice()).isEqualByComparingTo("9000.00");
+	}
+
+	@Test
+	void toMenu_productWithoutSizes_exposesEmptyListNotNull() {
+		// El client no debería tener que defenderse de un null acá.
+		BranchProduct bp = branchProduct(new BigDecimal("2800.00"), null);
+
+		List<MenuCategoryDTO> menu = mapper.toMenu(menuOf(List.of(bp)));
+
+		assertThat(menu.get(0).getProducts().get(0).getSizes()).isEmpty();
 	}
 }

@@ -8,7 +8,7 @@ import { OrderTrackingBanner } from '../features/order/OrderTrackingBanner'
 import { WelcomeModal } from '../components/WelcomeModal'
 import { useCart } from '../hooks/useCart'
 import { getTenantProfile } from '../services/tenantService'
-import { buildHalfAndHalfItem } from '../utils/halfAndHalf'
+import { buildHalfAndHalfItem, buildSizedItem } from '../utils/halfAndHalf'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080'
 const INTRO_SEEN_KEY = 'laroka_intro_seen'
@@ -221,6 +221,9 @@ export function MenuScreen({ branchId, branchName, onChangeBranch, paymentFailur
       // categoría, excluyendo el propio (el backend rechaza combinar un producto consigo
       // mismo, US-HH-02). El flag viene del menú (allowsHalfAndHalf por categoría).
       allowsHalfAndHalf: cat?.allowsHalfAndHalf === true,
+      // US-SIZE-F-02: los tamaños ya vienen en el producto del menú, con el precio de la
+      // sucursal resuelto; sólo falta saber si la categoría los habilita.
+      allowsSizes: cat?.allowsSizes === true,
       halfAndHalfCandidates: (cat?.products ?? []).filter(
         p => p.id !== product.id && p.available !== false,
       ),
@@ -239,6 +242,12 @@ export function MenuScreen({ branchId, branchName, onChangeBranch, paymentFailur
   // el producto suelto) y con el precio ya resuelto por la regla del mayor precio.
   const handleAddHalfAndHalf = useCallback((first, second, qty) => {
     addItem(buildHalfAndHalfItem(first, second), qty)
+  }, [addItem])
+
+  // US-SIZE-F-02: el ítem con tamaño entra con identidad propia y con el precio del tamaño
+  // ya resuelto por la sucursal, para no fusionarse con el mismo producto en otro tamaño.
+  const handleAddSized = useCallback((product, size, qty) => {
+    addItem(buildSizedItem(product, size), qty)
   }, [addItem])
 
   // Perfil del negocio (US-13-F-02): se carga al montar la pantalla del menú.
@@ -647,6 +656,7 @@ export function MenuScreen({ branchId, branchName, onChangeBranch, paymentFailur
               onBack={handleCloseDetail}
               onAddToCart={handleAddToCart}
               onAddHalfAndHalf={handleAddHalfAndHalf}
+              onAddSized={handleAddSized}
             />
           </Motion.div>
         )}

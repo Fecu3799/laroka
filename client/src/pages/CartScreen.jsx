@@ -264,6 +264,8 @@ export function CartScreen({ items, extras = [], onBack, onRemove, onUpdateQty, 
       items: items.map(i => ({
         productId: cartItemProductId(i),
         ...(i.secondProductId != null ? { secondProductId: i.secondProductId } : {}),
+        // US-SIZE-F-02: sólo los tamaños alternativos viajan; "Grande" es la ausencia del campo.
+        ...(i.productSizeId != null ? { productSizeId: i.productSizeId } : {}),
         quantity: i.qty,
       })),
       ...(pushSubscriptionId ? { pushSubscriptionId } : {}),
@@ -309,6 +311,8 @@ export function CartScreen({ items, extras = [], onBack, onRemove, onUpdateQty, 
           // al backend con el id sintético del carrito como productId.
           productId: i.productId ?? null,
           secondProductId: i.secondProductId ?? null,
+          productSizeId: i.productSizeId ?? null,
+          sizeName: i.sizeName ?? null,
           productName: i.productName ?? null,
           secondProductName: i.secondProductName ?? null,
         })),

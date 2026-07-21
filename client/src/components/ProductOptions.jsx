@@ -45,23 +45,30 @@ export function OptionGroup({ title, children }) {
  * Grupo colapsable. La fila entera es el control: al tocarla se expande o colapsa el
  * contenido, y el chevron rota para indicar el estado.
  */
-export function OptionAccordion({ id, label, expanded, onToggle, children }) {
+export function OptionAccordion({ id, label, expanded, onToggle, disabled, disabledReason, children }) {
   const panelId = `${id}-panel`
+  const isOpen = expanded && !disabled
   return (
     <div className={styles.group}>
       <button
         type="button"
-        className={styles.accordionRow}
+        className={`${styles.accordionRow}${disabled ? ` ${styles.accordionRowDisabled}` : ''}`}
         onClick={() => onToggle(!expanded)}
-        aria-expanded={expanded}
+        aria-expanded={isOpen}
         aria-controls={panelId}
+        disabled={disabled}
       >
         <span className={styles.accordionLabel}>{label}</span>
-        <span className={`${styles.chevron}${expanded ? ` ${styles.chevronOpen}` : ''}`}>
+        {/* US-SIZE-F-02: deshabilitada se queda visible, con el motivo al lado — ocultarla
+            dejaría al cliente sin saber por qué desapareció una opción que vio antes. */}
+        {disabled && disabledReason && (
+          <span className={styles.accordionReason}>{disabledReason}</span>
+        )}
+        <span className={`${styles.chevron}${isOpen ? ` ${styles.chevronOpen}` : ''}`}>
           <ChevronIcon />
         </span>
       </button>
-      {expanded && (
+      {isOpen && (
         <div className={styles.accordionPanel} id={panelId}>
           {children}
         </div>

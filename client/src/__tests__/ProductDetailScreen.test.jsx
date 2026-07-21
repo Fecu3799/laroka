@@ -15,6 +15,7 @@ function renderDetail(overrides = {}, handlers = {}) {
     onBack: vi.fn(),
     onAddToCart: vi.fn(),
     onAddHalfAndHalf: vi.fn(),
+    onAddSized: vi.fn(),
     ...handlers,
   }
   render(<ProductDetailScreen {...props} />)
@@ -130,5 +131,109 @@ describe('ProductDetailScreen — opción mitad y mitad (US-HH-F-01)', () => {
     fireEvent.click(halfRow())
     expect(screen.getByRole('radio', { name: /Napolitana/ })).not.toBeChecked()
     expect(cta()).toBeDisabled()
+  })
+})
+
+describe('ProductDetailScreen — tamaños (US-SIZE-F-02)', () => {
+  const CHICA = { id: 50, size: 'CHICA', price: 1900 }
+
+  function renderConTamanios(overrides = {}) {
+    return renderDetail({
+      allowsSizes: true,
+      sizes: [CHICA],
+      allowsHalfAndHalf: true,
+      halfAndHalfCandidates: [NAPO],
+      ...overrides,
+    })
+  }
+
+  const sizeRadio = name => screen.queryByRole('radio', { name: new RegExp(name) })
+
+  it('no ofrece tamaños si la categoría no los habilita', () => {
+    renderConTamanios({ allowsSizes: false })
+
+    expect(sizeRadio('Grande')).not.toBeInTheDocument()
+    expect(sizeRadio('Chica')).not.toBeInTheDocument()
+  })
+
+  it('no ofrece tamaños si el producto no tiene ninguno cargado', () => {
+    renderConTamanios({ sizes: [] })
+
+    expect(sizeRadio('Grande')).not.toBeInTheDocument()
+  })
+
+  it('ofrece Grande (por defecto) y Chica con sus precios', () => {
+    renderConTamanios()
+
+    expect(sizeRadio('Grande')).toBeChecked()
+    expect(sizeRadio('Chica')).not.toBeChecked()
+    // El precio de cada tamaño viaja en el nombre accesible de su propio radio.
+    expect(sizeRadio('Grande')).toHaveAccessibleName(expect.stringContaining('$2.800'))
+    expect(sizeRadio('Chica')).toHaveAccessibleName(expect.stringContaining('$1.900'))
+  })
+
+  it('elegir Chica cambia el precio al del tamaño', () => {
+    renderConTamanios()
+    expect(totalPrice()).toHaveTextContent('$2.800')
+
+    fireEvent.click(sizeRadio('Chica'))
+
+    expect(totalPrice()).toHaveTextContent('$1.900')
+  })
+
+  it('con Chica elegida, mitad y mitad queda deshabilitada pero visible, con el motivo', () => {
+    renderConTamanios()
+    fireEvent.click(sizeRadio('Chica'))
+
+    const accordion = halfRow()
+    expect(accordion).toBeInTheDocument()      // no se oculta
+    expect(accordion).toBeDisabled()
+    expect(screen.getByText(/sólo disponible en tamaño grande/i)).toBeInTheDocument()
+  })
+
+  it('volver a Grande vuelve a habilitar mitad y mitad', () => {
+    renderConTamanios()
+    fireEvent.click(sizeRadio('Chica'))
+    fireEvent.click(sizeRadio('Grande'))
+
+    expect(halfRow()).toBeEnabled()
+    expect(screen.queryByText(/sólo disponible en tamaño grande/i)).not.toBeInTheDocument()
+  })
+
+  it('pasar a Chica descarta una combinación a medio armar', () => {
+    renderConTamanios()
+    fireEvent.click(halfRow())
+    fireEvent.click(screen.getByRole('radio', { name: /Napolitana/ }))
+    expect(totalPrice()).toHaveTextContent('$3.200')
+
+    fireEvent.click(sizeRadio('Chica'))
+
+    // El acordeón se cierra y el precio pasa a ser el del tamaño, no el de la combinación.
+    expect(screen.queryByRole('radio', { name: /Napolitana/ })).not.toBeInTheDocument()
+    expect(totalPrice()).toHaveTextContent('$1.900')
+  })
+
+  it('agrega el ítem con el tamaño elegido', () => {
+    const props = renderConTamanios()
+    fireEvent.click(sizeRadio('Chica'))
+    fireEvent.click(screen.getByRole('button', { name: /aumentar cantidad/i }))
+    fireEvent.click(cta())
+
+    expect(props.onAddSized).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 1 }),
+      expect.objectContaining({ id: 50, size: 'CHICA' }),
+      2,
+    )
+    expect(props.onAddToCart).not.toHaveBeenCalled()
+  })
+
+  it('con Grande agrega el producto sin tamaño (comportamiento actual)', () => {
+    // "Grande" no es un productSizeId: es la ausencia de tamaño (US-SIZE-03 rechaza
+    // combinar tamaño con mitad y mitad, y grande debe seguir admitiéndola).
+    const props = renderConTamanios()
+    fireEvent.click(cta())
+
+    expect(props.onAddToCart).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }), 1)
+    expect(props.onAddSized).not.toHaveBeenCalled()
   })
 })

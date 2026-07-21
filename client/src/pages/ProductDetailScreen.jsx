@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react'
-import { ProductOptions, OptionAccordion, OptionRadioList } from '../components/ProductOptions'
-import { halfAndHalfPrice } from '../utils/halfAndHalf'
+import { ProductOptions, OptionGroup, OptionAccordion, OptionRadioList } from '../components/ProductOptions'
+import { halfAndHalfPrice, sizeLabel } from '../utils/halfAndHalf'
 
 function formatPrice(price) {
   return `$${Number(price).toLocaleString('es-AR')}`
@@ -40,11 +40,14 @@ function SizeIcon() {
   )
 }
 
-export function ProductDetailScreen({ product, onBack, onAddToCart, onAddHalfAndHalf }) {
+export function ProductDetailScreen({ product, onBack, onAddToCart, onAddHalfAndHalf, onAddSized }) {
   const [qty, setQty] = useState(1)
   const [added, setAdded] = useState(false)
   const [halfAndHalf, setHalfAndHalf] = useState(false)
   const [secondHalfId, setSecondHalfId] = useState(null)
+  // US-SIZE-F-02: null = "Grande", que es el comportamiento por defecto (precio base del
+  // producto y sin productSizeId). Sólo los tamaños alternativos llevan id.
+  const [sizeId, setSizeId] = useState(null)
 
   const increment = useCallback(() => setQty(q => Math.min(99, q + 1)), [])
   const decrement = useCallback(() => setQty(q => Math.max(1, q - 1)), [])
@@ -55,6 +58,26 @@ export function ProductDetailScreen({ product, onBack, onAddToCart, onAddHalfAnd
   const halfCandidates = product.halfAndHalfCandidates ?? []
   const canOrderHalfAndHalf = product.allowsHalfAndHalf === true && halfCandidates.length > 0
   const secondHalf = halfCandidates.find(c => c.id === secondHalfId) ?? null
+
+  // US-SIZE-F-02: "Grande" no es una fila de product_size — es la ausencia de tamaño. Va
+  // primero y es la opción por defecto. Una fila GRANDE cargada por el ADMIN sería un
+  // duplicado de esa opción, así que no se ofrece (ver nota en el informe de la historia).
+  const sizes = (product.sizes ?? []).filter(s => s.size !== 'GRANDE')
+  const canChooseSize = product.allowsSizes === true && sizes.length > 0
+  const selectedSize = sizes.find(s => s.id === sizeId) ?? null
+
+  // US-SIZE-03: el backend rechaza con 422 un ítem que combine tamaño con mitad y mitad, y
+  // "Grande" es justamente el ítem sin tamaño. Por eso mitad y mitad sólo vive en Grande.
+  const halfAndHalfBlockedBySize = selectedSize != null
+
+  function handleSelectSize(nextSizeId) {
+    setSizeId(nextSizeId)
+    // Pasar a un tamaño alternativo cierra y limpia mitad y mitad: son excluyentes.
+    if (nextSizeId != null) {
+      setHalfAndHalf(false)
+      setSecondHalfId(null)
+    }
+  }
 
   // Al colapsar el acordeón se limpia la selección: volver a expandirlo no debe arrastrar la
   // mitad elegida antes.
@@ -68,17 +91,22 @@ export function ProductDetailScreen({ product, onBack, onAddToCart, onAddHalfAnd
   // error, que sería lo contrario a lo que el cliente marcó.
   const ctaBlocked = halfAndHalf && !secondHalf
 
-  const handleAdd = useCallback(() => {
+  // Función plana, no useCallback: depende de valores derivados en cada render (selectedSize,
+  // secondHalf) que el compilador de React no puede memoizar de forma estable.
+  function handleAdd() {
     if (ctaBlocked) return
     if (isHalfAndHalfReady) onAddHalfAndHalf?.(product, secondHalf, qty)
+    else if (selectedSize) onAddSized?.(product, selectedSize, qty)
     else onAddToCart?.(product, qty)
     setAdded(true)
     setTimeout(() => setAdded(false), 1800)
-  }, [ctaBlocked, isHalfAndHalfReady, onAddHalfAndHalf, onAddToCart, product, secondHalf, qty])
+  }
 
   // Preview de precio: con la combinación armada vale el mayor de las dos mitades (misma
   // regla que resuelve el backend, US-HH-03). Sin combinación, el precio del producto.
-  const unitPrice = isHalfAndHalfReady ? halfAndHalfPrice(product, secondHalf) : product.price
+  const unitPrice = isHalfAndHalfReady
+    ? halfAndHalfPrice(product, secondHalf)
+    : (selectedSize ? Number(selectedSize.price) : product.price)
   const totalPrice = unitPrice * qty
 
   return (
@@ -115,14 +143,35 @@ export function ProductDetailScreen({ product, onBack, onAddToCart, onAddHalfAnd
             <p className="detail-description">{product.description}</p>
           )}
 
-          {canOrderHalfAndHalf && (
+          {(canChooseSize || canOrderHalfAndHalf) && (
             <ProductOptions>
-              {/* US-SIZE-F-02: el grupo de tamaños entra acá como OptionGroup hermano. */}
+              {/* US-SIZE-F-02: el tamaño va primero — condiciona si mitad y mitad se puede. */}
+              {canChooseSize && (
+                <OptionGroup title="Tamaño">
+                  <OptionRadioList
+                    name="product-size"
+                    legend="Elegí el tamaño:"
+                    options={[
+                      { id: null, label: 'Grande', hint: formatPrice(product.price) },
+                      ...sizes.map(sz => ({
+                        id: sz.id,
+                        label: sizeLabel(sz.size),
+                        hint: formatPrice(sz.price),
+                      })),
+                    ]}
+                    selectedId={sizeId}
+                    onSelect={handleSelectSize}
+                  />
+                </OptionGroup>
+              )}
+              {canOrderHalfAndHalf && (
               <OptionAccordion
                 id="option-half-and-half"
                 label="Pedir mitad y mitad"
                 expanded={halfAndHalf}
                 onToggle={handleToggleHalfAndHalf}
+                disabled={halfAndHalfBlockedBySize}
+                disabledReason="Sólo disponible en tamaño grande"
               >
                 <OptionRadioList
                   name="second-half"
@@ -136,6 +185,7 @@ export function ProductDetailScreen({ product, onBack, onAddToCart, onAddHalfAnd
                   onSelect={setSecondHalfId}
                 />
               </OptionAccordion>
+              )}
             </ProductOptions>
           )}
         </div>

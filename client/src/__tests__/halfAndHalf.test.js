@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   buildHalfAndHalfItem,
+  buildSizedItem,
   cartItemProductId,
   halfAndHalfCartId,
   halfAndHalfName,
@@ -103,5 +104,31 @@ describe('orderItemDisplayName', () => {
   it('deja el nombre tal cual en un ítem simple', () => {
     expect(orderItemDisplayName({ name: 'Fugazzeta', secondProductName: null })).toBe('Fugazzeta')
     expect(orderItemDisplayName({ name: 'Fugazzeta' })).toBe('Fugazzeta')
+  })
+})
+
+describe('buildSizedItem', () => {
+  const MUZZA_SIZES = { id: 1, name: 'Muzzarella', price: 2800, imageUrl: 'muzza.jpg' }
+  const CHICA = { id: 50, size: 'CHICA', price: 1900 }
+
+  it('lleva el productSizeId y el precio del tamaño, no el del producto', () => {
+    const item = buildSizedItem(MUZZA_SIZES, CHICA)
+
+    expect(item.productId).toBe(1)
+    expect(item.productSizeId).toBe(50)
+    expect(item.price).toBe(1900)
+    expect(item.name).toBe('Muzzarella (Chica)')
+  })
+
+  it('no comparte identidad con el producto suelto ni con otro tamaño', () => {
+    const chica = buildSizedItem(MUZZA_SIZES, CHICA)
+    const otra = buildSizedItem(MUZZA_SIZES, { id: 51, size: 'CHICA', price: 2000 })
+
+    expect(chica.id).not.toBe(MUZZA_SIZES.id)
+    expect(chica.id).not.toBe(otra.id)
+  })
+
+  it('cartItemProductId devuelve el producto base, no el id del carrito', () => {
+    expect(cartItemProductId(buildSizedItem(MUZZA_SIZES, CHICA))).toBe(1)
   })
 })

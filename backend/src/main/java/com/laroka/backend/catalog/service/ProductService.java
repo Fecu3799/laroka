@@ -35,6 +35,7 @@ public class ProductService {
 	private final CategoryRepository categoryRepository;
 	private final BranchRepository branchRepository;
 	private final BranchProductRepository branchProductRepository;
+	private final ProductSizeService productSizeService;
 	private final TenantRepository tenantRepository;
 
 	public Product findById(Integer id) {
@@ -43,11 +44,15 @@ public class ProductService {
 	}
 
 	@Cacheable(value = "menu", key = "#branchId")
-	public List<BranchProduct> getMenuForBranch(Integer branchId) {
+	public BranchMenu getMenuForBranch(Integer branchId) {
 		validateBranchExists(branchId);
 		// US-15-11: el menú retorna todos los productos de la sucursal (disponibles y no).
 		// El campo available viaja en el DTO; el mapper ordena disponibles primero.
-		return branchProductRepository.findByBranchIdWithProductAndCategory(branchId);
+		// US-SIZE-F-02: los tamaños con precio ya resuelto por sucursal viajan en el mismo
+		// valor cacheado, para no duplicar los seis puntos de evicción de este cache.
+		return new BranchMenu(
+			branchProductRepository.findByBranchIdWithProductAndCategory(branchId),
+			productSizeService.resolveSizesForBranch(branchId));
 	}
 
 	public List<Product> findByCategory(Integer categoryId) {
