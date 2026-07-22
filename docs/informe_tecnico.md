@@ -1,4 +1,4 @@
-﻿# LaRoka
+﻿# PediSur
 
 ## Introducción
 
@@ -898,7 +898,7 @@ realice de manera ordenada, consistente y alineada con los objetivos del proyect
 ### 2. Introducción al Product Backlog
 
 El presente Product Backlog organiza el trabajo de desarrollo del sistema
-LaRoka a partir de las definiciones establecidas en las etapas de análisis y diseño.
+PediSur a partir de las definiciones establecidas en las etapas de análisis y diseño.
 Contempla la totalidad de los requisitos funcionales, reglas de negocio, decisiones
 arquitectónicas y criterios de calidad relevados, traducidos en historias de usuario
 priorizadas y agrupadas en sprints de implementación incremental.
@@ -1203,7 +1203,7 @@ inicializados y deployados
 en Vercel para tener el
 pipeline frontend operativo
 Dos proyectos Vite+React:
-laroka-client y laroka-backoffice.
+pedisur-client y pedisur-backoffice.
 Deploy automático desde Vercel
 conectado al repo. Build exitoso en
 Vercel
@@ -1214,8 +1214,8 @@ con dos buckets separados
 para dev y prod
 Bucket R2 creado. Credenciales
 configuradas como variables de
-entorno. Buckets laroka-dev y
-laroka-prod creados. Variable
+entorno. Buckets pedisur-dev y
+pedisur-prod creados. Variable
 R2_BUCKET_NAME determina
 bucket activo por ambiente. Test de
 upload exitoso.
