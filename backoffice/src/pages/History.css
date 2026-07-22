@@ -91,6 +91,16 @@
   background: color-mix(in srgb, var(--accent) 5%, transparent);
 }
 
+/* Fila cuyo detalle está abierto en el panel lateral. La barra izquierda marca
+   la selección sin desplazar el contenido (border-box sobre la primera celda). */
+.history-row.is-selected td {
+  background: color-mix(in srgb, var(--accent) 11%, transparent);
+}
+
+.history-row.is-selected td:first-child {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
 .history-table td {
   padding: 14px 18px;
   font-size: 14px;

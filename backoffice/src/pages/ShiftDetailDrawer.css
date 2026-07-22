@@ -1,103 +1,12 @@
-/* ── Modal detalle de turno cerrado (US-08-F-04) ────────────────── */
-
-.sdm-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  background: color-mix(in srgb, var(--color-bg) 72%, transparent);
-  backdrop-filter: blur(2px);
-}
-
-.sdm-modal {
-  width: 100%;
-  max-width: 560px;
-  max-height: 90vh;
-  overflow-y: auto;
-  background: var(--bg-secondary);
-  border: 1px solid color-mix(in srgb, var(--border) 32%, transparent);
-  border-radius: 16px;
-  padding: 22px 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-/* ── Header ──────────────────────────────────────────────────────── */
-
-.sdm-modal-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.sdm-modal-title-group {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.sdm-clock-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
-  color: var(--accent);
-  flex-shrink: 0;
-}
-
-.sdm-clock-icon svg {
-  width: 18px;
-  height: 18px;
-}
-
-.sdm-modal-title {
-  font-size: 20px;
-  font-weight: 800;
-  color: var(--text-primary);
-  line-height: 1;
-}
-
-.sdm-modal-date {
-  font-size: 12px;
-  color: var(--text-secondary);
-  margin-top: 3px;
-}
-
-.sdm-close-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  border: 1px solid color-mix(in srgb, var(--border) 30%, transparent);
-  background: transparent;
-  color: var(--text-secondary);
-  font-size: 18px;
-  line-height: 1;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  transition: background 0.12s ease, color 0.12s ease;
-}
-
-.sdm-close-btn:hover {
-  background: color-mix(in srgb, var(--border) 14%, transparent);
-  color: var(--text-primary);
-}
+/* ── Contenido del detalle de turno cerrado (US-08-F-04) ────────── */
+/* Solo contenido: el shell (overlay, panel, header, cerrar) lo aporta
+   components/ui/Drawer. */
 
 /* ── Period card ─────────────────────────────────────────────────── */
 
 .sdm-period-card {
-  background: color-mix(in srgb, var(--bg-card) 60%, transparent);
-  border: 1px solid color-mix(in srgb, var(--border) 22%, transparent);
+  background: color-mix(in srgb, var(--border) 5%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 24%, transparent);
   border-radius: 12px;
   padding: 16px 18px;
   display: flex;
@@ -117,7 +26,7 @@
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: var(--bg-card);
+  background: color-mix(in srgb, var(--border) 14%, transparent);
   color: var(--text-primary);
   display: flex;
   align-items: center;
@@ -220,8 +129,8 @@
 }
 
 .sdm-metric {
-  background: color-mix(in srgb, var(--bg-card) 60%, transparent);
-  border: 1px solid color-mix(in srgb, var(--border) 22%, transparent);
+  background: color-mix(in srgb, var(--border) 5%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 24%, transparent);
   border-left: 3px solid var(--border);
   border-radius: 10px;
   padding: 14px 16px;
@@ -269,8 +178,8 @@
 /* ── Revenue breakdown ───────────────────────────────────────────── */
 
 .sdm-breakdown {
-  background: color-mix(in srgb, var(--bg-card) 60%, transparent);
-  border: 1px solid color-mix(in srgb, var(--border) 22%, transparent);
+  background: color-mix(in srgb, var(--border) 5%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 24%, transparent);
   border-radius: 10px;
   padding: 16px 18px;
   display: flex;
@@ -361,7 +270,6 @@
 /* ── Responsive ──────────────────────────────────────────────────── */
 
 @media (max-width: 600px) {
-  .sdm-modal { padding: 18px 16px; }
   .sdm-metrics { grid-template-columns: 1fr; }
   .sdm-period-card { flex-direction: column; }
   .sdm-breakdown-row {

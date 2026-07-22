@@ -6,6 +6,7 @@ import java.util.Map;
 
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,6 +17,7 @@ import com.laroka.backend.catalog.entity.BranchProduct;
 import com.laroka.backend.catalog.entity.Category;
 import com.laroka.backend.catalog.entity.Product;
 import com.laroka.backend.catalog.entity.ProductSize;
+import com.laroka.backend.catalog.event.MenuCacheEvictionEvent;
 import com.laroka.backend.catalog.exception.BranchProductNotFoundException;
 import com.laroka.backend.catalog.exception.CategoryNotFoundException;
 import com.laroka.backend.catalog.exception.ProductNotFoundException;
@@ -39,6 +41,7 @@ public class ProductService {
 	private final BranchProductRepository branchProductRepository;
 	private final ProductSizeService productSizeService;
 	private final TenantRepository tenantRepository;
+	private final ApplicationEventPublisher eventPublisher;
 
 	public Product findById(Integer id) {
 		return repository.findById(id)
@@ -124,12 +127,17 @@ public class ProductService {
 	// Eliminar un producto borra primero todas sus entradas branch_product (FK) y luego
 	// el producto, todo en la misma transacción. Invalida el caché del menú de todas las
 	// sucursales porque el producto deja de existir en cualquiera de ellas.
+	//
+	// La evicción NO va con @CacheEvict acá: el orden entre el advisor de transacción y el
+	// de cache no está garantizado, y evictar antes del commit abre una ventana donde un
+	// request concurrente repuebla "menu" con el producto todavía vivo. En su lugar se
+	// publica MenuCacheEvictionEvent y MenuCacheEvictionListener evicta en AFTER_COMMIT.
 	@Transactional
-	@CacheEvict(value = "menu", allEntries = true)
 	public void delete(Integer id) {
 		Product product = findById(id);
 		branchProductRepository.deleteByProductId(id);
 		repository.delete(product);
+		eventPublisher.publishEvent(MenuCacheEvictionEvent.productDeleted(id));
 	}
 
 	@CacheEvict(value = "menu", key = "#branchId")
@@ -228,7 +236,14 @@ public class ProductService {
 	// applyToAllBranches afecta potencialmente todas las sucursales (override limpiado) y,
 	// aun en false, el nuevo precio base afecta a las sucursales sin override. Por eso se
 	// evicta el menú completo en ambos casos.
-	@CacheEvict(value = "menu", allEntries = true)
+	//
+	// @Transactional porque con applyToAllBranches son dos escrituras (precio base + limpieza
+	// de overrides) que tienen que caer juntas: sin la transacción, si falla la segunda el
+	// producto queda con el precio nuevo y las sucursales conservando sus overrides viejos,
+	// que es exactamente lo contrario de lo que se pidió. Y como acá @Transactional es
+	// necesario, la evicción no puede ir con @CacheEvict (orden indeterminado entre advisors):
+	// va por evento, igual que delete.
+	@Transactional
 	public Product updatePrice(Integer productId, BigDecimal price, boolean applyToAllBranches) {
 		Product product = findById(productId);
 		product.setPrice(price);
@@ -238,6 +253,7 @@ public class ProductService {
 			branchProducts.forEach(bp -> bp.setPriceOverride(null));
 			branchProductRepository.saveAll(branchProducts);
 		}
+		eventPublisher.publishEvent(MenuCacheEvictionEvent.productPriceUpdated(productId));
 		return saved;
 	}
 

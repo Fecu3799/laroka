@@ -5,7 +5,7 @@ import { getShiftHistory } from '../services/shiftsService'
 import { downloadShiftSummary } from '../services/ticketService'
 import { useHistory } from '../context/HistoryContext'
 import { formatShiftDate, formatShiftClock, formatCurrency } from '../utils/shiftsUtils'
-import ShiftDetailModal from './ShiftDetailModal'
+import ShiftDetailDrawer from './ShiftDetailDrawer'
 import './History.css'
 
 const PAGE_SIZE = 6
@@ -100,8 +100,9 @@ export default function History() {
                 {shifts.map(shift => (
                   <tr
                     key={shift.shiftId}
-                    className="history-row"
+                    className={`history-row${selected?.shiftId === shift.shiftId ? ' is-selected' : ''}`}
                     onClick={() => setSelected(shift)}
+                    aria-selected={selected?.shiftId === shift.shiftId}
                   >
                     <td>{formatShiftDate(shift.openedAt)}</td>
                     <td className="history-mono">{formatShiftClock(shift.openedAt)}</td>
@@ -150,9 +151,13 @@ export default function History() {
         </>
       )}
 
-      {selected && (
-        <ShiftDetailModal shift={selected} onClose={() => setSelected(null)} />
-      )}
+      {/* Montado siempre: al pasar de un turno a otro con el panel abierto sólo
+          cambia `shift`, así el drawer no se desmonta ni repite la animación. */}
+      <ShiftDetailDrawer
+        shift={selected}
+        open={selected != null}
+        onClose={() => setSelected(null)}
+      />
     </div>
   )
 }

@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -13,6 +14,7 @@ import com.laroka.backend.catalog.entity.CategoryType;
 import com.laroka.backend.catalog.entity.Product;
 import com.laroka.backend.catalog.exception.CategoryNotFoundException;
 import com.laroka.backend.catalog.exception.CategoryTypeNotFoundException;
+import com.laroka.backend.catalog.event.MenuCacheEvictionEvent;
 import com.laroka.backend.catalog.repository.BranchProductRepository;
 import com.laroka.backend.catalog.repository.CategoryRepository;
 import com.laroka.backend.catalog.repository.CategoryTypeRepository;
@@ -33,6 +35,7 @@ public class CategoryService {
 	private final BranchProductRepository branchProductRepository;
 	private final TenantRepository tenantRepository;
 	private final CategoryTypeRepository categoryTypeRepository;
+	private final ApplicationEventPublisher eventPublisher;
 
 	public Category findById(Integer id) {
 		return repository.findById(id)
@@ -62,6 +65,20 @@ public class CategoryService {
 		return repository.save(category);
 	}
 
+	// name y categoryType viajan al menú cacheado: MenuMapper expone categoryName y deriva
+	// allowsHalfAndHalf/allowsSizes del tipo. Sin evict, renombrar una categoría o cambiarle
+	// el tipo no se refleja hasta que expire el TTL — y un cambio de allowsSizes decide si el
+	// client muestra o no el selector de tamaños. El evict es total porque la categoría
+	// aparece en el menú de todas las sucursales del tenant.
+	//
+	// @CacheEvict directo (sin evento) alcanza: este método hace una sola escritura, así que
+	// la transacción propia de save() ya lo hace atómico y no hace falta @Transactional. Sin
+	// @Transactional no hay orden indeterminado entre advisors: la evicción corre después de
+	// que save() commiteó. Mismo criterio que ProductService.update.
+	//
+	// create() NO evicta a propósito: una categoría recién creada no tiene productos, y
+	// MenuMapper arma el menú agrupando branch_product, así que no puede aparecer en él.
+	@CacheEvict(value = "menu", allEntries = true)
 	public Category update(Integer id, Category updates) {
 		Category category = findById(id);
 		Tenant tenant = validateTenantExists(updates.getTenant().getId());
@@ -75,8 +92,12 @@ public class CategoryService {
 	// entradas branch_product (FK), todo en la misma transacción. El frontend confirma la
 	// acción mostrando la cantidad de productos afectados. Invalida el caché del menú de
 	// todas las sucursales porque esos productos dejan de existir.
+	//
+	// La evicción NO va con @CacheEvict: el orden entre el advisor de transacción y el de
+	// cache no está garantizado, y evictar antes del commit abre una ventana donde un request
+	// concurrente repuebla "menu" con productos todavía vivos. Se publica el evento y
+	// MenuCacheEvictionListener evicta en AFTER_COMMIT (mismo patrón que ProductService.delete).
 	@Transactional
-	@CacheEvict(value = "menu", allEntries = true)
 	public void delete(Integer id) {
 		Category category = findById(id);
 		List<Product> products = productRepository.findByCategoryId(id);
@@ -85,6 +106,7 @@ public class CategoryService {
 		}
 		productRepository.deleteAll(products);
 		repository.delete(category);
+		eventPublisher.publishEvent(MenuCacheEvictionEvent.categoryDeleted(id));
 	}
 
 	private Tenant validateTenantExists(Integer tenantId) {
