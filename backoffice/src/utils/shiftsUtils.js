@@ -71,6 +71,20 @@ export function formatShiftDate(value) {
 }
 
 /**
+ * Timestamp compacto de apertura para identificar un turno: DDMMYY-HH:mm
+ * (formato LATAM, 24h). Ej: "160726-20:55". Reemplaza al sufijo del UUID como
+ * etiqueta legible del turno.
+ */
+export function formatShiftStamp(value) {
+  if (!value) return '—'
+  const d = new Date(value)
+  const p = n => String(n).padStart(2, '0')
+  const date = `${p(d.getDate())}${p(d.getMonth() + 1)}${p(d.getFullYear() % 100)}`
+  const time = `${p(d.getHours())}:${p(d.getMinutes())}`
+  return `${date}-${time}`
+}
+
+/**
  * Iniciales para el avatar del encargado (máx. 2 letras).
  */
 export function getInitials(name) {
