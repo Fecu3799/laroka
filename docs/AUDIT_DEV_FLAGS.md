@@ -24,7 +24,7 @@ Rama: `features/quick-fixes`
 | # | Propiedad | Archivo:Línea | Dev | Prod | Qué controla |
 |---|-----------|--------------|-----|------|-------------|
 | B-02 | `swagger.enabled` | `application.yml:56` | `false` | `false` | Activa/desactiva endpoints de Swagger/OpenAPI |
-| B-03 | `r2.bucket-name` | `application.yml:51` | `"laroka-dev"` | bucket prod | Nombre del bucket Cloudflare R2 |
+| B-03 | `r2.bucket-name` | `application.yml:51` | `"pedisur-dev"` | bucket prod | Nombre del bucket Cloudflare R2 |
 | B-04 | `cors.allowed-origins` | `application.yml:38` | `localhost:5173, localhost:5174, 192.168.1.114:5173` | dominios prod | Orígenes CORS permitidos |
 | B-05 | `jwt.expiration` | `application.yml:35` | `28800000` (8 h) | configurable vía env | Expiración del JWT en milisegundos |
 | B-06 | `order.expiration-minutes` | `application.yml:45` | `30` | configurable | Tiempo de expiración de pedidos sin pago |
@@ -35,7 +35,7 @@ Rama: `features/quick-fixes`
 
 | # | Propiedad | Archivo:Línea | Valor | Qué controla |
 |---|-----------|--------------|-------|-------------|
-| B-09 | `spring.datasource.url` | `application-local.yml:3` | `jdbc:postgresql://localhost:5432/laroka` | Conexión DB local |
+| B-09 | `spring.datasource.url` | `application-local.yml:3` | `jdbc:postgresql://localhost:5432/pedisur` | Conexión DB local |
 | B-10 | `spring.datasource.username` | `application-local.yml:4` | `"postgres"` | Usuario DB local |
 | B-11 | `spring.datasource.password` | `application-local.yml:5` | `"postgres"` | Password DB local (hardcodeado) |
 | B-12 | `jwt.secret` | `application-local.yml:21` | clave de prueba hardcodeada | Secreto para firmar JWTs en local |
@@ -162,7 +162,7 @@ Logs de debug de MercadoPago presentes en producción (no condicionados a DEV):
 
 | # | Variable | Archivo | Valor | Riesgo |
 |---|----------|---------|-------|--------|
-| I-01 | `DB_URL` | `.env` | `jdbc:postgresql://localhost:5432/laroka` | — |
+| I-01 | `DB_URL` | `.env` | `jdbc:postgresql://localhost:5432/pedisur` | — |
 | I-02 | `DB_USER` | `.env` | `postgres` | — |
 | I-03 | `DB_PASS` | `.env` | `postgres` | Credencial hardcodeada |
 | I-04 | `R2_ACCESS_KEY` | `.env` | clave real de R2 | **CRÍTICO: secreto real en repo** |
@@ -177,14 +177,14 @@ Logs de debug de MercadoPago presentes en producción (no condicionados a DEV):
 |---|----------|--------------|-------|-------------|
 | I-09 | `POSTGRES_USER` | `docker-compose.yml:8` | `postgres` | Usuario DB en Docker local |
 | I-10 | `POSTGRES_PASSWORD` | `docker-compose.yml:9` | `postgres` | Password DB en Docker local |
-| I-11 | `POSTGRES_DB` | `docker-compose.yml:10` | `laroka` | Nombre de la DB en Docker local |
+| I-11 | `POSTGRES_DB` | `docker-compose.yml:10` | `pedisur` | Nombre de la DB en Docker local |
 
 ### 5.3 `backend/Dockerfile`
 
 | # | Flag JVM | Archivo:Línea | Qué controla |
 |---|----------|--------------|-------------|
 | I-12 | `-javaagent:/app/newrelic/newrelic.jar` | `Dockerfile:27` | Agente APM de New Relic inyectado en imagen de producción |
-| I-13 | `-Dnewrelic.config.app_name=laroka-backend` | `Dockerfile:28` | Nombre de la app en New Relic |
+| I-13 | `-Dnewrelic.config.app_name=pedisur-backend` | `Dockerfile:28` | Nombre de la app en New Relic |
 | I-14 | `-Dnewrelic.config.log_file_name=STDOUT` | `Dockerfile:29` | Logs de New Relic a stdout |
 
 ### 5.4 `client/vite.config.js`
@@ -271,7 +271,7 @@ APP_DEV_SWAGGER_ENABLED=true
 APP_DEV_LOG_LEVEL=DEBUG
 
 # Infraestructura (nunca hardcodear)
-DB_URL=jdbc:postgresql://localhost:5432/laroka
+DB_URL=jdbc:postgresql://localhost:5432/pedisur
 DB_USER=postgres
 DB_PASS=postgres
 JWT_SECRET=<generar con openssl rand -base64 48>
@@ -279,7 +279,7 @@ JWT_EXPIRATION=28800000
 CORS_ALLOWED_ORIGINS=http://localhost:5173,http://localhost:5174
 
 # Cloudflare R2
-R2_BUCKET_NAME=laroka-dev
+R2_BUCKET_NAME=pedisur-dev
 R2_ENDPOINT=
 R2_ACCESS_KEY=
 R2_SECRET_KEY=

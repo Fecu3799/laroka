@@ -1,4 +1,4 @@
-# LaRoka — Contexto del Proyecto
+# PediSur — Contexto del Proyecto
 
 ## Descripción
 
@@ -20,7 +20,7 @@ Monolito modular con proyección a plataforma multi-tenant (multi-pizzería).
 
 ## Estructura del repo
 
-laroka/
+pedisur/
 ├── backend/
 ├── client/
 ├── backoffice/

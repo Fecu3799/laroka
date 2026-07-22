@@ -29,7 +29,7 @@ public class VapidConfig {
     @Value("${vapid.private-key:}")
     private String privateKey;
 
-    @Value("${vapid.subject:mailto:soporte@laroka.app}")
+    @Value("${vapid.subject:mailto:soporte@pedisur.app}")
     private String subject;
 
     public boolean isConfigured() {

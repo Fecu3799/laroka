@@ -1,4 +1,4 @@
-# LaRoka — Sistema de Gestión de Pedidos
+# PediSur — Sistema de Gestión de Pedidos
 
 Sistema de gestión digital de pedidos para pizzería multi-sucursal, concebido como base evolutiva hacia una plataforma multi-comercio.
 
@@ -6,7 +6,7 @@ Sistema de gestión digital de pedidos para pizzería multi-sucursal, concebido 
 
 ## Descripción
 
-LaRoka digitaliza y centraliza el flujo de pedidos entre clientes y sucursales, cubriendo desde la selección del menú hasta el seguimiento operativo en tiempo real. El sistema está compuesto por una aplicación cliente (PWA mobile-first), un backoffice para el personal del local y un backend centralizado con lógica de negocio.
+PediSur digitaliza y centraliza el flujo de pedidos entre clientes y sucursales, cubriendo desde la selección del menú hasta el seguimiento operativo en tiempo real. El sistema está compuesto por una aplicación cliente (PWA mobile-first), un backoffice para el personal del local y un backend centralizado con lógica de negocio.
 
 ---
 
@@ -61,9 +61,9 @@ variable de entorno `VITE_TENANT_ID`.
 Monolito modular. El backend centraliza toda la lógica de negocio organizado en módulos independientes con separación explícita de capas.
 
 ```
-laroka/
+pedisur/
 ├── backend/                  # Spring Boot — API REST
-│   └── src/main/java/com/laroka/backend/
+│   └── src/main/java/com/pedisur/backend/
 │       ├── auth/             # Autenticación JWT y refresh tokens
 │       ├── branch/           # Sucursales
 │       ├── catalog/          # Productos y categorías
@@ -130,8 +130,8 @@ STAFF/MANAGER lo leen del token; ADMIN lo toma del header `X-Branch-Id`
 ### 1. Clonar el repositorio
 
 ```bash
-git clone https://github.com/tu-usuario/laroka.git
-cd laroka
+git clone https://github.com/tu-usuario/pedisur.git
+cd pedisur
 ```
 
 ### 2. Variables de entorno
@@ -152,7 +152,7 @@ Para el backend, las variables se configuran en
 ```yaml
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/laroka
+    url: jdbc:postgresql://localhost:5432/pedisur
     username: postgres
     password: postgres
   jpa:
@@ -182,14 +182,14 @@ Variables requeridas:
 
 ```env
 # Base de datos
-DB_URL=jdbc:postgresql://localhost:5432/laroka
+DB_URL=jdbc:postgresql://localhost:5432/pedisur
 DB_USER=postgres
 DB_PASS=postgres
 
 # Cloudflare R2
 R2_ACCESS_KEY=
 R2_SECRET_KEY=
-R2_BUCKET_NAME=laroka-dev
+R2_BUCKET_NAME=pedisur-dev
 R2_ENDPOINT=
 
 # MercadoPago

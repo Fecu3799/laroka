@@ -19,7 +19,7 @@ import org.springframework.web.client.RestClient;
 class ResendEmailAdapterTest {
 
     private static final String RESEND_URL = "https://api.resend.com/emails";
-    private static final String TO = "dueno@laroka.app";
+    private static final String TO = "dueno@pedisur.app";
     private static final String SUBJECT = "Reporte de bug";
     private static final String BODY = "Algo se rompió en el checkout";
 
@@ -38,14 +38,14 @@ class ResendEmailAdapterTest {
 
     @Test
     void send_success_postsExpectedPayload() {
-        newAdapter("test-key", "LaRoka <no-reply@laroka.app>");
+        newAdapter("test-key", "PediSur <no-reply@pedisur.app>");
         server.expect(requestTo(RESEND_URL))
                 .andExpect(method(HttpMethod.POST))
                 .andExpect(header("Authorization", "Bearer test-key"))
                 .andExpect(content().json("""
                         {
-                          "from": "LaRoka <no-reply@laroka.app>",
-                          "to": ["dueno@laroka.app"],
+                          "from": "PediSur <no-reply@pedisur.app>",
+                          "to": ["dueno@pedisur.app"],
                           "subject": "Reporte de bug",
                           "text": "Algo se rompió en el checkout"
                         }
@@ -63,7 +63,7 @@ class ResendEmailAdapterTest {
 
     @Test
     void send_providerError_doesNotThrowAndReturnsFalse() {
-        newAdapter("test-key", "no-reply@laroka.app");
+        newAdapter("test-key", "no-reply@pedisur.app");
         server.expect(requestTo(RESEND_URL))
                 .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
 
@@ -78,7 +78,7 @@ class ResendEmailAdapterTest {
 
     @Test
     void send_blankApiKey_isNoOpAndReturnsFalse() {
-        newAdapter("", "no-reply@laroka.app");
+        newAdapter("", "no-reply@pedisur.app");
 
         // Sin expectativas: si se emitiera cualquier request, MockRestServiceServer
         // fallaría con "unexpected request". verify() en verde ⇒ no hubo llamada.

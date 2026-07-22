@@ -119,7 +119,7 @@ cache:
 vapid:
   public-key: ${VAPID_PUBLIC_KEY:}
   private-key: ${VAPID_PRIVATE_KEY:}
-  subject: ${VAPID_SUBJECT:mailto:soporte@laroka.app}
+  subject: ${VAPID_SUBJECT:mailto:soporte@pedisur.app}
 
 swagger:
   enabled: ${APP_DEV_SWAGGER_ENABLED:${APP_DEV_MODE:false}}

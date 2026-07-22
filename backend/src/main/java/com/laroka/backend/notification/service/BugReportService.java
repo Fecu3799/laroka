@@ -63,7 +63,7 @@ public class BugReportService {
                 .orElseThrow(() -> new EntityNotFoundException("Sucursal no encontrada: " + activeBranchId));
 
         String role = reporter.getRole().name();
-        String subject = "[LaRoka] Reporte de bug — " + reporter.getName() + " (" + role + ")";
+        String subject = "[PediSur] Reporte de bug — " + reporter.getName() + " (" + role + ")";
         String body = buildBody(reporter.getName(), role, branch.getName(), description, url, userAgent, screenshotUrl);
 
         boolean sent = emailService.send(bugReportEmail, subject, body);
@@ -84,7 +84,7 @@ public class BugReportService {
                 : "";
 
         return """
-                Nuevo reporte de bug — LaRoka Backoffice
+                Nuevo reporte de bug — PediSur Backoffice
 
                 Reportado por: %s (%s)
                 Sucursal: %s

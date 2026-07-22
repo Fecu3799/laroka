@@ -26,7 +26,7 @@ import com.laroka.backend.staffuser.repository.StaffUserRepository;
 @ExtendWith(MockitoExtension.class)
 class BugReportServiceTest {
 
-    private static final String BUG_REPORT_EMAIL = "dueno@laroka.app";
+    private static final String BUG_REPORT_EMAIL = "dueno@pedisur.app";
     private static final Integer USER_ID = 7;
     private static final Integer BRANCH_ID = 3;
 
@@ -62,7 +62,7 @@ class BugReportServiceTest {
                 org.mockito.ArgumentMatchers.anyString())).thenReturn(true);
 
         service.report(USER_ID, BRANCH_ID, "El botón de pago no responde",
-                "https://backoffice.laroka.app/orders", "Mozilla/5.0 (Macintosh)", null);
+                "https://backoffice.pedisur.app/orders", "Mozilla/5.0 (Macintosh)", null);
 
         ArgumentCaptor<String> subject = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<String> body = ArgumentCaptor.forClass(String.class);
@@ -76,7 +76,7 @@ class BugReportServiceTest {
                 .contains("STAFF")
                 .contains("Puerto Madryn")
                 .contains("El botón de pago no responde")
-                .contains("https://backoffice.laroka.app/orders")
+                .contains("https://backoffice.pedisur.app/orders")
                 .contains("Mozilla/5.0 (Macintosh)");
         // Sin captura: no aparece la línea de screenshot.
         assertThat(body.getValue()).doesNotContain("Captura de pantalla");
