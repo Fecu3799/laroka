@@ -44,6 +44,83 @@ export function canCancel(status) {
   return status === 'PENDING_PAYMENT' || status === 'RECEIVED'
 }
 
+/** Métodos de pago que cobran vía MercadoPago: el importe ya viajó al gateway. */
+const GATEWAY_PAYMENT_METHODS = ['MERCADOPAGO', 'QR_CODE']
+/** Estados de un pago de gateway que bloquean el descuento: cobrado o en vuelo. */
+const DISCOUNT_BLOCKING_PAYMENT_STATUSES = ['APPROVED', 'PENDING']
+
+/**
+ * Ventana del descuento: el pedido activo, después de RECEIVED y antes de
+ * DELIVERED. Espeja ACTIVE_ORDER_STATUSES del backend.
+ */
+const DISCOUNTABLE_STATUSES = [
+  'RECEIVED',
+  'IN_PREPARATION',
+  'ON_THE_WAY',
+  'READY_FOR_PICKUP',
+]
+
+/**
+ * ¿Se le puede aplicar un descuento manual a este pedido? (US-19-02)
+ *
+ * Espeja los guards del backend (`OrderService.applyDiscount`) para no ofrecerle
+ * al operador un botón que va a terminar en 422:
+ *  - solo MANAGER y ADMIN (el backend lo valida con @PreAuthorize; acá es UI)
+ *  - nunca con un pago de gateway aprobado o pendiente
+ *  - solo mientras el pedido está activo: en PENDING_PAYMENT todavía no está
+ *    definido cómo se cobra, y desde DELIVERED el total ya se factura en el
+ *    resumen del turno (un cancelado directamente no tiene nada que cobrar)
+ *
+ * Es una comprobación de conveniencia, no de seguridad: la autorización real es
+ * del backend. Si los guards divergen, el modal muestra el 422 igual.
+ */
+export function canApplyDiscount(order, role) {
+  if (role !== 'MANAGER' && role !== 'ADMIN') return false
+  if (!order || !DISCOUNTABLE_STATUSES.includes(order.status)) return false
+  return !(
+    GATEWAY_PAYMENT_METHODS.includes(order.paymentMethod) &&
+    DISCOUNT_BLOCKING_PAYMENT_STATUSES.includes(order.paymentStatus)
+  )
+}
+
+/**
+ * Motivos del descuento (US-19-02). El backend los persiste como enum en inglés
+ * (`DiscountReason`); acá se mapean a la etiqueta que ve el operador. El `value`
+ * es lo que viaja al endpoint — nunca la etiqueta.
+ */
+export const DISCOUNT_REASON_OPTIONS = [
+  { value: 'CUSTOMER_PROMO', label: 'Promoción al cliente' },
+  { value: 'TRANSFER_ADJUSTMENT', label: 'Ajuste por transferencia' },
+  { value: 'OTHER', label: 'Otro' },
+]
+
+/**
+ * Mensaje de error del descuento según el código de estado (US-19-02). El backend
+ * distingue dos rechazos con causas y remedios distintos, y mezclarlos en un
+ * "error genérico" deja al operador sin saber si corregir el formulario o dejar
+ * de intentar:
+ *  - 400: lo rechazó @Valid por el rango del porcentaje. El body trae
+ *    "Validation failed", inútil para el operador, así que se reemplaza.
+ *  - 422: lo rechazó un guard de negocio (pago de gateway detectado, o pedido con
+ *    el pago pendiente). El mensaje del backend ya es específico y accionable, y
+ *    distingue entre esos dos casos; se muestra tal cual.
+ */
+export function discountErrorMessage(err) {
+  if (err?.status === 400) {
+    return 'El porcentaje debe ser un número entre 0 y 100.'
+  }
+  if (err?.status === 422) {
+    return (
+      err.message ??
+      'No se puede aplicar un descuento a este pedido: el cobro ya está tomado por MercadoPago o QR.'
+    )
+  }
+  if (err?.message === 'network_error') {
+    return 'Sin conexión. Verificá tu internet e intentá de nuevo.'
+  }
+  return 'No se pudo aplicar el descuento. Intentá de nuevo.'
+}
+
 export function canConfirmOrder({ cartItems, orderType, deliveryAddress }) {
   return cartItems.length > 0 &&
     (orderType !== 'DELIVERY' || (deliveryAddress ?? '').trim().length > 0)

@@ -17,10 +17,12 @@ import {
   getNextStatus,
   canGoBack as goBackAllowed,
   canCancel as cancelAllowed,
+  canApplyDiscount,
   formatOrderNumber,
   orderItemDisplayName,
 } from "../utils/ordersUtils";
 import NewOrderModal from "../components/NewOrderModal";
+import DiscountModal from "../components/DiscountModal";
 import OperatorStatusBar from "../components/OperatorStatusBar";
 import useOperatorMessages from "../hooks/useOperatorMessages";
 import "./Orders.css";
@@ -1155,6 +1157,7 @@ function OrderDetail({
   const [cancelConfirming, setCancelConfirming] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [retryingRefund, setRetryingRefund] = useState(false);
+  const [discountOpen, setDiscountOpen] = useState(false);
 
   const canGoBack = goBackAllowed(order.status);
   const canCancel = cancelAllowed(order.status);
@@ -1662,6 +1665,19 @@ function OrderDetail({
               {formatPrice(order.totalAmount)}
             </span>
           </div>
+
+          {/* US-19-02: descuento manual. Solo MANAGER/ADMIN y solo si el pedido
+              no está tomado por un pago de gateway — canApplyDiscount espeja los
+              guards del backend. */}
+          {canApplyDiscount(order, role) && (
+            <button
+              className="detail-action-btn detail-action-discount"
+              type="button"
+              onClick={() => setDiscountOpen(true)}
+            >
+              Aplicar descuento
+            </button>
+          )}
         </div>
 
         {/* Notas */}
@@ -1680,6 +1696,20 @@ function OrderDetail({
             </div>
           )}
 
+        {discountOpen && (
+          <DiscountModal
+            order={order}
+            token={token}
+            branchId={branchId}
+            onClose={() => setDiscountOpen(false)}
+            onApplied={() => {
+              // Refresca detalle y lista: el total del pedido cambió. El backend
+              // además emite order-updated por SSE para el resto de las sesiones.
+              onRefetch();
+              onRefresh();
+            }}
+          />
+        )}
       </div>
     </div>
   );

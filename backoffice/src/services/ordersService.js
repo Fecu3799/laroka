@@ -52,3 +52,20 @@ export async function retryRefund(orderId, token, branchId) {
     headers: backofficeHeaders(token, branchId),
   })
 }
+
+// US-19-01 / US-19-02: descuento porcentual manual (MANAGER/ADMIN, el backend
+// valida el rol). Devuelve 204; el descuento aplicado llega por el refetch del
+// detalle. `silentErrors` porque el modal muestra su propio mensaje por código
+// de estado — 400 (rango de porcentaje) y 422 (guard de pago de gateway) tienen
+// causas distintas y el toast genérico las mezclaría.
+export async function applyDiscount(orderId, { percentage, reason, note }, token, branchId) {
+  await apiFetch(
+    `${API_URL}/backoffice/orders/${orderId}/discount`,
+    {
+      method: 'POST',
+      headers: backofficeHeaders(token, branchId, { 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ percentage, reason, note: note?.trim() ? note.trim() : null }),
+    },
+    { silentErrors: true },
+  )
+}

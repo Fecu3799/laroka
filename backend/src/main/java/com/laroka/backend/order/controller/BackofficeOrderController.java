@@ -227,8 +227,10 @@ public class BackofficeOrderController {
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     @Operation(summary = "Apply a manual percentage discount (ADMIN/MANAGER only)",
             description = "Applies a percentage discount over the order subtotal and overwrites totalAmount. " +
-                    "Only for orders charged outside the gateway: returns 422 if the order still has the payment " +
-                    "pending (PENDING_PAYMENT) or has a MERCADOPAGO/QR_CODE payment in PENDING or APPROVED. " +
+                    "Only while the order is active (RECEIVED, IN_PREPARATION, ON_THE_WAY, READY_FOR_PICKUP) and " +
+                    "charged outside the gateway: returns 422 outside that window — the payment is still pending, " +
+                    "the order was already delivered (its total is billed in the shift summary) or cancelled — " +
+                    "and 422 if it has a MERCADOPAGO/QR_CODE payment in PENDING or APPROVED. " +
                     "Every application is recorded as a new order_discount row (append-only audit trail). " +
                     "Returns 403 if wrong branch or not ADMIN/MANAGER.")
     public ResponseEntity<Void> applyDiscount(

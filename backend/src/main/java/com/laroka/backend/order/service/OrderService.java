@@ -488,14 +488,25 @@ public class OrderService {
             throw new BusinessException("El porcentaje de descuento debe estar entre 0 y 100");
         }
 
-        // Un pedido en PENDING_PAYMENT todavía no definió cómo se cobra: puede acabar
-        // en MercadoPago o QR. Descontarlo acá también desincronizaría el importe con
-        // la preference ya creada en el gateway. Además, este guard es el que cubre el
-        // caso "todavía no hay fila de Payment que lockear": tanto initiatePayment como
-        // chargeQr exigen PENDING_PAYMENT, así que ningún pago de gateway puede nacer
-        // sobre un pedido que superó este chequeo.
-        if (order.getStatus() == OrderStatus.PENDING_PAYMENT) {
-            throw new BusinessException("No se puede descontar un pedido con el pago pendiente");
+        // La ventana del descuento es el pedido activo: después de RECEIVED y antes de
+        // DELIVERED. Los tres bordes se cierran por razones distintas:
+        //  - PENDING_PAYMENT: todavía no está definido cómo se cobra (puede acabar en
+        //    MercadoPago o QR) y descontarlo desincronizaría el importe con la
+        //    preference ya creada. Este borde es además el que cubre el caso "todavía
+        //    no hay fila de Payment que lockear": tanto initiatePayment como chargeQr
+        //    exigen PENDING_PAYMENT, así que ningún pago de gateway puede nacer sobre
+        //    un pedido que superó este chequeo.
+        //  - DELIVERED: WorkShiftService.calculateSummary factura los pedidos
+        //    entregados sumando su totalAmount. Descontar después dejaría el pedido
+        //    descalzado de un resumen ya emitido (o del que se emita al cerrar).
+        //  - CANCELLED: no hay nada que cobrar.
+        //  - CANCELLATION_REQUESTED: queda fuera por la misma definición de "activo"
+        //    que usa el resto del módulo; ajustar el precio de un pedido cuya
+        //    cancelación está sin resolver mezcla dos decisiones distintas.
+        if (!ACTIVE_ORDER_STATUSES.contains(order.getStatus())) {
+            log.warn("Discount rejected — order outside the discount window | orderId={} status={}",
+                    orderId, order.getStatus());
+            throw new BusinessException(discountWindowClosedMessage(order.getStatus()));
         }
 
         // Lock pesimista (SELECT ... FOR UPDATE) sobre el pago + chequeo del método y
@@ -540,6 +551,21 @@ public class OrderService {
 
         log.info("Discount applied | orderId={} percentage={} originalTotal={} discount={} finalTotal={} reason={} staffUserId={}",
                 orderId, percentage, originalTotal, discountAmount, finalTotal, reason, staffUserId);
+    }
+
+    /**
+     * Motivo por el que el pedido quedó fuera de la ventana del descuento. El
+     * backoffice muestra este texto tal cual en el modal (US-19-02), así que cada
+     * estado explica su propia razón en vez de un rechazo genérico.
+     */
+    private static String discountWindowClosedMessage(OrderStatus status) {
+        return switch (status) {
+            case PENDING_PAYMENT -> "No se puede descontar un pedido con el pago pendiente";
+            case DELIVERED -> "No se puede descontar un pedido ya entregado: su total ya se factura en el resumen del turno";
+            case CANCELLED -> "No se puede descontar un pedido cancelado: no hay nada que cobrar";
+            case CANCELLATION_REQUESTED -> "No se puede descontar un pedido con una cancelación pendiente de resolver";
+            default -> "El pedido no admite descuentos en su estado actual";
+        };
     }
 
     /**

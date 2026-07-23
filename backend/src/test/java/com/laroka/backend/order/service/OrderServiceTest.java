@@ -2471,6 +2471,80 @@ class OrderServiceTest {
         verify(orderDiscountRepository, never()).save(any());
     }
 
+    /**
+     * La ventana del descuento se cierra al entregar: desde ahí el totalAmount ya se
+     * factura en el resumen del turno (WorkShiftService.calculateSummary suma los
+     * DELIVERED), y un cancelado no tiene nada que cobrar.
+     */
+    @Test
+    void applyDiscount_orderDelivered_throwsBusinessException() {
+        UUID orderId = UUID.randomUUID();
+        Order order = discountableOrder(new BigDecimal("1000.00"));
+        order.setStatus(OrderStatus.DELIVERED);
+
+        when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
+
+        assertThatThrownBy(() -> service.applyDiscount(orderId, 1, new BigDecimal("10"),
+                DiscountReason.CUSTOMER_PROMO, null, 7))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("ya entregado");
+
+        verify(paymentRepository, never()).findByOrderIdForUpdate(any());
+        verify(orderDiscountRepository, never()).save(any());
+        assertThat(order.getTotalAmount()).isEqualByComparingTo("1700.00");
+    }
+
+    @Test
+    void applyDiscount_orderCancelled_throwsBusinessException() {
+        UUID orderId = UUID.randomUUID();
+        Order order = discountableOrder(new BigDecimal("1000.00"));
+        order.setStatus(OrderStatus.CANCELLED);
+
+        when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
+
+        assertThatThrownBy(() -> service.applyDiscount(orderId, 1, new BigDecimal("10"),
+                DiscountReason.CUSTOMER_PROMO, null, 7))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("cancelado");
+
+        verify(orderDiscountRepository, never()).save(any());
+    }
+
+    @Test
+    void applyDiscount_orderWithPendingCancellationRequest_throwsBusinessException() {
+        UUID orderId = UUID.randomUUID();
+        Order order = discountableOrder(new BigDecimal("1000.00"));
+        order.setStatus(OrderStatus.CANCELLATION_REQUESTED);
+
+        when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
+
+        assertThatThrownBy(() -> service.applyDiscount(orderId, 1, new BigDecimal("10"),
+                DiscountReason.CUSTOMER_PROMO, null, 7))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("cancelación pendiente");
+
+        verify(orderDiscountRepository, never()).save(any());
+    }
+
+    /** Toda la ventana activa admite descuento, no solo RECEIVED. */
+    @Test
+    void applyDiscount_allActiveStatuses_areAllowed() {
+        for (OrderStatus status : List.of(OrderStatus.RECEIVED, OrderStatus.IN_PREPARATION,
+                OrderStatus.ON_THE_WAY, OrderStatus.READY_FOR_PICKUP)) {
+            UUID orderId = UUID.randomUUID();
+            Order order = discountableOrder(new BigDecimal("1000.00"));
+            order.setStatus(status);
+
+            when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
+            when(paymentRepository.findByOrderIdForUpdate(orderId)).thenReturn(Optional.empty());
+
+            service.applyDiscount(orderId, 1, new BigDecimal("10"),
+                    DiscountReason.CUSTOMER_PROMO, null, 7);
+
+            assertThat(order.getTotalAmount()).isEqualByComparingTo("1600.00");
+        }
+    }
+
     @Test
     void applyDiscount_percentageOutOfRange_throwsBusinessException() {
         UUID orderId = UUID.randomUUID();

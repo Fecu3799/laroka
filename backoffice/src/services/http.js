@@ -23,12 +23,22 @@ async function tryRefresh() {
   }
 }
 
-export async function apiFetch(url, options = {}) {
+/**
+ * `silentErrors` suprime los toasts automáticos y deja el error entero en manos
+ * del caller. Es para pantallas que muestran el error inline y necesitan un
+ * mensaje propio por código de estado: el toast genérico las contradiría (un 400
+ * de @Valid llega con message "Validation failed", que no le dice nada al
+ * operador). El error se sigue lanzando con `.status`, así que el caller decide
+ * qué texto mostrar. El refresh de token en 401 y la redirección al login no se
+ * ven afectados.
+ */
+export async function apiFetch(url, options = {}, { silentErrors = false } = {}) {
+  const toast = silentErrors ? () => {} : dispatchToast
   let res
   try {
     res = await fetch(url, options)
   } catch {
-    dispatchToast('Sin conexión. Verificá tu internet.')
+    toast('Sin conexión. Verificá tu internet.')
     throw new Error('network_error')
   }
 
@@ -44,7 +54,7 @@ export async function apiFetch(url, options = {}) {
         })
         if (res.ok) return res
       } catch {
-        dispatchToast('Sin conexión. Verificá tu internet.')
+        toast('Sin conexión. Verificá tu internet.')
         throw new Error('network_error')
       }
     }
@@ -61,9 +71,9 @@ export async function apiFetch(url, options = {}) {
   } catch { /* ignore */ }
 
   if (res.status >= 500) {
-    dispatchToast('Ocurrió un error. Intentá de nuevo.')
+    toast('Ocurrió un error. Intentá de nuevo.')
   } else {
-    dispatchToast(message ?? 'Error al procesar la solicitud.')
+    toast(message ?? 'Error al procesar la solicitud.')
   }
 
   const err = new Error(message ?? `HTTP ${res.status}`)

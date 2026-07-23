@@ -981,6 +981,24 @@
   cursor: not-allowed;
 }
 
+/* Descuento manual (US-19-02). Vive dentro del bloque de productos, debajo del
+   Total, porque es la acción que modifica ese número. Discreto y en acento: es
+   una acción deliberada del encargado, no la principal de la pantalla. */
+.detail-action-discount {
+  margin: 10px 14px 14px;
+  width: calc(100% - 28px);
+  padding: 9px 12px;
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  color: var(--accent);
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.detail-action-discount:hover {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
 /* ── Productos block ─────────────────────────────────────────── */
 
 .detail-products-block {
