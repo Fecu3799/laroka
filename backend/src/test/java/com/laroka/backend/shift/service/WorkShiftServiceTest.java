@@ -57,6 +57,7 @@ class WorkShiftServiceTest {
     @Mock private WorkShiftRepository workShiftRepository;
     @Mock private WorkShiftSummaryRepository workShiftSummaryRepository;
     @Mock private OrderRepository orderRepository;
+    @Mock private com.laroka.backend.order.repository.OrderDiscountRepository orderDiscountRepository;
     @Mock private OrderItemRepository orderItemRepository;
     @Mock private PaymentRepository paymentRepository;
     @Mock private StaffUserRepository staffUserRepository;

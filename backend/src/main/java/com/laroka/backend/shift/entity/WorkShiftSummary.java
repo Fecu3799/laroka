@@ -68,6 +68,25 @@ public class WorkShiftSummary {
     @Column(name = "cancellation_rate", nullable = false, precision = 5, scale = 2)
     private BigDecimal cancellationRate;
 
+    // Descuentos del turno (US-20-02): agregados sobre los pedidos DELIVERED cuyo
+    // descuento vigente es APPLIED. total_discount = suma de lo descontado;
+    // discounted_orders = cuántos pedidos lo tuvieron; el resto es el desglose por
+    // motivo. Persistidos con el summary para que el histórico los conserve.
+    @Column(name = "total_discount", nullable = false, precision = 10, scale = 2)
+    private BigDecimal totalDiscount;
+
+    @Column(name = "discounted_orders", nullable = false)
+    private Integer discountedOrders;
+
+    @Column(name = "discount_customer_promo", nullable = false, precision = 10, scale = 2)
+    private BigDecimal discountCustomerPromo;
+
+    @Column(name = "discount_transfer_adjustment", nullable = false, precision = 10, scale = 2)
+    private BigDecimal discountTransferAdjustment;
+
+    @Column(name = "discount_other", nullable = false, precision = 10, scale = 2)
+    private BigDecimal discountOther;
+
     @Column(name = "calculated_at", nullable = false)
     private OffsetDateTime calculatedAt;
 

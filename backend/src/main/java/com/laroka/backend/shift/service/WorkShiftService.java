@@ -3,7 +3,9 @@ package com.laroka.backend.shift.service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.OffsetDateTime;
+import java.util.Comparator;
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -21,15 +23,19 @@ import com.laroka.backend.branch.entity.Branch;
 import com.laroka.backend.branch.exception.BranchNotFoundException;
 import com.laroka.backend.branch.repository.BranchRepository;
 import com.laroka.backend.shared.exception.BusinessException;
+import com.laroka.backend.order.entity.DiscountReason;
 import com.laroka.backend.order.entity.Order;
+import com.laroka.backend.order.entity.OrderDiscount;
 import com.laroka.backend.order.entity.OrderStatus;
 import com.laroka.backend.order.entity.OrderType;
 import com.laroka.backend.order.entity.PaymentMethod;
+import com.laroka.backend.order.repository.OrderDiscountRepository;
 import com.laroka.backend.order.repository.OrderItemRepository;
 import com.laroka.backend.order.repository.OrderRepository;
 import com.laroka.backend.order.service.OrderService;
 import com.laroka.backend.payment.entity.Payment;
 import com.laroka.backend.payment.repository.PaymentRepository;
+import com.laroka.backend.shift.dto.ShiftOrderDetailDTO;
 import com.laroka.backend.shift.dto.TopProductDTO;
 import com.laroka.backend.shift.entity.ShiftStatus;
 import com.laroka.backend.shift.entity.WorkShift;
@@ -49,6 +55,7 @@ public class WorkShiftService {
     private final WorkShiftRepository workShiftRepository;
     private final WorkShiftSummaryRepository workShiftSummaryRepository;
     private final OrderRepository orderRepository;
+    private final OrderDiscountRepository orderDiscountRepository;
     private final OrderItemRepository orderItemRepository;
     private final PaymentRepository paymentRepository;
     private final StaffUserRepository staffUserRepository;
@@ -177,13 +184,14 @@ public class WorkShiftService {
             .filter(o -> o.getStatus() == OrderStatus.DELIVERED)
             .toList();
 
+        List<UUID> deliveredIds = delivered.stream().map(Order::getId).toList();
+
         BigDecimal totalRevenue = delivered.stream()
             .map(Order::getTotalAmount)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         Map<PaymentMethod, BigDecimal> revenueByMethod = new EnumMap<>(PaymentMethod.class);
         if (!delivered.isEmpty()) {
-            List<UUID> deliveredIds = delivered.stream().map(Order::getId).toList();
             List<Payment> payments = paymentRepository.findByOrderIdIn(deliveredIds);
             Map<UUID, PaymentMethod> methodByOrderId = payments.stream()
                 .collect(java.util.stream.Collectors.toMap(
@@ -215,6 +223,8 @@ public class WorkShiftService {
                 .multiply(BigDecimal.valueOf(100))
                 .divide(BigDecimal.valueOf(totalCount), 2, RoundingMode.HALF_UP);
 
+        DiscountAggregate disc = computeDiscountAggregates(deliveredIds);
+
         return WorkShiftSummary.builder()
             .shift(shift)
             .totalOrders(totalCount)
@@ -228,7 +238,58 @@ public class WorkShiftService {
             .deliveryOrders(deliveryOrders)
             .takeawayOrders(takeawayOrders)
             .cancellationRate(cancellationRate)
+            .totalDiscount(disc.total())
+            .discountedOrders(disc.orders())
+            .discountCustomerPromo(disc.customerPromo())
+            .discountTransferAdjustment(disc.transferAdjustment())
+            .discountOther(disc.other())
             .build();
+    }
+
+    /** Agregados de descuento del turno (US-20-02), listos para el summary. */
+    private record DiscountAggregate(BigDecimal total, int orders, BigDecimal customerPromo,
+                                     BigDecimal transferAdjustment, BigDecimal other) {
+        static DiscountAggregate empty() {
+            return new DiscountAggregate(BigDecimal.ZERO, 0,
+                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
+        }
+    }
+
+    /**
+     * Suma los descuentos vigentes de los pedidos DELIVERED del turno (US-20-02). El
+     * descuento vigente de un pedido es su fila de order_discount más reciente; sólo
+     * cuenta si es APPLIED. Una reversión (REVERTED, US-19-06) no aporta descuento: el
+     * pedido se facturó a su total completo, así que sumar su discount_amount
+     * descuadraría contra total_revenue. Devuelve el total, la cantidad de pedidos con
+     * descuento y el desglose por motivo.
+     */
+    private DiscountAggregate computeDiscountAggregates(List<UUID> deliveredIds) {
+        if (deliveredIds.isEmpty()) {
+            return DiscountAggregate.empty();
+        }
+        // Filas ordenadas por applied_at DESC: la primera de cada pedido es la vigente.
+        List<OrderDiscount> rows = orderDiscountRepository.findByOrderIdInOrderByAppliedAtDesc(deliveredIds);
+        Map<UUID, OrderDiscount> currentByOrder = new HashMap<>();
+        for (OrderDiscount d : rows) {
+            currentByOrder.putIfAbsent(d.getOrder().getId(), d);
+        }
+
+        BigDecimal total = BigDecimal.ZERO;
+        int count = 0;
+        Map<DiscountReason, BigDecimal> byReason = new EnumMap<>(DiscountReason.class);
+        for (OrderDiscount d : currentByOrder.values()) {
+            if (!d.isApplied()) {
+                continue;
+            }
+            total = total.add(d.getDiscountAmount());
+            count++;
+            byReason.merge(d.getReason(), d.getDiscountAmount(), BigDecimal::add);
+        }
+
+        return new DiscountAggregate(total, count,
+            byReason.getOrDefault(DiscountReason.CUSTOMER_PROMO, BigDecimal.ZERO),
+            byReason.getOrDefault(DiscountReason.TRANSFER_ADJUSTMENT, BigDecimal.ZERO),
+            byReason.getOrDefault(DiscountReason.OTHER, BigDecimal.ZERO));
     }
 
     public WorkShiftSummary getCurrentShiftSummary(Integer branchId) {
@@ -289,6 +350,64 @@ public class WorkShiftService {
 
         return rows.stream()
             .map(r -> new TopProductDTO((Integer) r[0], (String) r[1], (Long) r[2]))
+            .toList();
+    }
+
+    /**
+     * Detalle completo de los pedidos del turno para el PDF de cierre (US-20-03): una
+     * fila por pedido terminal (DELIVERED o CANCELLED), ordenada por hora, con origen,
+     * método de pago, total, estado y el descuento vigente (con motivo) si lo tiene.
+     *
+     * Se resuelve on-demand contra Order, NO se persiste — a diferencia de los agregados
+     * de US-20-02, que sí van en el summary inmutable. La razón: los pedidos de un turno
+     * cerrado son terminales (RN-13, no reversibles) y su set es fijo (los pedidos se
+     * crean sólo con el turno abierto), así que reconstruir el detalle da siempre el
+     * mismo resultado — la inmutabilidad de RN-TU-02 ya la garantizan los propios
+     * pedidos. Persistir una copia sería duplicar datos inmutables (una tabla o blob por
+     * pedido) sin ganar correctitud, y bloatearía la respuesta polleada de /current.
+     * Es el mismo criterio on-demand de getTopProducts.
+     */
+    public List<ShiftOrderDetailDTO> getShiftOrderDetails(UUID shiftId, Integer branchId) {
+        WorkShift shift = workShiftRepository.findById(shiftId)
+            .orElseThrow(() -> new BusinessException("Turno no encontrado"));
+        if (!shift.getBranch().getId().equals(branchId)) {
+            throw new BusinessException("El turno no pertenece a esta sucursal");
+        }
+
+        List<Order> orders = orderRepository.findByShiftIdAndStatusIn(
+            shiftId, List.of(OrderStatus.DELIVERED, OrderStatus.CANCELLED));
+        if (orders.isEmpty()) {
+            return List.of();
+        }
+
+        List<UUID> ids = orders.stream().map(Order::getId).toList();
+        Map<UUID, PaymentMethod> methodByOrder = paymentRepository.findByOrderIdIn(ids).stream()
+            .collect(java.util.stream.Collectors.toMap(
+                p -> p.getOrder().getId(), Payment::getMethod, (a, b) -> a));
+
+        // Descuento vigente por pedido (última fila; sólo cuenta si APPLIED, US-19-06).
+        Map<UUID, OrderDiscount> currentDiscount = new HashMap<>();
+        for (OrderDiscount d : orderDiscountRepository.findByOrderIdInOrderByAppliedAtDesc(ids)) {
+            currentDiscount.putIfAbsent(d.getOrder().getId(), d);
+        }
+
+        return orders.stream()
+            .sorted(Comparator.comparing(Order::getCreatedAt,
+                Comparator.nullsLast(Comparator.naturalOrder())))
+            .map(o -> {
+                OrderDiscount d = currentDiscount.get(o.getId());
+                boolean applied = d != null && d.isApplied();
+                return ShiftOrderDetailDTO.builder()
+                    .createdAt(o.getCreatedAt())
+                    .orderNumber(o.getOrderNumber())
+                    .origin(o.getOrigin())
+                    .paymentMethod(methodByOrder.get(o.getId()))
+                    .totalAmount(o.getTotalAmount())
+                    .status(o.getStatus())
+                    .discountAmount(applied ? d.getDiscountAmount() : null)
+                    .discountReason(applied ? d.getReason() : null)
+                    .build();
+            })
             .toList();
     }
 }

@@ -7,6 +7,8 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -526,6 +528,171 @@ class OrderDiscountIntegrationTest {
         // El desglose por método sale del mismo totalAmount: no puede divergir del total.
         assertThat((BigDecimal) summary.get("cash_revenue")).isEqualByComparingTo("97.00");
         assertThat((BigDecimal) summary.get("mp_revenue")).isEqualByComparingTo("0.00");
+
+        // US-20-02: agregados de descuento del turno. 10% de 100 = 10 descontado, en 1
+        // pedido, imputado al motivo CUSTOMER_PROMO.
+        assertThat((BigDecimal) summary.get("total_discount")).isEqualByComparingTo("10.00");
+        assertThat(summary.get("discounted_orders")).isEqualTo(1);
+        assertThat((BigDecimal) summary.get("discount_customer_promo")).isEqualByComparingTo("10.00");
+        assertThat((BigDecimal) summary.get("discount_transfer_adjustment")).isEqualByComparingTo("0.00");
+        assertThat((BigDecimal) summary.get("discount_other")).isEqualByComparingTo("0.00");
+    }
+
+    // ── US-20-02: agregados de descuento del turno ───────────────────────────────
+
+    /** Varios pedidos con motivos distintos: el desglose por motivo y el total cuadran. */
+    @Test
+    void shiftSummary_discountBreakdownByReason() throws Exception {
+        UUID promo = createCashOrder(); // 10% de 100 = 10 → CUSTOMER_PROMO
+        applyDiscount(promo, "10", "CUSTOMER_PROMO", null).andExpect(status().isNoContent());
+        deliver(promo);
+
+        UUID transfer = createCashOrder(); // 20% de 100 = 20 → TRANSFER_ADJUSTMENT
+        applyDiscount(transfer, "20", "TRANSFER_ADJUSTMENT", null).andExpect(status().isNoContent());
+        deliver(transfer);
+
+        UUID plain = createCashOrder(); // sin descuento
+        deliver(plain);
+
+        Map<String, Object> summary = closeShiftAndReadSummary();
+
+        assertThat((BigDecimal) summary.get("total_discount")).isEqualByComparingTo("30.00");
+        assertThat(summary.get("discounted_orders")).isEqualTo(2); // sólo los dos con descuento
+        assertThat((BigDecimal) summary.get("discount_customer_promo")).isEqualByComparingTo("10.00");
+        assertThat((BigDecimal) summary.get("discount_transfer_adjustment")).isEqualByComparingTo("20.00");
+        assertThat((BigDecimal) summary.get("discount_other")).isEqualByComparingTo("0.00");
+    }
+
+    /** Un descuento revertido no cuenta: el pedido se facturó a su total completo. */
+    @Test
+    void shiftSummary_revertedDiscountIsNotCounted() throws Exception {
+        UUID orderId = createCashOrder();
+        applyDiscount(orderId, "10", "CUSTOMER_PROMO", null).andExpect(status().isNoContent());
+        revertDiscount(orderId, "OTHER", null).andExpect(status().isNoContent());
+        deliver(orderId);
+
+        Map<String, Object> summary = closeShiftAndReadSummary();
+
+        // Hay filas en order_discount (aplicado + revertido), pero el vigente es REVERTED.
+        assertThat(countDiscounts(orderId)).isEqualTo(2);
+        assertThat((BigDecimal) summary.get("total_discount")).isEqualByComparingTo("0.00");
+        assertThat(summary.get("discounted_orders")).isEqualTo(0);
+        assertThat((BigDecimal) summary.get("total_revenue")).isEqualByComparingTo("107.00");
+    }
+
+    /** Sin descuentos, los agregados quedan en cero (la sección del PDF se ocultará). */
+    @Test
+    void shiftSummary_withoutDiscounts_aggregatesAreZero() throws Exception {
+        UUID orderId = createCashOrder();
+        deliver(orderId);
+
+        Map<String, Object> summary = closeShiftAndReadSummary();
+
+        assertThat((BigDecimal) summary.get("total_discount")).isEqualByComparingTo("0.00");
+        assertThat(summary.get("discounted_orders")).isEqualTo(0);
+    }
+
+    /** El agregado también viaja por la API (no sólo en la columna persistida). */
+    @Test
+    void closeShiftResponse_exposesDiscountAggregates() throws Exception {
+        UUID orderId = createCashOrder();
+        applyDiscount(orderId, "10", "CUSTOMER_PROMO", null).andExpect(status().isNoContent());
+        deliver(orderId);
+        jdbcTemplate.update("UPDATE branch SET accepting_orders = false WHERE id = ?", BRANCH_ID);
+
+        mockMvc.perform(post("/backoffice/shifts/close")
+                .header("Authorization", "Bearer " + managerToken()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.totalDiscount").value(10.00))
+            .andExpect(jsonPath("$.discountedOrders").value(1))
+            .andExpect(jsonPath("$.discountCustomerPromo").value(10.00));
+    }
+
+    // ── US-20-03: detalle de pedidos del turno (on-demand) ───────────────────────
+
+    /**
+     * El detalle trae los pedidos terminales del turno —entregados Y cancelados—, con
+     * su método, total, estado y el descuento vigente (con motivo). Un cancelado se
+     * distingue por su estado y no aporta descuento.
+     */
+    @Test
+    void shiftOrderDetails_includesDeliveredAndCancelled_withDiscountAndMethod() throws Exception {
+        UUID delivered = createCashOrder();
+        applyDiscount(delivered, "10", "CUSTOMER_PROMO", null).andExpect(status().isNoContent());
+        deliver(delivered); // total 97, CASH, APPLIED CUSTOMER_PROMO
+
+        UUID cancelled = createCashOrder();
+        cancel(cancelled); // CANCELLED, sin descuento
+
+        mockMvc.perform(get("/backoffice/shifts/" + currentShiftId() + "/order-details")
+                .header("Authorization", "Bearer " + managerToken()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.length()").value(2))
+            // Fila entregada: método, total, estado y descuento con motivo.
+            .andExpect(jsonPath("$[?(@.status=='DELIVERED')].paymentMethod",
+                contains("CASH")))
+            .andExpect(jsonPath("$[?(@.status=='DELIVERED')].totalAmount",
+                contains(97.00)))
+            .andExpect(jsonPath("$[?(@.status=='DELIVERED')].origin",
+                contains("CLIENT")))
+            .andExpect(jsonPath("$[?(@.status=='DELIVERED')].discountAmount",
+                contains(10.00)))
+            .andExpect(jsonPath("$[?(@.status=='DELIVERED')].discountReason",
+                contains("CUSTOMER_PROMO")))
+            // Fila cancelada: presente y sin descuento.
+            .andExpect(jsonPath("$[?(@.status=='CANCELLED')].discountReason",
+                contains(nullValue())));
+    }
+
+    /** Un descuento revertido no figura como descuento en el detalle (US-19-06). */
+    @Test
+    void shiftOrderDetails_revertedDiscount_showsNoDiscount() throws Exception {
+        UUID orderId = createCashOrder();
+        applyDiscount(orderId, "10", "CUSTOMER_PROMO", null).andExpect(status().isNoContent());
+        revertDiscount(orderId, "OTHER", null).andExpect(status().isNoContent());
+        deliver(orderId);
+
+        mockMvc.perform(get("/backoffice/shifts/" + currentShiftId() + "/order-details")
+                .header("Authorization", "Bearer " + managerToken()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.length()").value(1))
+            .andExpect(jsonPath("$[0].status").value("DELIVERED"))
+            .andExpect(jsonPath("$[0].totalAmount").value(107.00))
+            .andExpect(jsonPath("$[0].discountAmount").value(nullValue()))
+            .andExpect(jsonPath("$[0].discountReason").value(nullValue()));
+    }
+
+    /** Ordenado por hora: los createdAt de las filas vienen en orden ascendente. */
+    @Test
+    void shiftOrderDetails_areOrderedByTime() throws Exception {
+        UUID first = createCashOrder();
+        deliver(first);
+        UUID second = createCashOrder();
+        deliver(second);
+        UUID third = createCashOrder();
+        cancel(third);
+
+        String json = mockMvc.perform(get("/backoffice/shifts/" + currentShiftId() + "/order-details")
+                .header("Authorization", "Bearer " + managerToken()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.length()").value(3))
+            .andReturn().getResponse().getContentAsString();
+
+        var arr = objectMapper.readTree(json);
+        String t0 = arr.get(0).get("createdAt").asText();
+        String t1 = arr.get(1).get("createdAt").asText();
+        String t2 = arr.get(2).get("createdAt").asText();
+        // ISO-8601 lexicográfico == cronológico.
+        assertThat(t0.compareTo(t1)).isLessThanOrEqualTo(0);
+        assertThat(t1.compareTo(t2)).isLessThanOrEqualTo(0);
+    }
+
+    @Test
+    void shiftOrderDetails_asStaff_returns403() throws Exception {
+        UUID shiftId = currentShiftId();
+        mockMvc.perform(get("/backoffice/shifts/" + shiftId + "/order-details")
+                .header("Authorization", "Bearer " + tokenFor(STAFF_USER_ID, "STAFF")))
+            .andExpect(status().isForbidden());
     }
 
     @Test
@@ -665,6 +832,21 @@ class OrderDiscountIntegrationTest {
         mockMvc.perform(post("/backoffice/shifts/open")
                 .header("Authorization", "Bearer " + managerToken()))
             .andExpect(status().isOk());
+    }
+
+    private UUID currentShiftId() {
+        return UUID.fromString(jdbcTemplate.queryForObject(
+            "SELECT id FROM work_shift WHERE branch_id = ? AND status = 'OPEN'",
+            String.class, BRANCH_ID));
+    }
+
+    /** Cancela un pedido activo (RECEIVED) desde el backoffice, con motivo. */
+    private void cancel(UUID orderId) throws Exception {
+        mockMvc.perform(patch("/backoffice/orders/" + orderId + "/status")
+                .header("Authorization", "Bearer " + managerToken())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"nextStatus\":\"CANCELLED\",\"reason\":\"Prueba\"}"))
+            .andExpect(status().isNoContent());
     }
 
     private void enableOrders() throws Exception {

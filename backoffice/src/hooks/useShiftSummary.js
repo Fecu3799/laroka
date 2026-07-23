@@ -70,6 +70,9 @@ export default function useShiftSummary(activeShiftKey) {
         openedAt: last.openedAt,
         openedBy: last.openedBy,
         closedAt: last.closedAt,
+        // closedBy viaja en el ShiftHistoryItemDTO (nombre, o null si auto-cerró).
+        // Lo consume ShiftSummaryDocument para el "Cerrado por" del PDF (US-20-01).
+        closedBy: last.closedBy,
         // Expuesto por el backend (US-16-04): true si el turno se auto-cerró.
         // Lo consume ShiftSummaryDocument vía shift.autoClose.
         autoClose: last.autoClose ?? false,
