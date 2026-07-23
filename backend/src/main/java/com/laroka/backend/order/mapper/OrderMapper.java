@@ -12,15 +12,18 @@ import com.laroka.backend.order.dto.BackofficeOrderItemDTO;
 import com.laroka.backend.order.dto.BackofficeOrderResponseDTO;
 import com.laroka.backend.order.dto.CreateOrderRequestDTO;
 import com.laroka.backend.order.dto.CreateOrderResponseDTO;
+import com.laroka.backend.order.dto.OrderDiscountDTO;
 import com.laroka.backend.order.dto.OrderItemResponseDTO;
 import com.laroka.backend.order.dto.OrderItemStatusDTO;
 import com.laroka.backend.order.dto.OrderStatusHistoryDTO;
 import com.laroka.backend.order.dto.OrderStatusResponseDTO;
 import com.laroka.backend.order.entity.Order;
+import com.laroka.backend.order.entity.OrderDiscount;
 import com.laroka.backend.order.entity.OrderItem;
 import com.laroka.backend.order.entity.OrderOrigin;
 import com.laroka.backend.order.entity.OrderStatusHistory;
 import com.laroka.backend.order.entity.PaymentMethod;
+import com.laroka.backend.order.service.AppliedDiscount;
 import com.laroka.backend.order.service.BackofficeOrderDetail;
 import com.laroka.backend.payment.entity.Payment;
 
@@ -164,6 +167,25 @@ public class OrderMapper {
                 .refundedAmount(payment != null ? payment.getRefundedAmount() : null)
                 .statusHistory(detail.history().stream().map(this::toHistoryDTO).toList())
                 .cancellationReason(cancellationReason)
+                .discount(toDiscountDTO(detail.discount()))
+                .build();
+    }
+
+    /** US-19-03: descuento vigente del pedido, o null si no tiene ninguno aplicado. */
+    private OrderDiscountDTO toDiscountDTO(AppliedDiscount applied) {
+        if (applied == null) {
+            return null;
+        }
+        OrderDiscount discount = applied.discount();
+        return OrderDiscountDTO.builder()
+                .percentage(discount.getPercentage())
+                .originalTotalAmount(discount.getOriginalTotalAmount())
+                .discountAmount(discount.getDiscountAmount())
+                .finalTotalAmount(discount.getFinalTotalAmount())
+                .reason(discount.getReason())
+                .note(discount.getNote())
+                .appliedByName(applied.appliedByName())
+                .appliedAt(discount.getAppliedAt())
                 .build();
     }
 

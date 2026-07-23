@@ -63,6 +63,8 @@ import com.laroka.backend.order.repository.OrderItemRepository;
 import com.laroka.backend.order.repository.OrderRepository;
 import com.laroka.backend.order.repository.OrderStatusHistoryRepository;
 import com.laroka.backend.shift.entity.ShiftStatus;
+import com.laroka.backend.staffuser.entity.StaffUser;
+import com.laroka.backend.staffuser.repository.StaffUserRepository;
 import com.laroka.backend.shift.entity.WorkShift;
 import com.laroka.backend.shift.repository.WorkShiftRepository;
 import com.laroka.backend.shared.exception.BusinessException;
@@ -91,6 +93,7 @@ public class OrderService {
     private final PushNotificationService pushNotificationService;
     private final PaymentGateway paymentGateway;
     private final OrderDiscountRepository orderDiscountRepository;
+    private final StaffUserRepository staffUserRepository;
 
     /**
      * Motivo registrado cuando el auto-cierre de turno cancela un pedido activo.
@@ -626,7 +629,29 @@ public class OrderService {
         List<OrderStatusHistory> history = historyRepository.findByOrderIdOrderByChangedAtAsc(orderId);
         Payment payment = paymentRepository.findByOrderId(orderId).orElse(null);
 
-        return new BackofficeOrderDetail(order, payment, history);
+        // US-19-03: descuento vigente = la fila más reciente. La tabla es append-only,
+        // así que las anteriores son historial y no se exponen acá. El nombre de quién
+        // lo aplicó se resuelve ahora porque appliedBy es un id plano (el módulo order
+        // no se acopla a la entidad de staffuser).
+        AppliedDiscount discount = orderDiscountRepository
+                .findFirstByOrderIdOrderByAppliedAtDesc(orderId)
+                .map(d -> new AppliedDiscount(d, resolveStaffUserName(d.getAppliedBy())))
+                .orElse(null);
+
+        return new BackofficeOrderDetail(order, payment, history, discount);
+    }
+
+    /**
+     * Nombre del usuario, o null si ya no existe. Un descuento sobrevive al borrado
+     * de quien lo aplicó: la fila es traza de auditoría y no debe romper el detalle.
+     */
+    private String resolveStaffUserName(Integer staffUserId) {
+        if (staffUserId == null) {
+            return null;
+        }
+        return staffUserRepository.findById(staffUserId)
+                .map(StaffUser::getName)
+                .orElse(null);
     }
 
     @Transactional(readOnly = true)

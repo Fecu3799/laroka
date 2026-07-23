@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -164,6 +165,73 @@ class OrderDiscountIntegrationTest {
 
         assertThat(orderRepository.findById(orderId).orElseThrow().getTotalAmount())
             .isEqualByComparingTo("87.00");
+    }
+
+    // ── US-19-03: el detalle expone el descuento vigente y su traza ──────────────
+
+    @Test
+    void orderDetail_afterDiscount_exposesCurrentDiscountWithTraceability() throws Exception {
+        UUID orderId = createCashOrder();
+        applyDiscount(orderId, "10", "CUSTOMER_PROMO", "cortesía por demora")
+            .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/backoffice/orders/" + orderId)
+                .header("Authorization", "Bearer " + managerToken()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.discount.percentage").value(10.00))
+            .andExpect(jsonPath("$.discount.originalTotalAmount").value(107.00))
+            .andExpect(jsonPath("$.discount.discountAmount").value(10.00))
+            .andExpect(jsonPath("$.discount.finalTotalAmount").value(97.00))
+            .andExpect(jsonPath("$.discount.reason").value("CUSTOMER_PROMO"))
+            .andExpect(jsonPath("$.discount.note").value("cortesía por demora"))
+            // El nombre se resuelve desde staff_user: appliedBy es sólo un id.
+            .andExpect(jsonPath("$.discount.appliedByName").value("Manager"))
+            .andExpect(jsonPath("$.discount.appliedAt").exists())
+            // El total de arriba ya viene post-descuento; la línea explica ese número.
+            .andExpect(jsonPath("$.totalAmount").value(97.00))
+            .andExpect(jsonPath("$.subtotal").value(100.00));
+    }
+
+    @Test
+    void orderDetail_withoutDiscount_leavesDiscountNull() throws Exception {
+        UUID orderId = createCashOrder();
+
+        mockMvc.perform(get("/backoffice/orders/" + orderId)
+                .header("Authorization", "Bearer " + managerToken()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.discount").doesNotExist())
+            .andExpect(jsonPath("$.totalAmount").value(107.00));
+    }
+
+    /**
+     * La tabla es append-only: tras dos aplicaciones el detalle muestra sólo la más
+     * reciente (findFirstByOrderIdOrderByAppliedAtDesc), no la primera ni una suma.
+     */
+    @Test
+    void orderDetail_afterTwoDiscounts_exposesOnlyTheMostRecentOne() throws Exception {
+        UUID orderId = createCashOrder();
+        applyDiscount(orderId, "10", "CUSTOMER_PROMO", "primera").andExpect(status().isNoContent());
+        applyDiscount(orderId, "20", "TRANSFER_ADJUSTMENT", "segunda").andExpect(status().isNoContent());
+
+        // La fila anterior sigue en la tabla y con sus valores originales: el detalle
+        // muestra sólo la vigente, pero el historial no se borra ni se pisa. El conteo
+        // por sí solo no alcanzaría — dejaría pasar una mutación de la fila vieja.
+        assertThat(countDiscounts(orderId)).isEqualTo(2);
+        Map<String, Object> previous = jdbcTemplate.queryForMap(
+            "SELECT * FROM order_discount WHERE order_id = ? AND percentage = 10.00", orderId);
+        assertThat((BigDecimal) previous.get("discount_amount")).isEqualByComparingTo("10.00");
+        assertThat((BigDecimal) previous.get("final_total_amount")).isEqualByComparingTo("97.00");
+        assertThat(previous.get("reason")).isEqualTo("CUSTOMER_PROMO");
+        assertThat(previous.get("note")).isEqualTo("primera");
+
+        mockMvc.perform(get("/backoffice/orders/" + orderId)
+                .header("Authorization", "Bearer " + managerToken()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.discount.percentage").value(20.00))
+            .andExpect(jsonPath("$.discount.reason").value("TRANSFER_ADJUSTMENT"))
+            .andExpect(jsonPath("$.discount.note").value("segunda"))
+            .andExpect(jsonPath("$.discount.finalTotalAmount").value(87.00))
+            .andExpect(jsonPath("$.totalAmount").value(87.00));
     }
 
     // ── Guards de negocio contra la base real ───────────────────────────────────

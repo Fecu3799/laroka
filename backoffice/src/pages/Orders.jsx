@@ -18,6 +18,7 @@ import {
   canGoBack as goBackAllowed,
   canCancel as cancelAllowed,
   canApplyDiscount,
+  DISCOUNT_REASON_LABEL,
   formatOrderNumber,
   orderItemDisplayName,
 } from "../utils/ordersUtils";
@@ -167,6 +168,13 @@ function formatDateTime(ts) {
 function formatPrice(n) {
   if (n == null) return "—";
   return "$" + Number(n).toLocaleString("es-AR", { maximumFractionDigits: 0 });
+}
+
+// Porcentaje del descuento (US-19-03). El backend lo persiste como NUMERIC(5,2), así
+// que un 10% llega como "10.00": se muestran decimales solo cuando existen.
+function formatPercentage(n) {
+  if (n == null) return "";
+  return Number(n).toLocaleString("es-AR", { maximumFractionDigits: 2 }) + "%";
 }
 
 function getInitials(name) {
@@ -1659,12 +1667,45 @@ function OrderDetail({
               <span>{formatPrice(order.serviceFee)}</span>
             </div>
           )}
+
+          {/* US-19-03: descuento vigente. Va entre los fees y el Total porque el
+              Total ya viene post-descuento — sin esta línea el número de abajo no
+              cerraría con la suma de arriba. */}
+          {order.discount && (
+            <div className="detail-subtotal-row detail-discount-row">
+              <span>
+                Descuento
+                <span className="detail-discount-pct">
+                  {formatPercentage(order.discount.percentage)}
+                </span>
+              </span>
+              <span>−{formatPrice(order.discount.discountAmount)}</span>
+            </div>
+          )}
+
           <div className="detail-total-row">
             <span className="detail-total-label">TOTAL</span>
             <span className="detail-total-amount">
               {formatPrice(order.totalAmount)}
             </span>
           </div>
+
+          {/* US-19-03: trazabilidad del descuento. Un ajuste de precio nunca debe
+              aparecer sin explicación: quién lo hizo, cuándo y por qué. */}
+          {order.discount && (
+            <div className="detail-discount-trace">
+              <span className="detail-discount-trace-reason">
+                {DISCOUNT_REASON_LABEL[order.discount.reason] ?? order.discount.reason}
+              </span>
+              <span className="detail-discount-trace-meta">
+                {order.discount.appliedByName ?? "Usuario eliminado"} ·{" "}
+                {formatDateTime(order.discount.appliedAt)}
+              </span>
+              {order.discount.note && (
+                <p className="detail-discount-trace-note">"{order.discount.note}"</p>
+              )}
+            </div>
+          )}
 
           {/* US-19-02: descuento manual. Solo MANAGER/ADMIN y solo si el pedido
               no está tomado por un pago de gateway — canApplyDiscount espeja los

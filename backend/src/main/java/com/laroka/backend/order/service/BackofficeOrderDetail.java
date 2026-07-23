@@ -6,4 +6,9 @@ import com.laroka.backend.order.entity.Order;
 import com.laroka.backend.order.entity.OrderStatusHistory;
 import com.laroka.backend.payment.entity.Payment;
 
-public record BackofficeOrderDetail(Order order, Payment payment, List<OrderStatusHistory> history) {}
+/**
+ * {@code discount} es el descuento vigente del pedido (US-19-03) o null si nunca se
+ * le aplicó ninguno.
+ */
+public record BackofficeOrderDetail(Order order, Payment payment, List<OrderStatusHistory> history,
+                                    AppliedDiscount discount) {}

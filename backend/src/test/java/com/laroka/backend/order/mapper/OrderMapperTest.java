@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -15,10 +16,15 @@ import com.laroka.backend.catalog.entity.ProductSize;
 import com.laroka.backend.catalog.entity.ProductSizeName;
 import com.laroka.backend.order.dto.BackofficeOrderResponseDTO;
 import com.laroka.backend.order.dto.CreateOrderResponseDTO;
+import com.laroka.backend.order.dto.OrderDiscountDTO;
+import com.laroka.backend.order.entity.DiscountReason;
 import com.laroka.backend.order.entity.Order;
+import com.laroka.backend.order.entity.OrderDiscount;
 import com.laroka.backend.order.entity.OrderItem;
 import com.laroka.backend.order.entity.OrderStatus;
 import com.laroka.backend.order.entity.OrderType;
+import com.laroka.backend.order.service.AppliedDiscount;
+import com.laroka.backend.order.service.BackofficeOrderDetail;
 
 /**
  * US-HH-01: los ítems exponen la segunda mitad cuando corresponde (mitad y mitad) y la
@@ -133,5 +139,59 @@ class OrderMapperTest {
 		BackofficeOrderResponseDTO dto = mapper.toBackofficeResponseDTO(order(), null);
 
 		assertThat(dto.getItems()).extracting("sizeName").containsOnlyNulls();
+	}
+
+	// ── US-19-03: descuento vigente expuesto en el detalle ──────────────────────
+
+	private OrderDiscount discount() {
+		return OrderDiscount.builder()
+			.id(UUID.randomUUID())
+			.percentage(new BigDecimal("10.00"))
+			.originalTotalAmount(new BigDecimal("6000.00"))
+			.discountAmount(new BigDecimal("600.00"))
+			.finalTotalAmount(new BigDecimal("5400.00"))
+			.reason(DiscountReason.CUSTOMER_PROMO)
+			.note("cortesía por demora")
+			.appliedBy(7)
+			.appliedAt(LocalDateTime.of(2026, 7, 23, 20, 30))
+			.build();
+	}
+
+	@Test
+	void toBackofficeDetailDTO_withDiscount_exposesAmountsAndTraceability() {
+		BackofficeOrderDetail detail = new BackofficeOrderDetail(
+			order(), null, List.of(), new AppliedDiscount(discount(), "Ana Gómez"));
+
+		OrderDiscountDTO dto = mapper.toBackofficeDetailDTO(detail).getDiscount();
+
+		assertThat(dto).isNotNull();
+		assertThat(dto.getPercentage()).isEqualByComparingTo("10.00");
+		assertThat(dto.getOriginalTotalAmount()).isEqualByComparingTo("6000.00");
+		assertThat(dto.getDiscountAmount()).isEqualByComparingTo("600.00");
+		assertThat(dto.getFinalTotalAmount()).isEqualByComparingTo("5400.00");
+		assertThat(dto.getReason()).isEqualTo(DiscountReason.CUSTOMER_PROMO);
+		assertThat(dto.getNote()).isEqualTo("cortesía por demora");
+		assertThat(dto.getAppliedByName()).isEqualTo("Ana Gómez");
+		assertThat(dto.getAppliedAt()).isEqualTo(LocalDateTime.of(2026, 7, 23, 20, 30));
+	}
+
+	@Test
+	void toBackofficeDetailDTO_withoutDiscount_leavesDiscountNull() {
+		BackofficeOrderDetail detail = new BackofficeOrderDetail(order(), null, List.of(), null);
+
+		assertThat(mapper.toBackofficeDetailDTO(detail).getDiscount()).isNull();
+	}
+
+	@Test
+	void toBackofficeDetailDTO_discountFromDeletedUser_keepsAmountsWithNullName() {
+		// La fila del descuento sobrevive al borrado de quien lo aplicó: es traza de
+		// auditoría y no debe romper el detalle.
+		BackofficeOrderDetail detail = new BackofficeOrderDetail(
+			order(), null, List.of(), new AppliedDiscount(discount(), null));
+
+		OrderDiscountDTO dto = mapper.toBackofficeDetailDTO(detail).getDiscount();
+
+		assertThat(dto.getAppliedByName()).isNull();
+		assertThat(dto.getDiscountAmount()).isEqualByComparingTo("600.00");
 	}
 }

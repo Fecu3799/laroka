@@ -48,4 +48,8 @@ public class BackofficeOrderDetailDTO {
     private BigDecimal refundedAmount;
     private List<OrderStatusHistoryDTO> statusHistory;
     private String cancellationReason;
+    // US-19-03: descuento vigente (la fila más reciente de order_discount) con su
+    // trazabilidad. null = el pedido nunca recibió un descuento. totalAmount de arriba
+    // ya viene post-descuento, así que esta línea explica de dónde sale ese número.
+    private OrderDiscountDTO discount;
 }

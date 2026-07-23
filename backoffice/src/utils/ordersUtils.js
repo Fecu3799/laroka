@@ -95,6 +95,14 @@ export const DISCOUNT_REASON_OPTIONS = [
 ]
 
 /**
+ * Etiqueta visible de un motivo (US-19-03). Se deriva de DISCOUNT_REASON_OPTIONS
+ * para que el dropdown del modal y la traza del detalle no puedan divergir.
+ */
+export const DISCOUNT_REASON_LABEL = Object.fromEntries(
+  DISCOUNT_REASON_OPTIONS.map(o => [o.value, o.label]),
+)
+
+/**
  * Mensaje de error del descuento según el código de estado (US-19-02). El backend
  * distingue dos rechazos con causas y remedios distintos, y mezclarlos en un
  * "error genérico" deja al operador sin saber si corregir el formulario o dejar
