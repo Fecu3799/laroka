@@ -8,6 +8,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -43,7 +44,9 @@ import com.laroka.backend.catalog.repository.ProductRepository;
 import com.laroka.backend.catalog.repository.ProductSizeRepository;
 import com.laroka.backend.catalog.service.ProductSizeService;
 import com.laroka.backend.order.domain.OrderStateMachine;
+import com.laroka.backend.order.entity.DiscountReason;
 import com.laroka.backend.order.entity.Order;
+import com.laroka.backend.order.entity.OrderDiscount;
 import com.laroka.backend.order.entity.OrderItem;
 import com.laroka.backend.order.entity.OrderOrigin;
 import com.laroka.backend.order.entity.OrderStatus;
@@ -55,6 +58,7 @@ import com.laroka.backend.order.exception.InvalidProductSizeException;
 import com.laroka.backend.order.exception.OrderNotFoundException;
 import com.laroka.backend.order.exception.ProductUnavailableException;
 import com.laroka.backend.order.repository.BranchOrderSequenceRepository;
+import com.laroka.backend.order.repository.OrderDiscountRepository;
 import com.laroka.backend.order.repository.OrderItemRepository;
 import com.laroka.backend.order.repository.OrderRepository;
 import com.laroka.backend.order.repository.OrderStatusHistoryRepository;
@@ -86,6 +90,7 @@ public class OrderService {
     private final PushSubscriptionRepository pushSubscriptionRepository;
     private final PushNotificationService pushNotificationService;
     private final PaymentGateway paymentGateway;
+    private final OrderDiscountRepository orderDiscountRepository;
 
     /**
      * Motivo registrado cuando el auto-cierre de turno cancela un pedido activo.
@@ -110,6 +115,26 @@ public class OrderService {
      * cancelación tardía. Constante de clase para poder ajustarla sin tocar la lógica.
      */
     private static final BigDecimal CANCELLATION_REFUND_RATE = new BigDecimal("0.85");
+
+    /** Base porcentual, para no repetir el literal en cálculos y validaciones. */
+    private static final BigDecimal ONE_HUNDRED = new BigDecimal("100");
+
+    /**
+     * Métodos de pago que cobran a través de MercadoPago. Un pedido cobrado por
+     * alguno de ellos no admite descuento manual (US-19-01): el importe ya viajó al
+     * gateway y bajarlo acá lo dejaría descalzado del cobro real.
+     */
+    private static final Set<PaymentMethod> GATEWAY_PAYMENT_METHODS =
+            Set.of(PaymentMethod.MERCADOPAGO, PaymentMethod.QR_CODE);
+
+    /**
+     * Estados de un pago de gateway que bloquean el descuento (US-19-01): APPROVED
+     * porque ya se cobró, PENDING porque el cobro está en vuelo y puede aprobarse en
+     * cualquier momento. Los estados terminales fallidos (REJECTED, CANCELLED) no
+     * bloquean: ahí no hay cobro que descalzar.
+     */
+    private static final Set<PaymentStatus> DISCOUNT_BLOCKING_PAYMENT_STATUSES =
+            Set.of(PaymentStatus.PENDING, PaymentStatus.APPROVED);
 
     @Transactional
     public OrderCreationResult createOrder(Order order, List<OrderItem> items,
@@ -427,6 +452,94 @@ public class OrderService {
                     orderId, payment.getMercadopagoPaymentId(), payment.getRefundedAmount(), e.getMessage());
             throw new BusinessException("El reintento de reembolso falló: " + e.getMessage());
         }
+    }
+
+    /**
+     * Aplica un descuento porcentual manual sobre el subtotal del pedido (US-19-01,
+     * MANAGER/ADMIN). Solo para pedidos cobrados por fuera del gateway: si existe un
+     * {@link Payment} de método {@link #GATEWAY_PAYMENT_METHODS} en estado
+     * {@link #DISCOUNT_BLOCKING_PAYMENT_STATUSES}, se rechaza — el dinero ya está (o
+     * está por estar) en MercadoPago y bajarle el total al pedido dejaría el cobro
+     * descalzado del importe registrado.
+     *
+     * Cada aplicación inserta una fila nueva en {@code order_discount}; nunca se
+     * mutan ni borran las anteriores. El cálculo parte siempre de
+     * {@code subtotal + deliveryFee + serviceFee} y no de {@code totalAmount}, que
+     * puede venir ya descontado: así reaplicar el mismo porcentaje es idempotente en
+     * el importe final en vez de encadenar descuentos sobre descuentos.
+     */
+    @Transactional
+    public void applyDiscount(UUID orderId, Integer branchId, BigDecimal percentage,
+                              DiscountReason reason, String note, Integer staffUserId) {
+        Order order = orderRepository.findByIdWithBranch(orderId)
+                .orElseThrow(() -> {
+                    log.warn("Order not found | orderId={}", orderId);
+                    return new OrderNotFoundException(orderId);
+                });
+
+        if (!order.getBranch().getId().equals(branchId)) {
+            log.warn("Branch mismatch on apply-discount | orderId={} orderBranch={} userBranch={}",
+                    orderId, order.getBranch().getId(), branchId);
+            throw new AccessDeniedException("El pedido no pertenece a la sucursal del usuario");
+        }
+
+        if (percentage.compareTo(BigDecimal.ZERO) < 0
+                || percentage.compareTo(ONE_HUNDRED) > 0) {
+            throw new BusinessException("El porcentaje de descuento debe estar entre 0 y 100");
+        }
+
+        // Un pedido en PENDING_PAYMENT todavía no definió cómo se cobra: puede acabar
+        // en MercadoPago o QR. Descontarlo acá también desincronizaría el importe con
+        // la preference ya creada en el gateway. Además, este guard es el que cubre el
+        // caso "todavía no hay fila de Payment que lockear": tanto initiatePayment como
+        // chargeQr exigen PENDING_PAYMENT, así que ningún pago de gateway puede nacer
+        // sobre un pedido que superó este chequeo.
+        if (order.getStatus() == OrderStatus.PENDING_PAYMENT) {
+            throw new BusinessException("No se puede descontar un pedido con el pago pendiente");
+        }
+
+        // Lock pesimista (SELECT ... FOR UPDATE) sobre el pago + chequeo del método y
+        // estado bajo el lock, en la misma transacción que la escritura del descuento
+        // (mismo patrón que retryRefund). Sin el lock, un webhook de MercadoPago
+        // aprobando el pago en simultáneo podía intercalarse entre el chequeo y la
+        // escritura: leíamos PENDING, el webhook commiteaba APPROVED, y el pedido
+        // quedaba cobrado por el total viejo con un total nuevo más bajo.
+        Payment payment = paymentRepository.findByOrderIdForUpdate(orderId).orElse(null);
+        if (payment != null
+                && GATEWAY_PAYMENT_METHODS.contains(payment.getMethod())
+                && DISCOUNT_BLOCKING_PAYMENT_STATUSES.contains(payment.getStatus())) {
+            log.warn("Discount rejected — gateway payment in progress | orderId={} method={} status={}",
+                    orderId, payment.getMethod(), payment.getStatus());
+            throw new BusinessException(
+                    "No se puede aplicar un descuento a un pedido pagado por MercadoPago o QR");
+        }
+
+        BigDecimal originalTotal = order.getSubtotal()
+                .add(order.getDeliveryFee())
+                .add(order.getServiceFee());
+        BigDecimal discountAmount = order.getSubtotal()
+                .multiply(percentage)
+                .divide(ONE_HUNDRED, 2, RoundingMode.HALF_UP);
+        BigDecimal finalTotal = originalTotal.subtract(discountAmount);
+
+        orderDiscountRepository.save(OrderDiscount.builder()
+                .id(UUID.randomUUID())
+                .order(order)
+                .percentage(percentage)
+                .originalTotalAmount(originalTotal)
+                .discountAmount(discountAmount)
+                .finalTotalAmount(finalTotal)
+                .reason(reason)
+                .note(note)
+                .appliedBy(staffUserId)
+                .appliedAt(LocalDateTime.now())
+                .build());
+
+        order.setTotalAmount(finalTotal);
+        orderRepository.save(order);
+
+        log.info("Discount applied | orderId={} percentage={} originalTotal={} discount={} finalTotal={} reason={} staffUserId={}",
+                orderId, percentage, originalTotal, discountAmount, finalTotal, reason, staffUserId);
     }
 
     /**

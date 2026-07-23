@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.laroka.backend.order.dto.ApplyDiscountRequestDTO;
 import com.laroka.backend.order.dto.BackofficeOrderDetailDTO;
 import com.laroka.backend.order.dto.BackofficeOrderPageDTO;
 import com.laroka.backend.order.dto.BackofficeOrderResponseDTO;
@@ -216,6 +217,29 @@ public class BackofficeOrderController {
 
         Integer branchId = securityUtils.resolveBranchId(principal, request);
         orderService.retryRefund(id, branchId);
+        BackofficeOrderRow updatedRow = orderService.findOrderRowById(id);
+        notificationService.sendOrderUpdatedEvent(branchId,
+                orderMapper.toBackofficeResponseDTO(updatedRow.order(), updatedRow.payment()), "BACKOFFICE");
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{id}/discount")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    @Operation(summary = "Apply a manual percentage discount (ADMIN/MANAGER only)",
+            description = "Applies a percentage discount over the order subtotal and overwrites totalAmount. " +
+                    "Only for orders charged outside the gateway: returns 422 if the order still has the payment " +
+                    "pending (PENDING_PAYMENT) or has a MERCADOPAGO/QR_CODE payment in PENDING or APPROVED. " +
+                    "Every application is recorded as a new order_discount row (append-only audit trail). " +
+                    "Returns 403 if wrong branch or not ADMIN/MANAGER.")
+    public ResponseEntity<Void> applyDiscount(
+            @PathVariable UUID id,
+            @Valid @RequestBody ApplyDiscountRequestDTO dto,
+            @AuthenticationPrincipal CustomUserDetails principal,
+            HttpServletRequest request) {
+
+        Integer branchId = securityUtils.resolveBranchId(principal, request);
+        orderService.applyDiscount(id, branchId, dto.getPercentage(), dto.getReason(),
+                dto.getNote(), principal.getUserId());
         BackofficeOrderRow updatedRow = orderService.findOrderRowById(id);
         notificationService.sendOrderUpdatedEvent(branchId,
                 orderMapper.toBackofficeResponseDTO(updatedRow.order(), updatedRow.payment()), "BACKOFFICE");

@@ -97,6 +97,7 @@ Capas obligatorias por módulo:
 | V36     | branch_product_size (override de precio por sucursal a nivel tamaño) |
 | V37     | order_item product_size_id (FK a product_size, nullable) |
 | V38     | payment refund_failed_at + refund_delay_notified |
+| V39     | order_discount (descuento porcentual manual, append-only) |
 
 Toda migración nueva debe ser la siguiente versión disponible en esta tabla.
 Actualizar esta tabla al agregar una migración.
