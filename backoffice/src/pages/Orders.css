@@ -1042,6 +1042,35 @@
   background: color-mix(in srgb, var(--accent) 10%, transparent);
 }
 
+/* US-19-06: con un descuento vigente conviven "Modificar" (acento) y "Borrar"
+   (danger). Comparten fila; al vivir dentro del layout, cada botón anula el
+   margen lateral propio para que el contenedor controle el ancho. */
+.detail-discount-actions {
+  display: flex;
+  gap: 8px;
+  margin: 10px 14px 14px;
+}
+
+.detail-discount-actions .detail-action-discount,
+.detail-discount-actions .detail-action-discount-remove {
+  flex: 1;
+  margin: 0;
+  width: auto;
+}
+
+.detail-action-discount-remove {
+  padding: 9px 12px;
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--color-danger) 40%, transparent);
+  color: var(--color-danger);
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.detail-action-discount-remove:hover {
+  border-color: var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger) 10%, transparent);
+}
+
 /* ── Productos block ─────────────────────────────────────────── */
 
 .detail-products-block {

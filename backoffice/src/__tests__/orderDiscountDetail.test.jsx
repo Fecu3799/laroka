@@ -35,6 +35,7 @@ vi.mock('../hooks/useOrderDetail', () => ({ default: vi.fn() }))
 vi.mock('../services/ordersService', () => ({
   advanceOrderStatus: vi.fn().mockResolvedValue({}),
   applyDiscount: vi.fn().mockResolvedValue(undefined),
+  revertDiscount: vi.fn().mockResolvedValue(undefined),
 }))
 
 const ORDER_ID = 'aaaa0000-0000-0000-0000-000000000001'
@@ -212,5 +213,58 @@ describe('botón de descuento según haya uno vigente (US-19-05)', () => {
     const body = within(document.body)
     expect(body.getByRole('heading', { name: 'Modificar descuento' })).toBeInTheDocument()
     expect(body.getByLabelText('Porcentaje').value).toBe('10')
+  })
+})
+
+describe('borrar descuento (US-19-06)', () => {
+  const removeBtn = panel => panel.querySelector('.detail-action-discount-remove')
+
+  test('sin descuento no aparece el botón "Borrar descuento"', () => {
+    const panel = openDetail({ ...ORDER, totalAmount: 1700, discount: null })
+    expect(removeBtn(panel)).toBeNull()
+  })
+
+  test('con descuento vigente conviven "Modificar" y "Borrar"', () => {
+    const panel = openDetail({ ...ORDER, discount: DISCOUNT })
+    expect(panel.querySelector('.detail-action-discount').textContent).toBe('Modificar descuento')
+    expect(removeBtn(panel).textContent).toBe('Borrar descuento')
+  })
+
+  test('al borrar, abre el modal de reversión mostrando el total restaurado', () => {
+    const panel = openDetail({ ...ORDER, discount: DISCOUNT })
+    fireEvent.click(removeBtn(panel))
+
+    const body = within(document.body)
+    expect(body.getByRole('heading', { name: 'Borrar descuento' })).toBeInTheDocument()
+    // El pedido vuelve a subtotal+fees = 1700, no al total descontado.
+    expect(body.getByText(/\$1\.700/)).toBeInTheDocument()
+  })
+})
+
+describe('pedido ya cobrado oculta todos los botones de descuento (US-19-07)', () => {
+  const anyDiscountBtn = panel =>
+    panel.querySelector('.detail-action-discount, .detail-action-discount-remove')
+
+  test('con un pago en efectivo aprobado no hay botón de descuento, aunque tenga uno vigente', () => {
+    // Un pedido marcado como pagado en efectivo: CASH APPROVED con descuento vigente.
+    // No debe mostrar "Modificar" ni "Borrar" — el precio ya quedó cobrado.
+    const panel = openDetail({
+      ...ORDER,
+      paymentMethod: 'CASH',
+      paymentStatus: 'APPROVED',
+      discount: DISCOUNT,
+    })
+    expect(anyDiscountBtn(panel)).toBeNull()
+  })
+
+  test('sin descuento y ya cobrado, tampoco aparece "Aplicar descuento"', () => {
+    const panel = openDetail({
+      ...ORDER,
+      paymentMethod: 'CASH',
+      paymentStatus: 'APPROVED',
+      totalAmount: 1700,
+      discount: null,
+    })
+    expect(anyDiscountBtn(panel)).toBeNull()
   })
 })

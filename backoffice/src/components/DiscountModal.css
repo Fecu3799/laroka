@@ -196,3 +196,19 @@
   opacity: 0.4;
   cursor: not-allowed;
 }
+
+/* Reversión de descuento (US-19-06). Reusa el shell dsm-*; agrega el texto guía y
+   la variante peligrosa del botón de confirmar. */
+.dsm-revert-lead {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.dsm-revert-lead strong { color: var(--text-primary); }
+
+.dsm-submit--danger {
+  background: var(--color-danger);
+  color: #fff;
+}

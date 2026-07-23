@@ -234,6 +234,166 @@ class OrderDiscountIntegrationTest {
             .andExpect(jsonPath("$.totalAmount").value(87.00));
     }
 
+    // ── US-19-06: revertir un descuento aplicado ─────────────────────────────────
+
+    /**
+     * Revertir no borra: inserta una fila REVERTED y el pedido vuelve a su total sin
+     * descontar. La fila aplicada anterior sigue en la tabla (traza append-only) y el
+     * detalle deja de exponer el descuento — no porque no haya filas, sino porque la
+     * vigente es REVERTED. Esa es la distinción que pide el enunciado.
+     */
+    @Test
+    void revertDiscount_restoresTotalAndHidesDiscountWhileKeepingTheTrail() throws Exception {
+        UUID orderId = createCashOrder();
+        applyDiscount(orderId, "10", "CUSTOMER_PROMO", "cortesía").andExpect(status().isNoContent());
+        assertThat(orderRepository.findById(orderId).orElseThrow().getTotalAmount())
+            .isEqualByComparingTo("97.00");
+
+        revertDiscount(orderId, "OTHER", "se cargó por error").andExpect(status().isNoContent());
+
+        // El total vuelve a subtotal + fees (107), no queda en 97.
+        assertThat(orderRepository.findById(orderId).orElseThrow().getTotalAmount())
+            .isEqualByComparingTo("107.00");
+
+        // Dos filas: la aplicada sobrevive intacta y se sumó una REVERTED.
+        assertThat(countDiscounts(orderId)).isEqualTo(2);
+        Map<String, Object> reverted = jdbcTemplate.queryForMap(
+            "SELECT * FROM order_discount WHERE order_id = ? AND action = 'REVERTED'", orderId);
+        assertThat((BigDecimal) reverted.get("percentage")).isEqualByComparingTo("0.00");
+        assertThat((BigDecimal) reverted.get("discount_amount")).isEqualByComparingTo("0.00");
+        assertThat((BigDecimal) reverted.get("final_total_amount")).isEqualByComparingTo("107.00");
+        assertThat(reverted.get("reason")).isEqualTo("OTHER");
+        assertThat(reverted.get("note")).isEqualTo("se cargó por error");
+        // La fila aplicada no se tocó.
+        Map<String, Object> applied = jdbcTemplate.queryForMap(
+            "SELECT * FROM order_discount WHERE order_id = ? AND action = 'APPLIED'", orderId);
+        assertThat((BigDecimal) applied.get("percentage")).isEqualByComparingTo("10.00");
+
+        // El detalle vuelve a no tener descuento, aunque HAY filas en la tabla.
+        mockMvc.perform(get("/backoffice/orders/" + orderId)
+                .header("Authorization", "Bearer " + managerToken()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.discount").doesNotExist())
+            .andExpect(jsonPath("$.totalAmount").value(107.00));
+    }
+
+    /**
+     * El caso que el enunciado marca como distinto de "no hay ninguna fila": la lista
+     * activa debe ocultar el descuento cuando el vigente es REVERTED, no sólo cuando
+     * no existe fila alguna. Cubre la ruta batch (findByOrderIdInOrderByAppliedAtDesc).
+     */
+    @Test
+    void activeList_afterRevert_hidesDiscountEvenThoughRowsExist() throws Exception {
+        UUID orderId = createCashOrder();
+        applyDiscount(orderId, "10", "CUSTOMER_PROMO", null).andExpect(status().isNoContent());
+        revertDiscount(orderId, "OTHER", null).andExpect(status().isNoContent());
+        assertThat(countDiscounts(orderId)).isEqualTo(2);
+
+        mockMvc.perform(get("/backoffice/orders")
+                .header("Authorization", "Bearer " + managerToken()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].id").value(orderId.toString()))
+            .andExpect(jsonPath("$[0].discount").doesNotExist())
+            .andExpect(jsonPath("$[0].totalAmount").value(107.00));
+    }
+
+    /** Reaplicar tras revertir vuelve a mostrar descuento: gana la fila más reciente. */
+    @Test
+    void reapplyAfterRevert_showsDiscountAgain() throws Exception {
+        UUID orderId = createCashOrder();
+        applyDiscount(orderId, "10", "CUSTOMER_PROMO", null).andExpect(status().isNoContent());
+        revertDiscount(orderId, "OTHER", null).andExpect(status().isNoContent());
+        applyDiscount(orderId, "20", "TRANSFER_ADJUSTMENT", null).andExpect(status().isNoContent());
+
+        assertThat(countDiscounts(orderId)).isEqualTo(3);
+        mockMvc.perform(get("/backoffice/orders/" + orderId)
+                .header("Authorization", "Bearer " + managerToken()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.discount.percentage").value(20.00))
+            .andExpect(jsonPath("$.totalAmount").value(87.00));
+    }
+
+    /** El resumen de turno factura el total restaurado tras revertir, no el descontado. */
+    @Test
+    void shiftSummary_afterRevert_billsTheRestoredTotal() throws Exception {
+        UUID orderId = createCashOrder();
+        applyDiscount(orderId, "10", "CUSTOMER_PROMO", null).andExpect(status().isNoContent());
+        revertDiscount(orderId, "OTHER", null).andExpect(status().isNoContent());
+        deliver(orderId);
+
+        Map<String, Object> summary = closeShiftAndReadSummary();
+
+        // 107 (restaurado), no 97 (el descuento revertido no se factura).
+        assertThat((BigDecimal) summary.get("total_revenue")).isEqualByComparingTo("107.00");
+    }
+
+    @Test
+    void revertDiscount_withoutCurrentDiscount_returns422() throws Exception {
+        UUID orderId = createCashOrder();
+
+        revertDiscount(orderId, "OTHER", null)
+            .andExpect(status().isUnprocessableEntity())
+            .andExpect(jsonPath("$.message").value(
+                "El pedido no tiene un descuento vigente para revertir"));
+
+        assertThat(countDiscounts(orderId)).isZero();
+    }
+
+    @Test
+    void revertDiscount_twice_secondReturns422BecauseCurrentIsAlreadyReverted() throws Exception {
+        UUID orderId = createCashOrder();
+        applyDiscount(orderId, "10", "CUSTOMER_PROMO", null).andExpect(status().isNoContent());
+        revertDiscount(orderId, "OTHER", null).andExpect(status().isNoContent());
+
+        // El vigente ya es REVERTED: no hay descuento real que revertir de nuevo.
+        revertDiscount(orderId, "OTHER", null)
+            .andExpect(status().isUnprocessableEntity());
+
+        assertThat(countDiscounts(orderId)).isEqualTo(2);
+    }
+
+    @Test
+    void revertDiscount_missingReason_returns400() throws Exception {
+        UUID orderId = createCashOrder();
+        applyDiscount(orderId, "10", "CUSTOMER_PROMO", null).andExpect(status().isNoContent());
+
+        mockMvc.perform(post("/backoffice/orders/" + orderId + "/discount/revert")
+                .header("Authorization", "Bearer " + managerToken())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+            .andExpect(status().isBadRequest());
+
+        // Sigue habiendo un solo descuento (el aplicado): el 400 no escribió nada.
+        assertThat(countDiscounts(orderId)).isEqualTo(1);
+    }
+
+    @Test
+    void revertDiscount_asStaff_returns403() throws Exception {
+        UUID orderId = createCashOrder();
+        applyDiscount(orderId, "10", "CUSTOMER_PROMO", null).andExpect(status().isNoContent());
+
+        mockMvc.perform(post("/backoffice/orders/" + orderId + "/discount/revert")
+                .header("Authorization", "Bearer " + tokenFor(STAFF_USER_ID, "STAFF"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"reason\":\"OTHER\"}"))
+            .andExpect(status().isForbidden());
+
+        assertThat(countDiscounts(orderId)).isEqualTo(1);
+    }
+
+    @Test
+    void revertDiscount_onDeliveredOrder_returns422() throws Exception {
+        UUID orderId = createCashOrder();
+        applyDiscount(orderId, "10", "CUSTOMER_PROMO", null).andExpect(status().isNoContent());
+        deliver(orderId);
+
+        // Entregado: fuera de la ventana. El descuento ya se facturó en el resumen.
+        revertDiscount(orderId, "OTHER", null)
+            .andExpect(status().isUnprocessableEntity());
+
+        assertThat(countDiscounts(orderId)).isEqualTo(1);
+    }
+
     // ── Guards de negocio contra la base real ───────────────────────────────────
 
     @Test
@@ -245,14 +405,62 @@ class OrderDiscountIntegrationTest {
         initiatePayment(orderId);
         triggerApprovedWebhook("mp-discount-001", orderId);
 
+        // MercadoPago APPROVED = ya cobrado: mensaje de "ya cobrado", no el de gateway.
         applyDiscount(orderId, "10", "CUSTOMER_PROMO", null)
             .andExpect(status().isUnprocessableEntity())
             .andExpect(jsonPath("$.message").value(
-                "No se puede aplicar un descuento a un pedido pagado por MercadoPago o QR"));
+                "No se puede modificar el descuento de un pedido ya cobrado"));
 
         assertThat(countDiscounts(orderId)).isZero();
         assertThat(orderRepository.findById(orderId).orElseThrow().getTotalAmount())
             .isEqualByComparingTo("107.00");
+    }
+
+    // ── US-19-07: pedido cobrado en efectivo (marcado como pagado a mano) ─────────
+
+    /**
+     * El bug reportado, end-to-end: se marca el pedido como pagado en efectivo
+     * (confirmCashPayment -> Payment CASH APPROVED) y a partir de ahí no se puede ni
+     * aplicar, ni modificar, ni revertir el descuento. Antes el guard sólo miraba
+     * pagos de gateway, así que un CASH APPROVED se colaba.
+     */
+    @Test
+    void cashApproved_rejectsApplyModifyAndRevert() throws Exception {
+        UUID orderId = createCashOrder();
+
+        // Descuento aplicado ANTES de cobrar (el flujo válido), y confirmado el cobro.
+        applyDiscount(orderId, "10", "CUSTOMER_PROMO", null).andExpect(status().isNoContent());
+        confirmCashPayment(orderId);
+        assertThat(paymentStatusOf(orderId)).isEqualTo("APPROVED");
+
+        String alreadyCharged = "No se puede modificar el descuento de un pedido ya cobrado";
+
+        // Aplicar de nuevo (modificar) → 422 ya cobrado.
+        applyDiscount(orderId, "20", "CUSTOMER_PROMO", null)
+            .andExpect(status().isUnprocessableEntity())
+            .andExpect(jsonPath("$.message").value(alreadyCharged));
+
+        // Revertir → 422 ya cobrado.
+        revertDiscount(orderId, "OTHER", null)
+            .andExpect(status().isUnprocessableEntity())
+            .andExpect(jsonPath("$.message").value(alreadyCharged));
+
+        // Nada se escribió tras el cobro: sigue el único descuento del 10%.
+        assertThat(countDiscounts(orderId)).isEqualTo(1);
+        assertThat(orderRepository.findById(orderId).orElseThrow().getTotalAmount())
+            .isEqualByComparingTo("97.00");
+    }
+
+    /** Sin marcar el cobro, un efectivo PENDING sigue admitiendo descuento (no se rompe). */
+    @Test
+    void cashPending_stillAllowsDiscount() throws Exception {
+        UUID orderId = createCashOrder();
+        assertThat(paymentStatusOf(orderId)).isEqualTo("PENDING");
+
+        applyDiscount(orderId, "10", "CUSTOMER_PROMO", null).andExpect(status().isNoContent());
+
+        assertThat(orderRepository.findById(orderId).orElseThrow().getTotalAmount())
+            .isEqualByComparingTo("97.00");
     }
 
     /**
@@ -506,12 +714,26 @@ class OrderDiscountIntegrationTest {
             .content(body));
     }
 
+    private org.springframework.test.web.servlet.ResultActions revertDiscount(
+            UUID orderId, String reason, String note) throws Exception {
+        String body = note == null
+            ? String.format("{\"reason\":\"%s\"}", reason)
+            : String.format("{\"reason\":\"%s\",\"note\":\"%s\"}", reason, note);
+
+        return mockMvc.perform(post("/backoffice/orders/" + orderId + "/discount/revert")
+            .header("Authorization", "Bearer " + managerToken())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(body));
+    }
+
     private void insertDiscountBySql(UUID orderId, BigDecimal percentage, int appliedBy) {
+        // action='APPLIED' explícito: sin él la fila violaría el NOT NULL de action y
+        // el test pasaría por la razón equivocada, sin llegar a ejercer el CHECK/FK.
         jdbcTemplate.update("""
             INSERT INTO order_discount
-                (id, order_id, percentage, original_total_amount, discount_amount,
+                (id, order_id, action, percentage, original_total_amount, discount_amount,
                  final_total_amount, reason, applied_by, applied_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
+            VALUES (?, ?, 'APPLIED', ?, ?, ?, ?, ?, ?, NOW())
             """,
             UUID.randomUUID(), orderId, percentage,
             new BigDecimal("107.00"), new BigDecimal("10.00"), new BigDecimal("97.00"),
@@ -547,6 +769,11 @@ class OrderDiscountIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"action\":\"CONFIRM\"}"))
             .andExpect(status().isOk());
+    }
+
+    private String paymentStatusOf(UUID orderId) {
+        return jdbcTemplate.queryForObject(
+            "SELECT status FROM payment WHERE order_id = ?", String.class, orderId);
     }
 
     /** Lleva un pedido DELIVERY en efectivo hasta DELIVERED, cobrándolo primero. */

@@ -25,6 +25,7 @@ import com.laroka.backend.order.dto.BackofficeOrderPageDTO;
 import com.laroka.backend.order.dto.BackofficeOrderResponseDTO;
 import com.laroka.backend.order.dto.CancelRequestActionDTO;
 import com.laroka.backend.order.dto.OrderFilterParams;
+import com.laroka.backend.order.dto.RevertDiscountRequestDTO;
 import com.laroka.backend.order.dto.UpdateOrderStatusRequestDTO;
 import com.laroka.backend.order.entity.OrderStatus;
 import com.laroka.backend.order.mapper.OrderMapper;
@@ -242,6 +243,29 @@ public class BackofficeOrderController {
         Integer branchId = securityUtils.resolveBranchId(principal, request);
         orderService.applyDiscount(id, branchId, dto.getPercentage(), dto.getReason(),
                 dto.getNote(), principal.getUserId());
+        BackofficeOrderRow updatedRow = orderService.findOrderRowById(id);
+        notificationService.sendOrderUpdatedEvent(branchId,
+                orderMapper.toBackofficeResponseDTO(updatedRow.order(), updatedRow.payment(), updatedRow.discount()), "BACKOFFICE");
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{id}/discount/revert")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    @Operation(summary = "Revert the current discount (ADMIN/MANAGER only)",
+            description = "Reverts the order's current discount, restoring totalAmount to the full " +
+                    "subtotal+fees. Append-only: inserts a REVERTED row (percentage 0, discount 0) with a " +
+                    "required reason and optional note — the applied->reverted trail stays in the table. " +
+                    "Same guards as applying: 422 outside the active window or with a MERCADOPAGO/QR_CODE " +
+                    "payment in PENDING/APPROVED, and 422 if the order has no current discount to revert. " +
+                    "Returns 403 if wrong branch or not ADMIN/MANAGER.")
+    public ResponseEntity<Void> revertDiscount(
+            @PathVariable UUID id,
+            @Valid @RequestBody RevertDiscountRequestDTO dto,
+            @AuthenticationPrincipal CustomUserDetails principal,
+            HttpServletRequest request) {
+
+        Integer branchId = securityUtils.resolveBranchId(principal, request);
+        orderService.revertDiscount(id, branchId, dto.getReason(), dto.getNote(), principal.getUserId());
         BackofficeOrderRow updatedRow = orderService.findOrderRowById(id);
         notificationService.sendOrderUpdatedEvent(branchId,
                 orderMapper.toBackofficeResponseDTO(updatedRow.order(), updatedRow.payment(), updatedRow.discount()), "BACKOFFICE");

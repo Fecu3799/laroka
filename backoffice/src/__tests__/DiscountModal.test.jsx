@@ -298,6 +298,26 @@ describe('canApplyDiscount', () => {
     expect(canApplyDiscount(mpRejected, 'MANAGER')).toBe(true)
   })
 
+  // US-19-07: el bug. Un pedido marcado como pagado en efectivo (CASH APPROVED) ya
+  // está cobrado y no debe mostrar los botones de descuento — antes se colaba.
+  test('lo niega con un pago en efectivo ya aprobado (ya cobrado)', () => {
+    const cashApproved = { ...ORDER, paymentMethod: 'CASH', paymentStatus: 'APPROVED' }
+    expect(canApplyDiscount(cashApproved, 'MANAGER')).toBe(false)
+    expect(canApplyDiscount(cashApproved, 'ADMIN')).toBe(false)
+  })
+
+  test('lo permite con un efectivo aún pendiente: pedido activo sin cobrar', () => {
+    const cashPending = { ...ORDER, paymentMethod: 'CASH', paymentStatus: 'PENDING' }
+    expect(canApplyDiscount(cashPending, 'MANAGER')).toBe(true)
+  })
+
+  test('lo niega con cualquier método APPROVED, no solo gateway', () => {
+    for (const method of ['CASH', 'MERCADOPAGO', 'QR_CODE']) {
+      expect(canApplyDiscount({ ...ORDER, paymentMethod: method, paymentStatus: 'APPROVED' }, 'MANAGER'))
+        .toBe(false)
+    }
+  })
+
   test('lo niega en PENDING_PAYMENT: todavía no está definido cómo se cobra', () => {
     expect(canApplyDiscount({ ...ORDER, status: 'PENDING_PAYMENT' }, 'ADMIN')).toBe(false)
   })

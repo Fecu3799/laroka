@@ -46,8 +46,6 @@ export function canCancel(status) {
 
 /** Métodos de pago que cobran vía MercadoPago: el importe ya viajó al gateway. */
 const GATEWAY_PAYMENT_METHODS = ['MERCADOPAGO', 'QR_CODE']
-/** Estados de un pago de gateway que bloquean el descuento: cobrado o en vuelo. */
-const DISCOUNT_BLOCKING_PAYMENT_STATUSES = ['APPROVED', 'PENDING']
 
 /**
  * Ventana del descuento: el pedido activo, después de RECEIVED y antes de
@@ -61,12 +59,16 @@ const DISCOUNTABLE_STATUSES = [
 ]
 
 /**
- * ¿Se le puede aplicar un descuento manual a este pedido? (US-19-02)
+ * ¿Se le puede aplicar/modificar/borrar un descuento a este pedido? (US-19-02/07)
  *
- * Espeja los guards del backend (`OrderService.applyDiscount`) para no ofrecerle
- * al operador un botón que va a terminar en 422:
+ * Espeja los guards del backend (`OrderService`) para no ofrecerle al operador un
+ * botón que va a terminar en 422:
  *  - solo MANAGER y ADMIN (el backend lo valida con @PreAuthorize; acá es UI)
- *  - nunca con un pago de gateway aprobado o pendiente
+ *  - nunca si el pedido ya fue cobrado, por el medio que sea: un pago APPROVED
+ *    (efectivo marcado a mano, MercadoPago o QR) deja el precio fijo (US-19-07)
+ *  - nunca con un cobro de gateway en proceso (PENDING de MercadoPago/QR): un
+ *    webhook puede aprobarlo en cualquier momento. Un efectivo PENDING no bloquea:
+ *    el pedido sigue activo sin cobrar
  *  - solo mientras el pedido está activo: en PENDING_PAYMENT todavía no está
  *    definido cómo se cobra, y desde DELIVERED el total ya se factura en el
  *    resumen del turno (un cancelado directamente no tiene nada que cobrar)
@@ -77,10 +79,13 @@ const DISCOUNTABLE_STATUSES = [
 export function canApplyDiscount(order, role) {
   if (role !== 'MANAGER' && role !== 'ADMIN') return false
   if (!order || !DISCOUNTABLE_STATUSES.includes(order.status)) return false
-  return !(
-    GATEWAY_PAYMENT_METHODS.includes(order.paymentMethod) &&
-    DISCOUNT_BLOCKING_PAYMENT_STATUSES.includes(order.paymentStatus)
-  )
+  // Ya cobrado por cualquier medio → el precio no se toca.
+  if (order.paymentStatus === 'APPROVED') return false
+  // Cobro de gateway en proceso (aprobable por webhook en cualquier momento).
+  if (GATEWAY_PAYMENT_METHODS.includes(order.paymentMethod) && order.paymentStatus === 'PENDING') {
+    return false
+  }
+  return true
 }
 
 /**

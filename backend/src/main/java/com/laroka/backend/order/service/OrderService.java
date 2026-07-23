@@ -44,6 +44,7 @@ import com.laroka.backend.catalog.repository.ProductRepository;
 import com.laroka.backend.catalog.repository.ProductSizeRepository;
 import com.laroka.backend.catalog.service.ProductSizeService;
 import com.laroka.backend.order.domain.OrderStateMachine;
+import com.laroka.backend.order.entity.DiscountAction;
 import com.laroka.backend.order.entity.DiscountReason;
 import com.laroka.backend.order.entity.Order;
 import com.laroka.backend.order.entity.OrderDiscount;
@@ -123,21 +124,31 @@ public class OrderService {
     private static final BigDecimal ONE_HUNDRED = new BigDecimal("100");
 
     /**
-     * Métodos de pago que cobran a través de MercadoPago. Un pedido cobrado por
-     * alguno de ellos no admite descuento manual (US-19-01): el importe ya viajó al
-     * gateway y bajarlo acá lo dejaría descalzado del cobro real.
+     * Métodos de pago que cobran a través de MercadoPago. Un cobro de gateway aún
+     * PENDING bloquea el descuento porque un webhook puede aprobarlo en paralelo; un
+     * cobro en efectivo PENDING no, porque el pedido sigue activo sin cobrar hasta que
+     * el operador lo confirma manualmente (US-19-07).
      */
     private static final Set<PaymentMethod> GATEWAY_PAYMENT_METHODS =
             Set.of(PaymentMethod.MERCADOPAGO, PaymentMethod.QR_CODE);
 
     /**
-     * Estados de un pago de gateway que bloquean el descuento (US-19-01): APPROVED
-     * porque ya se cobró, PENDING porque el cobro está en vuelo y puede aprobarse en
-     * cualquier momento. Los estados terminales fallidos (REJECTED, CANCELLED) no
-     * bloquean: ahí no hay cobro que descalzar.
+     * El pedido ya fue cobrado, por el medio que sea (US-19-07): un Payment APPROVED,
+     * sea CASH (marcado como pagado a mano), MercadoPago o QR. Una vez cobrado el
+     * precio no puede modificarse, así que ni aplicar, ni modificar, ni revertir un
+     * descuento están permitidos.
      */
-    private static final Set<PaymentStatus> DISCOUNT_BLOCKING_PAYMENT_STATUSES =
-            Set.of(PaymentStatus.PENDING, PaymentStatus.APPROVED);
+    private static final String DISCOUNT_ALREADY_CHARGED_MSG =
+            "No se puede modificar el descuento de un pedido ya cobrado";
+
+    /**
+     * Hay un cobro de gateway en proceso (Payment PENDING de MercadoPago/QR): todavía
+     * no está cobrado, pero un webhook puede aprobarlo en cualquier momento, así que
+     * tampoco se toca el precio. Mensaje distinto del de "ya cobrado" a propósito: son
+     * situaciones diferentes y el operador debe entender cuál está viendo.
+     */
+    private static final String DISCOUNT_GATEWAY_IN_FLIGHT_MSG =
+            "No se puede modificar el descuento: hay un pago de MercadoPago o QR en proceso";
 
     @Transactional
     public OrderCreationResult createOrder(Order order, List<OrderItem> items,
@@ -459,11 +470,10 @@ public class OrderService {
 
     /**
      * Aplica un descuento porcentual manual sobre el subtotal del pedido (US-19-01,
-     * MANAGER/ADMIN). Solo para pedidos cobrados por fuera del gateway: si existe un
-     * {@link Payment} de método {@link #GATEWAY_PAYMENT_METHODS} en estado
-     * {@link #DISCOUNT_BLOCKING_PAYMENT_STATUSES}, se rechaza — el dinero ya está (o
-     * está por estar) en MercadoPago y bajarle el total al pedido dejaría el cobro
-     * descalzado del importe registrado.
+     * MANAGER/ADMIN). Solo para pedidos que todavía no fueron cobrados: si el pedido
+     * ya tiene un {@link Payment} APPROVED (por el medio que sea) o un cobro de gateway
+     * en proceso, se rechaza en {@link #rejectDiscountIfPaymentBlocks} — bajar el total
+     * dejaría el cobro descalzado del importe registrado.
      *
      * Cada aplicación inserta una fila nueva en {@code order_discount}; nunca se
      * mutan ni borran las anteriores. El cálculo parte siempre de
@@ -512,21 +522,14 @@ public class OrderService {
             throw new BusinessException(discountWindowClosedMessage(order.getStatus()));
         }
 
-        // Lock pesimista (SELECT ... FOR UPDATE) sobre el pago + chequeo del método y
-        // estado bajo el lock, en la misma transacción que la escritura del descuento
-        // (mismo patrón que retryRefund). Sin el lock, un webhook de MercadoPago
-        // aprobando el pago en simultáneo podía intercalarse entre el chequeo y la
-        // escritura: leíamos PENDING, el webhook commiteaba APPROVED, y el pedido
-        // quedaba cobrado por el total viejo con un total nuevo más bajo.
+        // Lock pesimista (SELECT ... FOR UPDATE) sobre el pago + chequeo bajo el lock,
+        // en la misma transacción que la escritura del descuento (mismo patrón que
+        // retryRefund). Sin el lock, un webhook de MercadoPago aprobando el pago en
+        // simultáneo podía intercalarse entre el chequeo y la escritura: leíamos
+        // PENDING, el webhook commiteaba APPROVED, y el pedido quedaba cobrado por el
+        // total viejo con un total nuevo más bajo.
         Payment payment = paymentRepository.findByOrderIdForUpdate(orderId).orElse(null);
-        if (payment != null
-                && GATEWAY_PAYMENT_METHODS.contains(payment.getMethod())
-                && DISCOUNT_BLOCKING_PAYMENT_STATUSES.contains(payment.getStatus())) {
-            log.warn("Discount rejected — gateway payment in progress | orderId={} method={} status={}",
-                    orderId, payment.getMethod(), payment.getStatus());
-            throw new BusinessException(
-                    "No se puede aplicar un descuento a un pedido pagado por MercadoPago o QR");
-        }
+        rejectDiscountIfPaymentBlocks(orderId, payment);
 
         BigDecimal originalTotal = order.getSubtotal()
                 .add(order.getDeliveryFee())
@@ -539,6 +542,7 @@ public class OrderService {
         orderDiscountRepository.save(OrderDiscount.builder()
                 .id(UUID.randomUUID())
                 .order(order)
+                .action(DiscountAction.APPLIED)
                 .percentage(percentage)
                 .originalTotalAmount(originalTotal)
                 .discountAmount(discountAmount)
@@ -554,6 +558,105 @@ public class OrderService {
 
         log.info("Discount applied | orderId={} percentage={} originalTotal={} discount={} finalTotal={} reason={} staffUserId={}",
                 orderId, percentage, originalTotal, discountAmount, finalTotal, reason, staffUserId);
+    }
+
+    /**
+     * Revierte el descuento vigente de un pedido (US-19-06, MANAGER/ADMIN). No borra:
+     * la tabla es append-only, así que inserta una fila {@link DiscountAction#REVERTED}
+     * con {@code percentage=0}, {@code discountAmount=0} y
+     * {@code finalTotalAmount=originalTotalAmount} — el pedido vuelve a su total sin
+     * descontar. {@code order.totalAmount} se sobrescribe con ese total, igual que en
+     * cualquier aplicación. La traza completa (aplicado -> revertido) queda en la tabla.
+     *
+     * Mismos guards que aplicar (rol en el controller, ventana activa, sin pago de
+     * gateway bajo lock pesimista). Además exige que exista un descuento vigente real
+     * que revertir: si el más reciente ya es REVERTED —o no hay ninguno— se rechaza.
+     */
+    @Transactional
+    public void revertDiscount(UUID orderId, Integer branchId, DiscountReason reason,
+                               String note, Integer staffUserId) {
+        Order order = orderRepository.findByIdWithBranch(orderId)
+                .orElseThrow(() -> {
+                    log.warn("Order not found | orderId={}", orderId);
+                    return new OrderNotFoundException(orderId);
+                });
+
+        if (!order.getBranch().getId().equals(branchId)) {
+            log.warn("Branch mismatch on revert-discount | orderId={} orderBranch={} userBranch={}",
+                    orderId, order.getBranch().getId(), branchId);
+            throw new AccessDeniedException("El pedido no pertenece a la sucursal del usuario");
+        }
+
+        if (!ACTIVE_ORDER_STATUSES.contains(order.getStatus())) {
+            log.warn("Revert rejected — order outside the discount window | orderId={} status={}",
+                    orderId, order.getStatus());
+            throw new BusinessException(discountWindowClosedMessage(order.getStatus()));
+        }
+
+        // Mismo lock pesimista y mismo guard que aplicar: si el pedido ya fue cobrado
+        // (por el medio que sea) no se revierte —el precio quedó fijo—, y si hay un
+        // cobro de gateway en proceso un webhook podría aprobarlo mientras revertimos.
+        Payment payment = paymentRepository.findByOrderIdForUpdate(orderId).orElse(null);
+        rejectDiscountIfPaymentBlocks(orderId, payment);
+
+        OrderDiscount current = orderDiscountRepository
+                .findFirstByOrderIdOrderByAppliedAtDesc(orderId)
+                .orElse(null);
+        if (current == null || !current.isApplied()) {
+            throw new BusinessException("El pedido no tiene un descuento vigente para revertir");
+        }
+
+        // El pedido vuelve al total sin descuento. Se parte de subtotal+fees (no del
+        // totalAmount ya descontado), la misma base con la que se calculó el descuento.
+        BigDecimal originalTotal = order.getSubtotal()
+                .add(order.getDeliveryFee())
+                .add(order.getServiceFee());
+
+        orderDiscountRepository.save(OrderDiscount.builder()
+                .id(UUID.randomUUID())
+                .order(order)
+                .action(DiscountAction.REVERTED)
+                .percentage(BigDecimal.ZERO)
+                .originalTotalAmount(originalTotal)
+                .discountAmount(BigDecimal.ZERO)
+                .finalTotalAmount(originalTotal)
+                .reason(reason)
+                .note(note)
+                .appliedBy(staffUserId)
+                .appliedAt(LocalDateTime.now())
+                .build());
+
+        order.setTotalAmount(originalTotal);
+        orderRepository.save(order);
+
+        log.info("Discount reverted | orderId={} restoredTotal={} reason={} staffUserId={}",
+                orderId, originalTotal, reason, staffUserId);
+    }
+
+    /**
+     * Guard de pago para aplicar/modificar/revertir un descuento (US-19-07). El
+     * criterio es "¿ya se cobró, por el medio que sea?", no "¿se cobró por gateway?":
+     *  - Payment APPROVED (CASH marcado a mano, MercadoPago o QR) → ya cobrado, el
+     *    precio quedó fijo. Antes este caso se colaba para pagos manuales.
+     *  - Payment PENDING de gateway → cobro en proceso; un webhook puede aprobarlo en
+     *    paralelo, así que tampoco se toca el precio.
+     * Un pago en efectivo PENDING no bloquea: el pedido sigue activo sin cobrar.
+     */
+    private void rejectDiscountIfPaymentBlocks(UUID orderId, Payment payment) {
+        if (payment == null) {
+            return;
+        }
+        if (payment.getStatus() == PaymentStatus.APPROVED) {
+            log.warn("Discount rejected — order already charged | orderId={} method={} status={}",
+                    orderId, payment.getMethod(), payment.getStatus());
+            throw new BusinessException(DISCOUNT_ALREADY_CHARGED_MSG);
+        }
+        if (payment.getStatus() == PaymentStatus.PENDING
+                && GATEWAY_PAYMENT_METHODS.contains(payment.getMethod())) {
+            log.warn("Discount rejected — gateway payment in progress | orderId={} method={} status={}",
+                    orderId, payment.getMethod(), payment.getStatus());
+            throw new BusinessException(DISCOUNT_GATEWAY_IN_FLIGHT_MSG);
+        }
     }
 
     /**
@@ -633,12 +736,26 @@ public class OrderService {
         // así que las anteriores son historial y no se exponen acá. El nombre de quién
         // lo aplicó se resuelve ahora porque appliedBy es un id plano (el módulo order
         // no se acopla a la entidad de staffuser).
+        // US-19-06: si la fila vigente es REVERTED, el pedido no tiene descuento visible
+        // (isApplied lo filtra) — el detalle vuelve a mostrarse como si nunca hubiera
+        // existido, aunque la traza aplicado -> revertido siga en la tabla.
         AppliedDiscount discount = orderDiscountRepository
                 .findFirstByOrderIdOrderByAppliedAtDesc(orderId)
+                .filter(OrderDiscount::isApplied)
                 .map(d -> new AppliedDiscount(d, resolveStaffUserName(d.getAppliedBy())))
                 .orElse(null);
 
         return new BackofficeOrderDetail(order, payment, history, discount);
+    }
+
+    /**
+     * Descuento a mostrar a partir del más reciente del pedido (US-19-06): el propio
+     * si es una aplicación, o null si es una reversión (o no hay ninguno). Centraliza
+     * la regla "un vigente REVERTED no se muestra" para las rutas batch (lista activa
+     * e historial), que agrupan por pedido y se quedan con la fila más reciente.
+     */
+    private static OrderDiscount visibleDiscount(OrderDiscount latest) {
+        return latest != null && latest.isApplied() ? latest : null;
     }
 
     /**
@@ -698,7 +815,7 @@ public class OrderService {
                 .map(o -> new BackofficeOrderRow(
                         withItems.getOrDefault(o.getId(), o),
                         paymentByOrderId.get(o.getId()),
-                        discountByOrderId.get(o.getId())))
+                        visibleDiscount(discountByOrderId.get(o.getId()))))
                 .toList();
 
         return new PageImpl<>(rows, pageRequest, orderPage.getTotalElements());
@@ -753,7 +870,7 @@ public class OrderService {
 
         return filtered.stream()
                 .map(o -> new BackofficeOrderRow(o, paymentByOrderId.get(o.getId()),
-                        discountByOrderId.get(o.getId())))
+                        visibleDiscount(discountByOrderId.get(o.getId()))))
                 .toList();
     }
 
@@ -765,8 +882,10 @@ public class OrderService {
                     return new OrderNotFoundException(orderId);
                 });
         Payment payment = paymentRepository.findByOrderId(orderId).orElse(null);
+        // US-19-06: un vigente REVERTED se muestra como sin descuento (isApplied lo filtra).
         OrderDiscount discount = orderDiscountRepository
                 .findFirstByOrderIdOrderByAppliedAtDesc(orderId)
+                .filter(OrderDiscount::isApplied)
                 .orElse(null);
         return new BackofficeOrderRow(order, payment, discount);
     }

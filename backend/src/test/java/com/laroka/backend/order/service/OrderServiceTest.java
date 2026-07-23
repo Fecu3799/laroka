@@ -40,6 +40,7 @@ import com.laroka.backend.catalog.entity.CategoryType;
 import com.laroka.backend.catalog.entity.Product;
 import com.laroka.backend.catalog.repository.BranchProductRepository;
 import com.laroka.backend.catalog.repository.ProductRepository;
+import com.laroka.backend.order.entity.DiscountAction;
 import com.laroka.backend.order.entity.DiscountReason;
 import com.laroka.backend.order.entity.Order;
 import com.laroka.backend.order.entity.OrderDiscount;
@@ -2391,7 +2392,7 @@ class OrderServiceTest {
     }
 
     @Test
-    void applyDiscount_mercadoPagoApproved_throwsBusinessException() {
+    void applyDiscount_mercadoPagoApproved_throwsAlreadyCharged() {
         UUID orderId = UUID.randomUUID();
         Order order = discountableOrder(new BigDecimal("1000.00"));
         Payment payment = paymentWith(order, PaymentMethod.MERCADOPAGO, PaymentStatus.APPROVED);
@@ -2399,18 +2400,55 @@ class OrderServiceTest {
         when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
         when(paymentRepository.findByOrderIdForUpdate(orderId)).thenReturn(Optional.of(payment));
 
+        // APPROVED = ya cobrado; el mensaje es el de "ya cobrado", no el de gateway.
         assertThatThrownBy(() -> service.applyDiscount(orderId, 1, new BigDecimal("10"),
                 DiscountReason.CUSTOMER_PROMO, null, 7))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("MercadoPago");
+                .hasMessageContaining("ya cobrado");
 
         verify(orderDiscountRepository, never()).save(any());
         verify(orderRepository, never()).save(any(Order.class));
         assertThat(order.getTotalAmount()).isEqualByComparingTo("1700.00");
     }
 
+    // US-19-07: el bug reportado. Un pedido marcado como pagado en efectivo es un
+    // Payment CASH APPROVED. Antes se colaba (el guard sólo miraba gateway); ahora se
+    // rechaza con el mismo mensaje de "ya cobrado".
     @Test
-    void applyDiscount_mercadoPagoPending_throwsBusinessException() {
+    void applyDiscount_cashApproved_throwsAlreadyCharged() {
+        UUID orderId = UUID.randomUUID();
+        Order order = discountableOrder(new BigDecimal("1000.00"));
+        Payment payment = paymentWith(order, PaymentMethod.CASH, PaymentStatus.APPROVED);
+
+        when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
+        when(paymentRepository.findByOrderIdForUpdate(orderId)).thenReturn(Optional.of(payment));
+
+        assertThatThrownBy(() -> service.applyDiscount(orderId, 1, new BigDecimal("10"),
+                DiscountReason.CUSTOMER_PROMO, null, 7))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("ya cobrado");
+
+        verify(orderDiscountRepository, never()).save(any());
+        verify(orderRepository, never()).save(any(Order.class));
+        assertThat(order.getTotalAmount()).isEqualByComparingTo("1700.00");
+    }
+
+    // Un efectivo aún PENDING (pedido activo sin cobrar) SÍ admite descuento: es el
+    // flujo normal que no debe romperse al cerrar el bug del CASH APPROVED.
+    @Test
+    void applyDiscount_cashPending_isAllowed() {
+        UUID orderId = UUID.randomUUID();
+        Order order = discountableOrder(new BigDecimal("1000.00"));
+        Payment payment = paymentWith(order, PaymentMethod.CASH, PaymentStatus.PENDING);
+
+        OrderDiscount discount = applyAndCapture(orderId, order, payment, new BigDecimal("10"));
+
+        assertThat(discount.getFinalTotalAmount()).isEqualByComparingTo("1600.00");
+        assertThat(order.getTotalAmount()).isEqualByComparingTo("1600.00");
+    }
+
+    @Test
+    void applyDiscount_mercadoPagoPending_throwsGatewayInFlight() {
         UUID orderId = UUID.randomUUID();
         Order order = discountableOrder(new BigDecimal("1000.00"));
         Payment payment = paymentWith(order, PaymentMethod.MERCADOPAGO, PaymentStatus.PENDING);
@@ -2418,16 +2456,18 @@ class OrderServiceTest {
         when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
         when(paymentRepository.findByOrderIdForUpdate(orderId)).thenReturn(Optional.of(payment));
 
-        // El cobro está en vuelo: un webhook puede aprobarlo en cualquier momento.
+        // El cobro está en vuelo: un webhook puede aprobarlo en cualquier momento. El
+        // mensaje es el de gateway "en proceso", distinto del de "ya cobrado".
         assertThatThrownBy(() -> service.applyDiscount(orderId, 1, new BigDecimal("10"),
                 DiscountReason.CUSTOMER_PROMO, null, 7))
-                .isInstanceOf(BusinessException.class);
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("en proceso");
 
         verify(orderDiscountRepository, never()).save(any());
     }
 
     @Test
-    void applyDiscount_qrCodePending_throwsBusinessException() {
+    void applyDiscount_qrCodePending_throwsGatewayInFlight() {
         UUID orderId = UUID.randomUUID();
         Order order = discountableOrder(new BigDecimal("1000.00"));
         Payment payment = paymentWith(order, PaymentMethod.QR_CODE, PaymentStatus.PENDING);
@@ -2437,7 +2477,8 @@ class OrderServiceTest {
 
         assertThatThrownBy(() -> service.applyDiscount(orderId, 1, new BigDecimal("10"),
                 DiscountReason.CUSTOMER_PROMO, null, 7))
-                .isInstanceOf(BusinessException.class);
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("en proceso");
 
         verify(orderDiscountRepository, never()).save(any());
     }
@@ -2587,6 +2628,160 @@ class OrderServiceTest {
         assertThatThrownBy(() -> service.applyDiscount(orderId, 1, new BigDecimal("10"),
                 DiscountReason.CUSTOMER_PROMO, null, 7))
                 .isInstanceOf(OrderNotFoundException.class);
+
+        verify(orderDiscountRepository, never()).save(any());
+    }
+
+    @Test
+    void applyDiscount_marksRowAsApplied() {
+        UUID orderId = UUID.randomUUID();
+        Order order = discountableOrder(new BigDecimal("1000.00"));
+
+        OrderDiscount discount = applyAndCapture(orderId, order, null, new BigDecimal("10"));
+
+        assertThat(discount.getAction()).isEqualTo(DiscountAction.APPLIED);
+    }
+
+    // ── US-19-06: revertir un descuento ─────────────────────────────
+
+    private OrderDiscount appliedRow(BigDecimal percentage) {
+        return OrderDiscount.builder()
+                .id(UUID.randomUUID())
+                .action(DiscountAction.APPLIED)
+                .percentage(percentage)
+                .build();
+    }
+
+    private OrderDiscount revertAndCapture(UUID orderId, Order order, OrderDiscount current) {
+        when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
+        when(paymentRepository.findByOrderIdForUpdate(orderId)).thenReturn(Optional.empty());
+        when(orderDiscountRepository.findFirstByOrderIdOrderByAppliedAtDesc(orderId))
+                .thenReturn(Optional.ofNullable(current));
+
+        service.revertDiscount(orderId, 1, DiscountReason.OTHER, "error de carga", 7);
+
+        ArgumentCaptor<OrderDiscount> captor = ArgumentCaptor.forClass(OrderDiscount.class);
+        verify(orderDiscountRepository).save(captor.capture());
+        return captor.getValue();
+    }
+
+    @Test
+    void revertDiscount_insertsRevertedRowAndRestoresTotal() {
+        UUID orderId = UUID.randomUUID();
+        // Total ya descontado (1600); revertir lo devuelve a subtotal+fees (1700).
+        Order order = discountableOrder(new BigDecimal("1000.00"));
+        order.setTotalAmount(new BigDecimal("1600.00"));
+
+        OrderDiscount reverted = revertAndCapture(orderId, order, appliedRow(new BigDecimal("10")));
+
+        assertThat(reverted.getAction()).isEqualTo(DiscountAction.REVERTED);
+        assertThat(reverted.getPercentage()).isEqualByComparingTo("0");
+        assertThat(reverted.getDiscountAmount()).isEqualByComparingTo("0");
+        assertThat(reverted.getOriginalTotalAmount()).isEqualByComparingTo("1700.00");
+        assertThat(reverted.getFinalTotalAmount()).isEqualByComparingTo("1700.00");
+        assertThat(reverted.getReason()).isEqualTo(DiscountReason.OTHER);
+        assertThat(reverted.getNote()).isEqualTo("error de carga");
+        assertThat(reverted.getAppliedBy()).isEqualTo(7);
+        // El pedido vuelve a su total sin descontar.
+        assertThat(order.getTotalAmount()).isEqualByComparingTo("1700.00");
+        verify(orderRepository).save(order);
+    }
+
+    @Test
+    void revertDiscount_withoutCurrentDiscount_throwsBusinessException() {
+        UUID orderId = UUID.randomUUID();
+        Order order = discountableOrder(new BigDecimal("1000.00"));
+
+        when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
+        when(paymentRepository.findByOrderIdForUpdate(orderId)).thenReturn(Optional.empty());
+        when(orderDiscountRepository.findFirstByOrderIdOrderByAppliedAtDesc(orderId))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.revertDiscount(orderId, 1, DiscountReason.OTHER, null, 7))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("no tiene un descuento vigente para revertir");
+
+        verify(orderDiscountRepository, never()).save(any());
+        verify(orderRepository, never()).save(any(Order.class));
+    }
+
+    @Test
+    void revertDiscount_whenCurrentIsAlreadyReverted_throwsBusinessException() {
+        UUID orderId = UUID.randomUUID();
+        Order order = discountableOrder(new BigDecimal("1000.00"));
+        OrderDiscount alreadyReverted = OrderDiscount.builder()
+                .id(UUID.randomUUID()).action(DiscountAction.REVERTED).build();
+
+        when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
+        when(paymentRepository.findByOrderIdForUpdate(orderId)).thenReturn(Optional.empty());
+        when(orderDiscountRepository.findFirstByOrderIdOrderByAppliedAtDesc(orderId))
+                .thenReturn(Optional.of(alreadyReverted));
+
+        assertThatThrownBy(() -> service.revertDiscount(orderId, 1, DiscountReason.OTHER, null, 7))
+                .isInstanceOf(BusinessException.class);
+
+        verify(orderDiscountRepository, never()).save(any());
+    }
+
+    @Test
+    void revertDiscount_orderDelivered_throwsBusinessException() {
+        UUID orderId = UUID.randomUUID();
+        Order order = discountableOrder(new BigDecimal("1000.00"));
+        order.setStatus(OrderStatus.DELIVERED);
+
+        when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
+
+        assertThatThrownBy(() -> service.revertDiscount(orderId, 1, DiscountReason.OTHER, null, 7))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("ya entregado");
+
+        // Ni siquiera se llega a mirar el pago ni el descuento vigente.
+        verify(paymentRepository, never()).findByOrderIdForUpdate(any());
+        verify(orderDiscountRepository, never()).save(any());
+    }
+
+    @Test
+    void revertDiscount_mercadoPagoApproved_throwsAlreadyCharged() {
+        UUID orderId = UUID.randomUUID();
+        Order order = discountableOrder(new BigDecimal("1000.00"));
+        Payment payment = paymentWith(order, PaymentMethod.MERCADOPAGO, PaymentStatus.APPROVED);
+
+        when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
+        when(paymentRepository.findByOrderIdForUpdate(orderId)).thenReturn(Optional.of(payment));
+
+        assertThatThrownBy(() -> service.revertDiscount(orderId, 1, DiscountReason.OTHER, null, 7))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("ya cobrado");
+
+        verify(orderDiscountRepository, never()).save(any());
+    }
+
+    // US-19-07: revertir tampoco puede sobre un pedido ya cobrado en efectivo.
+    @Test
+    void revertDiscount_cashApproved_throwsAlreadyCharged() {
+        UUID orderId = UUID.randomUUID();
+        Order order = discountableOrder(new BigDecimal("1000.00"));
+        Payment payment = paymentWith(order, PaymentMethod.CASH, PaymentStatus.APPROVED);
+
+        when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
+        when(paymentRepository.findByOrderIdForUpdate(orderId)).thenReturn(Optional.of(payment));
+
+        assertThatThrownBy(() -> service.revertDiscount(orderId, 1, DiscountReason.OTHER, null, 7))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("ya cobrado");
+
+        verify(orderDiscountRepository, never()).save(any());
+    }
+
+    @Test
+    void revertDiscount_orderFromAnotherBranch_throwsAccessDenied() {
+        UUID orderId = UUID.randomUUID();
+        Order order = discountableOrder(new BigDecimal("1000.00")); // branch id=1
+
+        when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
+
+        assertThatThrownBy(() -> service.revertDiscount(orderId, 99, DiscountReason.OTHER, null, 7))
+                .isInstanceOf(AccessDeniedException.class);
 
         verify(orderDiscountRepository, never()).save(any());
     }

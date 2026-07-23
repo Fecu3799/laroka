@@ -62,6 +62,14 @@ public class OrderDiscount {
     @Column(name = "final_total_amount", nullable = false, precision = 10, scale = 2)
     private BigDecimal finalTotalAmount;
 
+    /**
+     * APPLIED = aplicación real; REVERTED = reversión (US-19-06). El vigente es la
+     * fila más reciente: si es REVERTED, el pedido no tiene descuento visible.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "action", nullable = false, length = 20)
+    private DiscountAction action;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "reason", nullable = false, length = 30)
     private DiscountReason reason;
@@ -79,4 +87,12 @@ public class OrderDiscount {
 
     @Column(name = "applied_at", nullable = false)
     private LocalDateTime appliedAt;
+
+    /**
+     * ¿Es un descuento real y vigente? Falso para una fila de reversión. Lo usan las
+     * rutas de lectura para no mostrar un descuento cuando el vigente es REVERTED.
+     */
+    public boolean isApplied() {
+        return action == DiscountAction.APPLIED;
+    }
 }

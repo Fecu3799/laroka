@@ -24,6 +24,7 @@ import {
 } from "../utils/ordersUtils";
 import NewOrderModal from "../components/NewOrderModal";
 import DiscountModal from "../components/DiscountModal";
+import RevertDiscountModal from "../components/RevertDiscountModal";
 import OperatorStatusBar from "../components/OperatorStatusBar";
 import useOperatorMessages from "../hooks/useOperatorMessages";
 import "./Orders.css";
@@ -1166,6 +1167,7 @@ function OrderDetail({
   const [cancelReason, setCancelReason] = useState("");
   const [retryingRefund, setRetryingRefund] = useState(false);
   const [discountOpen, setDiscountOpen] = useState(false);
+  const [revertOpen, setRevertOpen] = useState(false);
 
   const canGoBack = goBackAllowed(order.status);
   const canCancel = cancelAllowed(order.status);
@@ -1707,19 +1709,39 @@ function OrderDetail({
             </div>
           )}
 
-          {/* US-19-02/05: descuento manual. Solo MANAGER/ADMIN y solo si el pedido
+          {/* US-19-02/05/06: descuento manual. Solo MANAGER/ADMIN y solo si el pedido
               no está tomado por un pago de gateway — canApplyDiscount espeja los
-              guards del backend. Con un descuento vigente el botón pasa a "Modificar"
-              y abre el mismo modal precargado (US-19-05); el botón "Borrar descuento"
-              es alcance de US-19-06 (necesita el endpoint /revert). */}
+              guards del backend. Sin descuento vigente: un botón "Aplicar". Con uno
+              vigente: "Modificar" (mismo modal precargado, US-19-05) + "Borrar"
+              (revierte, US-19-06). Tras revertir, order.discount vuelve a null y el
+              detalle muestra de nuevo el único botón "Aplicar descuento". */}
           {canApplyDiscount(order, role) && (
-            <button
-              className="detail-action-btn detail-action-discount"
-              type="button"
-              onClick={() => setDiscountOpen(true)}
-            >
-              {order.discount ? "Modificar descuento" : "Aplicar descuento"}
-            </button>
+            order.discount ? (
+              <div className="detail-discount-actions">
+                <button
+                  className="detail-action-btn detail-action-discount"
+                  type="button"
+                  onClick={() => setDiscountOpen(true)}
+                >
+                  Modificar descuento
+                </button>
+                <button
+                  className="detail-action-btn detail-action-discount-remove"
+                  type="button"
+                  onClick={() => setRevertOpen(true)}
+                >
+                  Borrar descuento
+                </button>
+              </div>
+            ) : (
+              <button
+                className="detail-action-btn detail-action-discount"
+                type="button"
+                onClick={() => setDiscountOpen(true)}
+              >
+                Aplicar descuento
+              </button>
+            )
           )}
         </div>
 
@@ -1749,6 +1771,21 @@ function OrderDetail({
             onApplied={() => {
               // Refresca detalle y lista: el total del pedido cambió. El backend
               // además emite order-updated por SSE para el resto de las sesiones.
+              onRefetch();
+              onRefresh();
+            }}
+          />
+        )}
+
+        {revertOpen && (
+          <RevertDiscountModal
+            order={order}
+            token={token}
+            branchId={branchId}
+            onClose={() => setRevertOpen(false)}
+            onReverted={() => {
+              // Igual que aplicar: el total volvió a su valor sin descuento y
+              // order.discount pasa a null, así que el botón vuelve a "Aplicar".
               onRefetch();
               onRefresh();
             }}

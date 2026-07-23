@@ -69,3 +69,19 @@ export async function applyDiscount(orderId, { percentage, reason, note }, token
     { silentErrors: true },
   )
 }
+
+// US-19-06: revierte el descuento vigente (MANAGER/ADMIN). No borra: el backend
+// inserta una fila REVERTED y el pedido vuelve a su total sin descontar. Exige
+// motivo; nota opcional. `silentErrors` porque el modal de reversión muestra su
+// propio mensaje, igual que applyDiscount.
+export async function revertDiscount(orderId, { reason, note }, token, branchId) {
+  await apiFetch(
+    `${API_URL}/backoffice/orders/${orderId}/discount/revert`,
+    {
+      method: 'POST',
+      headers: backofficeHeaders(token, branchId, { 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ reason, note: note?.trim() ? note.trim() : null }),
+    },
+    { silentErrors: true },
+  )
+}
