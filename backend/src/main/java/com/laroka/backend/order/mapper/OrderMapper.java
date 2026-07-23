@@ -190,7 +190,17 @@ public class OrderMapper {
     }
 
     public BackofficeOrderResponseDTO toBackofficeResponseDTO(Order order, Payment payment) {
+        return toBackofficeResponseDTO(order, payment, null);
+    }
+
+    public BackofficeOrderResponseDTO toBackofficeResponseDTO(Order order, Payment payment,
+                                                              OrderDiscount discount) {
         return BackofficeOrderResponseDTO.builder()
+                // US-19-04: el ticket se imprime desde la fila de la lista, así que el
+                // descuento viaja acá. appliedByName queda null a propósito: la lista no
+                // resuelve nombres (sería una query extra en un endpoint que se refresca
+                // por polling) y el ticket no lo usa. El detalle sí lo trae (US-19-03).
+                .discount(discount == null ? null : toDiscountDTO(new AppliedDiscount(discount, null)))
                 .id(order.getId())
                 .orderNumber(order.getOrderNumber())
                 .createdAt(order.getCreatedAt())

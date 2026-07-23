@@ -75,7 +75,7 @@ public class BackofficeOrderController {
         OrderFilterParams params = new OrderFilterParams(status, dateFrom, dateTo, orderBy);
         List<BackofficeOrderRow> rows = orderService.findActiveOrdersByBranch(branchId, shiftId, params);
         List<BackofficeOrderResponseDTO> response = rows.stream()
-                .map(row -> orderMapper.toBackofficeResponseDTO(row.order(), row.payment()))
+                .map(row -> orderMapper.toBackofficeResponseDTO(row.order(), row.payment(), row.discount()))
                 .toList();
         return ResponseEntity.ok(response);
     }
@@ -99,7 +99,7 @@ public class BackofficeOrderController {
                 branchId, status, dateFrom, dateTo, page, size);
 
         List<BackofficeOrderResponseDTO> content = orderPage.getContent().stream()
-                .map(row -> orderMapper.toBackofficeResponseDTO(row.order(), row.payment()))
+                .map(row -> orderMapper.toBackofficeResponseDTO(row.order(), row.payment(), row.discount()))
                 .toList();
 
         return ResponseEntity.ok(BackofficeOrderPageDTO.builder()
@@ -138,7 +138,7 @@ public class BackofficeOrderController {
                 branchId, principal.getUserId());
         BackofficeOrderRow updatedRow = orderService.findOrderRowById(id);
         notificationService.sendOrderUpdatedEvent(branchId,
-                orderMapper.toBackofficeResponseDTO(updatedRow.order(), updatedRow.payment()), "BACKOFFICE");
+                orderMapper.toBackofficeResponseDTO(updatedRow.order(), updatedRow.payment(), updatedRow.discount()), "BACKOFFICE");
         return ResponseEntity.noContent().build();
     }
 
@@ -155,7 +155,7 @@ public class BackofficeOrderController {
         orderService.transitionToPreviousStatusForBackoffice(id, branchId, principal.getUserId());
         BackofficeOrderRow updatedRow = orderService.findOrderRowById(id);
         notificationService.sendOrderUpdatedEvent(branchId,
-                orderMapper.toBackofficeResponseDTO(updatedRow.order(), updatedRow.payment()), "BACKOFFICE");
+                orderMapper.toBackofficeResponseDTO(updatedRow.order(), updatedRow.payment(), updatedRow.discount()), "BACKOFFICE");
         return ResponseEntity.noContent().build();
     }
 
@@ -173,7 +173,7 @@ public class BackofficeOrderController {
         orderService.resolveCancellationRequest(id, dto.getAction(), branchId, principal.getUserId());
         BackofficeOrderRow updatedRow = orderService.findOrderRowById(id);
         notificationService.sendOrderUpdatedEvent(branchId,
-                orderMapper.toBackofficeResponseDTO(updatedRow.order(), updatedRow.payment()), "BACKOFFICE");
+                orderMapper.toBackofficeResponseDTO(updatedRow.order(), updatedRow.payment(), updatedRow.discount()), "BACKOFFICE");
         return ResponseEntity.noContent().build();
     }
 
@@ -195,7 +195,7 @@ public class BackofficeOrderController {
         Payment payment = paymentService.confirmCashPayment(id, branchId);
         BackofficeOrderRow updatedRow = orderService.findOrderRowById(id);
         notificationService.sendOrderUpdatedEvent(branchId,
-                orderMapper.toBackofficeResponseDTO(updatedRow.order(), payment), "BACKOFFICE");
+                orderMapper.toBackofficeResponseDTO(updatedRow.order(), payment, updatedRow.discount()), "BACKOFFICE");
         return ResponseEntity.ok(PaymentStatusResponseDTO.builder()
                 .status(payment.getStatus())
                 .method(payment.getMethod())
@@ -219,7 +219,7 @@ public class BackofficeOrderController {
         orderService.retryRefund(id, branchId);
         BackofficeOrderRow updatedRow = orderService.findOrderRowById(id);
         notificationService.sendOrderUpdatedEvent(branchId,
-                orderMapper.toBackofficeResponseDTO(updatedRow.order(), updatedRow.payment()), "BACKOFFICE");
+                orderMapper.toBackofficeResponseDTO(updatedRow.order(), updatedRow.payment(), updatedRow.discount()), "BACKOFFICE");
         return ResponseEntity.noContent().build();
     }
 
@@ -244,7 +244,7 @@ public class BackofficeOrderController {
                 dto.getNote(), principal.getUserId());
         BackofficeOrderRow updatedRow = orderService.findOrderRowById(id);
         notificationService.sendOrderUpdatedEvent(branchId,
-                orderMapper.toBackofficeResponseDTO(updatedRow.order(), updatedRow.payment()), "BACKOFFICE");
+                orderMapper.toBackofficeResponseDTO(updatedRow.order(), updatedRow.payment(), updatedRow.discount()), "BACKOFFICE");
         return ResponseEntity.noContent().build();
     }
 }

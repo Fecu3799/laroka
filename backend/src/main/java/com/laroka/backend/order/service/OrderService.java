@@ -687,10 +687,18 @@ public class OrderService {
         Map<UUID, Payment> paymentByOrderId = paymentRepository.findByOrderIdIn(ids)
                 .stream().collect(Collectors.toMap(p -> p.getOrder().getId(), p -> p, (a, b) -> a));
 
+        // Mismo batch que en la lista activa (US-19-04): el historial también expone
+        // totalAmount, y dejar discount en null sobre un pedido descontado haría que
+        // el DTO contradijera al detalle.
+        Map<UUID, OrderDiscount> discountByOrderId = orderDiscountRepository
+                .findByOrderIdInOrderByAppliedAtDesc(ids)
+                .stream().collect(Collectors.toMap(d -> d.getOrder().getId(), d -> d, (a, b) -> a));
+
         List<BackofficeOrderRow> rows = orderPage.getContent().stream()
                 .map(o -> new BackofficeOrderRow(
                         withItems.getOrDefault(o.getId(), o),
-                        paymentByOrderId.get(o.getId())))
+                        paymentByOrderId.get(o.getId()),
+                        discountByOrderId.get(o.getId())))
                 .toList();
 
         return new PageImpl<>(rows, pageRequest, orderPage.getTotalElements());
@@ -734,8 +742,18 @@ public class OrderService {
                 .stream()
                 .collect(Collectors.toMap(p -> p.getOrder().getId(), p -> p, (a, b) -> a));
 
+        // US-19-04: descuentos en batch (una query para toda la página, igual que los
+        // pagos) y no uno por pedido: esta lista se refresca por polling/SSE, así que
+        // un N+1 acá se paga en cada refresco. La query viene ordenada por applied_at
+        // DESC, así que el merge (a, b) -> a se queda con el descuento vigente.
+        Map<UUID, OrderDiscount> discountByOrderId = orderDiscountRepository
+                .findByOrderIdInOrderByAppliedAtDesc(orderIds)
+                .stream()
+                .collect(Collectors.toMap(d -> d.getOrder().getId(), d -> d, (a, b) -> a));
+
         return filtered.stream()
-                .map(o -> new BackofficeOrderRow(o, paymentByOrderId.get(o.getId())))
+                .map(o -> new BackofficeOrderRow(o, paymentByOrderId.get(o.getId()),
+                        discountByOrderId.get(o.getId())))
                 .toList();
     }
 
@@ -747,7 +765,10 @@ public class OrderService {
                     return new OrderNotFoundException(orderId);
                 });
         Payment payment = paymentRepository.findByOrderId(orderId).orElse(null);
-        return new BackofficeOrderRow(order, payment);
+        OrderDiscount discount = orderDiscountRepository
+                .findFirstByOrderIdOrderByAppliedAtDesc(orderId)
+                .orElse(null);
+        return new BackofficeOrderRow(order, payment, discount);
     }
 
     @Transactional(readOnly = true)

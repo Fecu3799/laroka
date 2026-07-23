@@ -39,6 +39,12 @@ function formatMoney(value) {
   return '$' + Number(value ?? 0).toLocaleString('es-AR', { maximumFractionDigits: 0 })
 }
 
+// Porcentaje del descuento: el backend lo persiste como NUMERIC(5,2) ("10.00"), así
+// que se muestran decimales sólo si los tiene.
+function formatPercentage(value) {
+  return Number(value ?? 0).toLocaleString('es-AR', { maximumFractionDigits: 2 }) + '%'
+}
+
 // Fecha legible del ticket: DD/MM/YYYY HH:MM.
 function formatDateTime(value) {
   const d = value ? new Date(value) : new Date()
@@ -107,6 +113,17 @@ export function buildTicketModel(order, branch) {
       name: orderItemDisplayName(it),
       unitPrice: formatMoney(it.unitPrice),
     })),
+    // US-19-04: con descuento aplicado el comprobante muestra la aritmética completa
+    // (subtotal previo → descuento → TOTAL). Sin ella el cliente vería un TOTAL que no
+    // se corresponde con la suma de los ítems. `originalTotalAmount` es el snapshot que
+    // el backend congela al aplicar, así que la resta siempre cierra.
+    discount: o.discount
+      ? {
+          percentage: formatPercentage(o.discount.percentage),
+          amount: formatMoney(o.discount.discountAmount),
+          originalTotal: formatMoney(o.discount.originalTotalAmount),
+        }
+      : null,
     total: formatMoney(o.totalAmount),
     paymentMethod: PAYMENT_METHOD_LABELS[o.paymentMethod] ?? o.paymentMethod ?? '',
     fileName: `ticket-${sid}-${fileDate(o.createdAt)}.pdf`,
@@ -215,6 +232,9 @@ function renderTicketHtml(model) {
     /* Total: el elemento más destacado */
     .total { display: flex; justify-content: space-between; align-items: baseline; font-size: 26px; font-weight: bold; }
     .total .label { letter-spacing: 1px; }
+    /* Descuento (US-19-04): subtotal previo y monto restado, encima del TOTAL */
+    .amount-row { display: flex; justify-content: space-between; font-size: 13px; padding: 2px 0; }
+    .amount-row.discount { font-weight: bold; }
     ${CLOSE_BUTTON_CSS}
   </style>
 </head>
@@ -234,6 +254,10 @@ function renderTicketHtml(model) {
       <tbody>${rows}</tbody>
     </table>
     <hr class="sep" />
+    ${model.discount ? `
+    <div class="amount-row"><span>Subtotal</span><span>${escapeHtml(model.discount.originalTotal)}</span></div>
+    <div class="amount-row discount"><span>Descuento (${escapeHtml(model.discount.percentage)})</span><span>-${escapeHtml(model.discount.amount)}</span></div>
+    <hr class="sep" />` : ''}
     <div class="total"><span class="label">TOTAL</span><span>${escapeHtml(model.total)}</span></div>
   </div>
   ${printScriptTag()}

@@ -249,3 +249,103 @@ describe('ítem con tamaño en ticket y comanda', () => {
     vi.restoreAllMocks()
   })
 })
+
+// ── US-19-04: línea de descuento en el comprobante ────────────────────────────
+
+describe('descuento en el ticket (US-19-04)', () => {
+  // Subtotal previo 1700, 10% sobre el subtotal de ítems (1000) → 100; total 1600.
+  const DISCOUNTED = {
+    ...order,
+    totalAmount: 1600,
+    discount: {
+      percentage: 10,
+      discountAmount: 100,
+      originalTotalAmount: 1700,
+      reason: 'CUSTOMER_PROMO',
+    },
+  }
+
+  it('buildTicketModel expone el descuento formateado', () => {
+    const model = buildTicketModel(DISCOUNTED, branch)
+
+    expect(model.discount).toEqual({
+      percentage: '10%',
+      amount: '$100',
+      originalTotal: '$1.700',
+    })
+    expect(model.total).toBe('$1.600')
+  })
+
+  it('sin descuento, el modelo lo deja en null', () => {
+    expect(buildTicketModel(order, branch).discount).toBeNull()
+  })
+
+  it('el ticket impreso muestra subtotal previo, descuento y total', async () => {
+    const cap = installCapture()
+    printTicket(DISCOUNTED, branch)
+    const html = await cap.html()
+
+    expect(html).toContain('<span>Subtotal</span><span>$1.700</span>')
+    expect(html).toContain('Descuento (10%)')
+    expect(html).toContain('<span>-$100</span>')
+    // El TOTAL impreso es el post-descuento y cierra con la resta de arriba.
+    expect(html).toContain('<span class="label">TOTAL</span><span>$1.600</span>')
+    vi.restoreAllMocks()
+  })
+
+  it('sin descuento el ticket no imprime ninguna línea de descuento', async () => {
+    const cap = installCapture()
+    printTicket(order, branch)
+    const html = await cap.html()
+
+    // Sobre el markup, no sobre el texto suelto: la hoja de estilos menciona
+    // "Descuento" en un comentario y haría pasar una aserción más laxa.
+    expect(html).not.toContain('class="amount-row discount"')
+    expect(html).not.toContain('<span>Subtotal</span>')
+    expect(html).toContain('<span class="label">TOTAL</span><span>$8.000</span>')
+    vi.restoreAllMocks()
+  })
+
+  // ── Edge cases pedidos por el backlog ──────────────────────────────────────
+
+  it('descuento de 0%: se imprime la línea y el total no cambia', async () => {
+    const zero = {
+      ...order,
+      totalAmount: 1700,
+      discount: { percentage: 0, discountAmount: 0, originalTotalAmount: 1700 },
+    }
+    const cap = installCapture()
+    printTicket(zero, branch)
+    const html = await cap.html()
+
+    expect(html).toContain('Descuento (0%)')
+    expect(html).toContain('<span>-$0</span>')
+    expect(html).toContain('<span class="label">TOTAL</span><span>$1.700</span>')
+    vi.restoreAllMocks()
+  })
+
+  it('descuento de 100%: descuenta el subtotal entero y quedan sólo los fees', () => {
+    const full = {
+      ...order,
+      totalAmount: 700,
+      discount: { percentage: 100, discountAmount: 1000, originalTotalAmount: 1700 },
+    }
+    const model = buildTicketModel(full, branch)
+
+    expect(model.discount.percentage).toBe('100%')
+    expect(model.discount.amount).toBe('$1.000')
+    expect(model.total).toBe('$700')
+  })
+
+  it('porcentaje con decimales: conserva los decimales del backend', () => {
+    const rounded = {
+      ...order,
+      totalAmount: 73.67,
+      discount: { percentage: 33.33, discountAmount: 33.33, originalTotalAmount: 107 },
+    }
+    const model = buildTicketModel(rounded, branch)
+
+    // NUMERIC(5,2) llega como 33.33; un "33%" redondeado ocultaría el importe real.
+    expect(model.discount.percentage).toBe('33,33%')
+  })
+})

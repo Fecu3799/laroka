@@ -131,7 +131,7 @@ class BackofficeOrderControllerAuthorizationTest {
     void adminToken_retryRefund_returns204() throws Exception {
         when(securityUtils.resolveBranchId(any(), any())).thenReturn(1);
         when(orderService.findOrderRowById(ORDER_ID))
-                .thenReturn(new BackofficeOrderRow(Order.builder().build(), Payment.builder().build()));
+                .thenReturn(new BackofficeOrderRow(Order.builder().build(), Payment.builder().build(), null));
 
         mockMvc.perform(post(RETRY_URL)
                 .header("Authorization", "Bearer " + tokenWithRole("ADMIN")))
@@ -160,7 +160,7 @@ class BackofficeOrderControllerAuthorizationTest {
     void managerToken_applyDiscount_returns204() throws Exception {
         when(securityUtils.resolveBranchId(any(), any())).thenReturn(1);
         when(orderService.findOrderRowById(ORDER_ID))
-                .thenReturn(new BackofficeOrderRow(Order.builder().build(), Payment.builder().build()));
+                .thenReturn(new BackofficeOrderRow(Order.builder().build(), Payment.builder().build(), null));
 
         mockMvc.perform(post(DISCOUNT_URL)
                 .header("Authorization", "Bearer " + tokenWithRole("MANAGER"))
@@ -176,7 +176,7 @@ class BackofficeOrderControllerAuthorizationTest {
     void adminToken_applyDiscount_returns204() throws Exception {
         when(securityUtils.resolveBranchId(any(), any())).thenReturn(1);
         when(orderService.findOrderRowById(ORDER_ID))
-                .thenReturn(new BackofficeOrderRow(Order.builder().build(), Payment.builder().build()));
+                .thenReturn(new BackofficeOrderRow(Order.builder().build(), Payment.builder().build(), null));
 
         mockMvc.perform(post(DISCOUNT_URL)
                 .header("Authorization", "Bearer " + tokenWithRole("ADMIN"))

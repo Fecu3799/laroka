@@ -293,6 +293,98 @@ class OrderDiscountIntegrationTest {
             .isEqualByComparingTo("107.00");
     }
 
+    // ── US-19-04: el resumen de turno refleja el total ya descontado ─────────────
+
+    /**
+     * El descuento sobrescribe {@code order.totalAmount} y la ventana se cierra en
+     * DELIVERED, así que cuando calculateSummary suma los entregados ya lee el importe
+     * final. Este test fija esa cadena end-to-end: sin doble conteo (no se resta el
+     * descuento otra vez) y sin inconsistencia entre totalRevenue, revenueByMethod y
+     * el averageTicket derivado.
+     */
+    @Test
+    void shiftSummary_afterDiscount_billsTheDiscountedTotalExactlyOnce() throws Exception {
+        UUID orderId = createCashOrder();
+        applyDiscount(orderId, "10", "CUSTOMER_PROMO", null).andExpect(status().isNoContent());
+        deliver(orderId);
+
+        Map<String, Object> summary = closeShiftAndReadSummary();
+
+        // 107 - 10 = 97. Ni 107 (ignorar el descuento) ni 87 (restarlo dos veces).
+        assertThat((BigDecimal) summary.get("total_revenue")).isEqualByComparingTo("97.00");
+        assertThat((BigDecimal) summary.get("average_ticket")).isEqualByComparingTo("97.00");
+        assertThat(summary.get("delivered_orders")).isEqualTo(1);
+
+        // El desglose por método sale del mismo totalAmount: no puede divergir del total.
+        assertThat((BigDecimal) summary.get("cash_revenue")).isEqualByComparingTo("97.00");
+        assertThat((BigDecimal) summary.get("mp_revenue")).isEqualByComparingTo("0.00");
+    }
+
+    @Test
+    void shiftSummary_withZeroPercentDiscount_billsTheFullTotal() throws Exception {
+        UUID orderId = createCashOrder();
+        applyDiscount(orderId, "0", "OTHER", "sin ajuste").andExpect(status().isNoContent());
+        deliver(orderId);
+
+        Map<String, Object> summary = closeShiftAndReadSummary();
+
+        // 0% es un descuento válido y deja el total intacto; la fila igual queda como traza.
+        assertThat((BigDecimal) summary.get("total_revenue")).isEqualByComparingTo("107.00");
+        assertThat(countDiscounts(orderId)).isEqualTo(1);
+    }
+
+    @Test
+    void shiftSummary_withHundredPercentDiscount_billsOnlyTheFees() throws Exception {
+        UUID orderId = createCashOrder();
+        applyDiscount(orderId, "100", "CUSTOMER_PROMO", "cortesía total")
+            .andExpect(status().isNoContent());
+        deliver(orderId);
+
+        Map<String, Object> summary = closeShiftAndReadSummary();
+
+        // El 100% se aplica al subtotal, no a los fees: quedan envío 5 + servicio 2.
+        assertThat((BigDecimal) summary.get("total_revenue")).isEqualByComparingTo("7.00");
+    }
+
+    /**
+     * Redondeo: 100 * 33.33% = 33.33 exacto en la fila, y el resumen suma ese mismo
+     * importe sin re-redondear (un segundo redondeo desplazaría la caja).
+     */
+    @Test
+    void shiftSummary_withRoundedDiscount_billsTheSameAmountPersistedInTheRow() throws Exception {
+        UUID orderId = createCashOrder();
+        applyDiscount(orderId, "33.33", "TRANSFER_ADJUSTMENT", null)
+            .andExpect(status().isNoContent());
+
+        BigDecimal persistedFinal = jdbcTemplate.queryForObject(
+            "SELECT final_total_amount FROM order_discount WHERE order_id = ?",
+            BigDecimal.class, orderId);
+        assertThat(persistedFinal).isEqualByComparingTo("73.67"); // 107 - 33.33
+
+        deliver(orderId);
+        Map<String, Object> summary = closeShiftAndReadSummary();
+
+        assertThat((BigDecimal) summary.get("total_revenue")).isEqualByComparingTo(persistedFinal);
+    }
+
+    /** Dos pedidos, uno con descuento y otro sin: la caja suma cada uno por su total. */
+    @Test
+    void shiftSummary_mixesDiscountedAndUndiscountedOrders() throws Exception {
+        UUID discounted = createCashOrder();
+        applyDiscount(discounted, "10", "CUSTOMER_PROMO", null).andExpect(status().isNoContent());
+        deliver(discounted);
+
+        UUID plain = createCashOrder();
+        deliver(plain);
+
+        Map<String, Object> summary = closeShiftAndReadSummary();
+
+        // 97 + 107 = 204, con un ticket promedio de 102.
+        assertThat((BigDecimal) summary.get("total_revenue")).isEqualByComparingTo("204.00");
+        assertThat((BigDecimal) summary.get("average_ticket")).isEqualByComparingTo("102.00");
+        assertThat(summary.get("delivered_orders")).isEqualTo(2);
+    }
+
     // ── Autorización y validación sobre la pila real ────────────────────────────
 
     @Test
@@ -455,6 +547,24 @@ class OrderDiscountIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"action\":\"CONFIRM\"}"))
             .andExpect(status().isOk());
+    }
+
+    /** Lleva un pedido DELIVERY en efectivo hasta DELIVERED, cobrándolo primero. */
+    private void deliver(UUID orderId) throws Exception {
+        confirmCashPayment(orderId);
+        transition(orderId, "IN_PREPARATION");
+        transition(orderId, "ON_THE_WAY");
+        transition(orderId, "DELIVERED");
+    }
+
+    /** Cierra el turno abierto y devuelve la fila de work_shift_summary persistida. */
+    private Map<String, Object> closeShiftAndReadSummary() throws Exception {
+        // El cierre exige la recepción desactivada (WorkShiftService.closeShift).
+        jdbcTemplate.update("UPDATE branch SET accepting_orders = false WHERE id = ?", BRANCH_ID);
+        mockMvc.perform(post("/backoffice/shifts/close")
+                .header("Authorization", "Bearer " + managerToken()))
+            .andExpect(status().isOk());
+        return jdbcTemplate.queryForMap("SELECT * FROM work_shift_summary");
     }
 
     private void transition(UUID orderId, String nextStatus) throws Exception {
