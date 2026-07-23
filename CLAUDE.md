@@ -99,6 +99,7 @@ Capas obligatorias por módulo:
 | V38     | payment refund_failed_at + refund_delay_notified |
 | V39     | order_discount (descuento porcentual manual, append-only) |
 | V40     | order_discount action (APPLIED / REVERTED, US-19-06)      |
+| V41     | work_shift_summary discount aggregates (US-20-02)         |
 
 Toda migración nueva debe ser la siguiente versión disponible en esta tabla.
 Actualizar esta tabla al agregar una migración.

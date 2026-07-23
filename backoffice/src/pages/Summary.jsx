@@ -5,6 +5,7 @@ import useAuth from '../hooks/useAuth'
 import useBranch from '../hooks/useBranch'
 import useOperatorMessages from '../hooks/useOperatorMessages'
 import { downloadShiftSummary } from '../services/ticketService'
+import { loadShiftOrderDetails } from '../services/shiftsService'
 import {
   formatDuration,
   formatCurrency,
@@ -181,8 +182,8 @@ export default function Summary() {
   const { shift, closeShift, summary } = useShift()
   const { state, loading, error } = summary
   const { orders, clearOrders } = useOrdersContext()
-  const { tenantName } = useAuth()
-  const { activeBranchName } = useBranch()
+  const { token, tenantName } = useAuth()
+  const { activeBranchName, activeBranchId } = useBranch()
   const { addMessage } = useOperatorMessages()
 
   const [confirmOpen, setConfirmOpen] = useState(false)
@@ -214,10 +215,12 @@ export default function Summary() {
 
   // Descarga el resumen del turno mostrado (US-16-05). Sirve tanto para el turno
   // en curso (Informe X: closedAt null → el PDF dice "En curso") como para el
-  // último turno cerrado (Informe Z). Usa el `state` ya cargado, sin fetch nuevo.
+  // último turno cerrado (Informe Z). El detalle de pedidos (US-20-03) se trae
+  // on-demand recién acá y se adjunta al `state` para el PDF, sin tocar el resto.
   async function handleDownloadSummary() {
     try {
-      await downloadShiftSummary(state, { name: activeBranchName, tenantName })
+      const orderDetails = await loadShiftOrderDetails(token, activeBranchId, state?.summary?.shiftId)
+      await downloadShiftSummary({ ...state, orderDetails }, { name: activeBranchName, tenantName })
     } catch {
       /* silent — apiFetch/PDF ya no aplican acá; fallo de render se ignora */
     }

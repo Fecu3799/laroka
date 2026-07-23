@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import useAuth from '../hooks/useAuth'
 import useBranch from '../hooks/useBranch'
-import { getShiftHistory } from '../services/shiftsService'
+import { getShiftHistory, loadShiftOrderDetails } from '../services/shiftsService'
 import { downloadShiftSummary } from '../services/ticketService'
 import { useHistory } from '../context/HistoryContext'
 import { formatShiftDate, formatShiftClock, formatCurrency } from '../utils/shiftsUtils'
@@ -50,7 +50,9 @@ export default function History() {
   async function handleDownload(e, shift) {
     e.stopPropagation()
     try {
-      await downloadShiftSummary(shift, { name: activeBranchName, tenantName })
+      // US-20-03: detalle de pedidos on-demand, adjuntado al item para el PDF.
+      const orderDetails = await loadShiftOrderDetails(token, activeBranchId, shift?.shiftId)
+      await downloadShiftSummary({ ...shift, orderDetails }, { name: activeBranchName, tenantName })
     } catch {
       /* silent */
     }

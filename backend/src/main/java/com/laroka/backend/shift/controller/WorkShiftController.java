@@ -21,6 +21,7 @@ import com.laroka.backend.shift.dto.CloseShiftResponseDTO;
 import com.laroka.backend.shift.dto.CurrentShiftResponseDTO;
 import com.laroka.backend.shift.dto.OpenShiftResponseDTO;
 import com.laroka.backend.shift.dto.ShiftHistoryItemDTO;
+import com.laroka.backend.shift.dto.ShiftOrderDetailDTO;
 import com.laroka.backend.shift.dto.TopProductDTO;
 import com.laroka.backend.shift.entity.ShiftStatus;
 import com.laroka.backend.shift.entity.WorkShift;
@@ -155,6 +156,22 @@ public class WorkShiftController {
         return ResponseEntity.ok(workShiftService.getTopProducts(shiftId, branchId));
     }
 
+    @GetMapping("/{shiftId}/order-details")
+    @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
+    @Operation(summary = "Get the full order detail of a shift (US-20-03)",
+            description = "Returns one row per terminal order (DELIVERED or CANCELLED) of the shift, "
+                    + "ordered by time, with origin, payment method, total, status and the current "
+                    + "applied discount. Calculated on-demand from Order (terminal orders are immutable), "
+                    + "not persisted. Used by the shift-close PDF.")
+    public ResponseEntity<List<ShiftOrderDetailDTO>> getShiftOrderDetails(
+            @PathVariable UUID shiftId,
+            @AuthenticationPrincipal CustomUserDetails principal,
+            HttpServletRequest request) {
+
+        Integer branchId = securityUtils.resolveBranchId(principal, request);
+        return ResponseEntity.ok(workShiftService.getShiftOrderDetails(shiftId, branchId));
+    }
+
     private ShiftHistoryItemDTO toHistoryItem(WorkShift ws) {
         WorkShiftSummary s = ws.getSummary();
         return ShiftHistoryItemDTO.builder()
@@ -182,6 +199,11 @@ public class WorkShiftController {
             .deliveryOrders(s.getDeliveryOrders())
             .takeawayOrders(s.getTakeawayOrders())
             .cancellationRate(s.getCancellationRate())
+            .totalDiscount(s.getTotalDiscount())
+            .discountedOrders(s.getDiscountedOrders())
+            .discountCustomerPromo(s.getDiscountCustomerPromo())
+            .discountTransferAdjustment(s.getDiscountTransferAdjustment())
+            .discountOther(s.getDiscountOther())
             .calculatedAt(s.getCalculatedAt())
             .autoClose(isAutoClosed(shift))
             .build();

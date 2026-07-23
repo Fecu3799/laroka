@@ -58,3 +58,25 @@ export async function getShiftHistory(token, branchId, page = 0, size = 20) {
   )
   return res.json()
 }
+
+// US-20-03: detalle de pedidos del turno (una fila por pedido terminal), resuelto
+// on-demand para el PDF de cierre. Se pide sólo al generar el resumen, no en el
+// polling del turno en vivo.
+export async function getShiftOrderDetails(token, branchId, shiftId) {
+  const res = await apiFetch(
+    `${API_URL}/backoffice/shifts/${shiftId}/order-details`,
+    { headers: authHeaders(token, branchId) },
+  )
+  return res.json()
+}
+
+// Variante resiliente para el PDF: si no hay shiftId o el fetch falla, devuelve []
+// para que el resumen se genere igual (sin la tabla de detalle) en vez de abortar.
+export async function loadShiftOrderDetails(token, branchId, shiftId) {
+  if (!shiftId) return []
+  try {
+    return await getShiftOrderDetails(token, branchId, shiftId)
+  } catch {
+    return []
+  }
+}
