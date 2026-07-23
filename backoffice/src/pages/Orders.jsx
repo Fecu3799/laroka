@@ -17,10 +17,14 @@ import {
   getNextStatus,
   canGoBack as goBackAllowed,
   canCancel as cancelAllowed,
+  canApplyDiscount,
+  DISCOUNT_REASON_LABEL,
   formatOrderNumber,
   orderItemDisplayName,
 } from "../utils/ordersUtils";
 import NewOrderModal from "../components/NewOrderModal";
+import DiscountModal from "../components/DiscountModal";
+import RevertDiscountModal from "../components/RevertDiscountModal";
 import OperatorStatusBar from "../components/OperatorStatusBar";
 import useOperatorMessages from "../hooks/useOperatorMessages";
 import "./Orders.css";
@@ -165,6 +169,13 @@ function formatDateTime(ts) {
 function formatPrice(n) {
   if (n == null) return "—";
   return "$" + Number(n).toLocaleString("es-AR", { maximumFractionDigits: 0 });
+}
+
+// Porcentaje del descuento (US-19-03). El backend lo persiste como NUMERIC(5,2), así
+// que un 10% llega como "10.00": se muestran decimales solo cuando existen.
+function formatPercentage(n) {
+  if (n == null) return "";
+  return Number(n).toLocaleString("es-AR", { maximumFractionDigits: 2 }) + "%";
 }
 
 function getInitials(name) {
@@ -1155,6 +1166,8 @@ function OrderDetail({
   const [cancelConfirming, setCancelConfirming] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [retryingRefund, setRetryingRefund] = useState(false);
+  const [discountOpen, setDiscountOpen] = useState(false);
+  const [revertOpen, setRevertOpen] = useState(false);
 
   const canGoBack = goBackAllowed(order.status);
   const canCancel = cancelAllowed(order.status);
@@ -1656,12 +1669,80 @@ function OrderDetail({
               <span>{formatPrice(order.serviceFee)}</span>
             </div>
           )}
+
+          {/* US-19-03: descuento vigente. Va entre los fees y el Total porque el
+              Total ya viene post-descuento — sin esta línea el número de abajo no
+              cerraría con la suma de arriba. */}
+          {order.discount && (
+            <div className="detail-subtotal-row detail-discount-row">
+              <span>
+                Descuento
+                <span className="detail-discount-pct">
+                  {formatPercentage(order.discount.percentage)}
+                </span>
+              </span>
+              <span>−{formatPrice(order.discount.discountAmount)}</span>
+            </div>
+          )}
+
           <div className="detail-total-row">
             <span className="detail-total-label">TOTAL</span>
             <span className="detail-total-amount">
               {formatPrice(order.totalAmount)}
             </span>
           </div>
+
+          {/* US-19-03: trazabilidad del descuento. Un ajuste de precio nunca debe
+              aparecer sin explicación: quién lo hizo, cuándo y por qué. */}
+          {order.discount && (
+            <div className="detail-discount-trace">
+              <span className="detail-discount-trace-reason">
+                {DISCOUNT_REASON_LABEL[order.discount.reason] ?? order.discount.reason}
+              </span>
+              <span className="detail-discount-trace-meta">
+                {order.discount.appliedByName ?? "Usuario eliminado"} ·{" "}
+                {formatDateTime(order.discount.appliedAt)}
+              </span>
+              {order.discount.note && (
+                <p className="detail-discount-trace-note">"{order.discount.note}"</p>
+              )}
+            </div>
+          )}
+
+          {/* US-19-02/05/06: descuento manual. Solo MANAGER/ADMIN y solo si el pedido
+              no está tomado por un pago de gateway — canApplyDiscount espeja los
+              guards del backend. Sin descuento vigente: un botón "Aplicar". Con uno
+              vigente: "Modificar" (mismo modal precargado, US-19-05) + "Borrar"
+              (revierte, US-19-06). Tras revertir, order.discount vuelve a null y el
+              detalle muestra de nuevo el único botón "Aplicar descuento". */}
+          {canApplyDiscount(order, role) && (
+            order.discount ? (
+              <div className="detail-discount-actions">
+                <button
+                  className="detail-action-btn detail-action-discount"
+                  type="button"
+                  onClick={() => setDiscountOpen(true)}
+                >
+                  Modificar descuento
+                </button>
+                <button
+                  className="detail-action-btn detail-action-discount-remove"
+                  type="button"
+                  onClick={() => setRevertOpen(true)}
+                >
+                  Borrar descuento
+                </button>
+              </div>
+            ) : (
+              <button
+                className="detail-action-btn detail-action-discount"
+                type="button"
+                onClick={() => setDiscountOpen(true)}
+              >
+                Aplicar descuento
+              </button>
+            )
+          )}
         </div>
 
         {/* Notas */}
@@ -1680,6 +1761,36 @@ function OrderDetail({
             </div>
           )}
 
+        {discountOpen && (
+          <DiscountModal
+            order={order}
+            token={token}
+            branchId={branchId}
+            mode={order.discount ? "edit" : "create"}
+            onClose={() => setDiscountOpen(false)}
+            onApplied={() => {
+              // Refresca detalle y lista: el total del pedido cambió. El backend
+              // además emite order-updated por SSE para el resto de las sesiones.
+              onRefetch();
+              onRefresh();
+            }}
+          />
+        )}
+
+        {revertOpen && (
+          <RevertDiscountModal
+            order={order}
+            token={token}
+            branchId={branchId}
+            onClose={() => setRevertOpen(false)}
+            onReverted={() => {
+              // Igual que aplicar: el total volvió a su valor sin descuento y
+              // order.discount pasa a null, así que el botón vuelve a "Aplicar".
+              onRefetch();
+              onRefresh();
+            }}
+          />
+        )}
       </div>
     </div>
   );

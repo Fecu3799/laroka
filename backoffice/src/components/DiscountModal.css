@@ -1,0 +1,214 @@
+/* ── Modal de descuento manual (US-19-02) ──────────────────────── */
+
+.dsm-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: dsm-fade 0.18s ease;
+}
+
+@keyframes dsm-fade { from { opacity: 0; } to { opacity: 1; } }
+
+.dsm-dialog {
+  width: min(420px, 92vw);
+  background: var(--color-sidebar-bg);
+  border: 1px solid color-mix(in srgb, var(--border) 28%, transparent);
+  border-radius: 14px;
+  padding: 22px 24px 24px;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.7);
+}
+
+.dsm-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.dsm-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.dsm-close {
+  width: 28px;
+  height: 28px;
+  border: 1px solid color-mix(in srgb, var(--border) 30%, transparent);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 19px;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.dsm-close:hover { color: var(--text-primary); border-color: var(--border); }
+
+.dsm-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.dsm-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.dsm-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.dsm-percentage-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.dsm-input,
+.dsm-textarea {
+  width: 100%;
+  background: color-mix(in srgb, var(--border) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 28%, transparent);
+  border-radius: 9px;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  padding: 11px 13px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.dsm-input {
+  font-size: 20px;
+  font-weight: 700;
+  padding-right: 38px;
+}
+
+/* El spinner nativo compite con el sufijo "%" y con un campo de un solo valor
+   no aporta nada. */
+.dsm-input::-webkit-outer-spin-button,
+.dsm-input::-webkit-inner-spin-button {
+  appearance: none;
+  margin: 0;
+}
+
+.dsm-input[type="number"] { appearance: textfield; }
+
+.dsm-input:focus,
+.dsm-textarea:focus { border-color: var(--accent); }
+
+.dsm-percentage-sign {
+  position: absolute;
+  right: 14px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  pointer-events: none;
+}
+
+.dsm-textarea { resize: vertical; min-height: 58px; }
+
+.dsm-hint { font-size: 12px; }
+.dsm-hint--warn { color: var(--color-warning); }
+
+.dsm-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 13px 15px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--border) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 22%, transparent);
+}
+
+.dsm-preview-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.dsm-preview-row--discount { color: var(--color-warning); font-weight: 600; }
+
+.dsm-preview-row--total {
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 24%, transparent);
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.dsm-error { font-size: 13px; color: var(--color-danger); }
+
+.dsm-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.dsm-cancel,
+.dsm-submit {
+  flex: 1;
+  padding: 11px 16px;
+  border-radius: 9px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: filter 0.15s, background 0.15s, opacity 0.15s;
+}
+
+.dsm-cancel {
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--border) 38%, transparent);
+  color: var(--text-secondary);
+}
+
+.dsm-cancel:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--border) 12%, transparent);
+  color: var(--text-primary);
+}
+
+.dsm-submit {
+  background: var(--accent);
+  border: none;
+  color: #0a1810;
+}
+
+.dsm-submit:hover:not(:disabled) { filter: brightness(1.08); }
+
+.dsm-submit:disabled,
+.dsm-cancel:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Reversión de descuento (US-19-06). Reusa el shell dsm-*; agrega el texto guía y
+   la variante peligrosa del botón de confirmar. */
+.dsm-revert-lead {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.dsm-revert-lead strong { color: var(--text-primary); }
+
+.dsm-submit--danger {
+  background: var(--color-danger);
+  color: #fff;
+}

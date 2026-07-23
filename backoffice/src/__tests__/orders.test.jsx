@@ -30,6 +30,8 @@ vi.mock('../hooks/useOrderDetail', () => ({
 
 vi.mock('../services/ordersService', () => ({
   advanceOrderStatus: vi.fn().mockResolvedValue({}),
+  // Orders.jsx monta DiscountModal (US-19-02), que importa applyDiscount.
+  applyDiscount: vi.fn().mockResolvedValue(undefined),
 }))
 
 // ── Test fixtures ─────────────────────────────────────────────

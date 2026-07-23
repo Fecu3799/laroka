@@ -102,8 +102,10 @@ class OrderControllerTest {
     void cancelOrder_resultsCancelled_emitsOrderUpdatedEvent() {
         UUID id = UUID.randomUUID();
         Order order = orderWith(id, OrderStatus.CANCELLED);
-        when(orderService.findOrderRowById(id)).thenReturn(new BackofficeOrderRow(order, null));
-        when(orderMapper.toBackofficeResponseDTO(any(), any())).thenReturn(new BackofficeOrderResponseDTO());
+        when(orderService.findOrderRowById(id)).thenReturn(new BackofficeOrderRow(order, null, null));
+        // US-19-04: el evento SSE se arma con el overload que además lleva el descuento.
+        when(orderMapper.toBackofficeResponseDTO(any(), any(), any()))
+                .thenReturn(new BackofficeOrderResponseDTO());
 
         controller.cancelOrder(id, null);
 
@@ -115,7 +117,7 @@ class OrderControllerTest {
     void cancelOrder_resultsCancellationRequested_emitsCancellationRequestEvent() {
         UUID id = UUID.randomUUID();
         Order order = orderWith(id, OrderStatus.CANCELLATION_REQUESTED);
-        when(orderService.findOrderRowById(id)).thenReturn(new BackofficeOrderRow(order, null));
+        when(orderService.findOrderRowById(id)).thenReturn(new BackofficeOrderRow(order, null, null));
 
         controller.cancelOrder(id, null);
 

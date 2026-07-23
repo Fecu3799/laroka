@@ -55,6 +55,16 @@ public class Payment {
     @Column(name = "refunded_amount", precision = 10, scale = 2)
     private BigDecimal refundedAmount;
 
+    // Momento en que el pago entró en REFUND_FAILED (US-17-08). Lo lee el job de
+    // avisos de demora para detectar reembolsos sin resolver hace más de N horas.
+    @Column(name = "refund_failed_at")
+    private LocalDateTime refundFailedAt;
+
+    // Marca que el aviso de demora ya se envió al cliente: garantiza un solo aviso
+    // por pedido (US-17-08). Primitivo → default false para pagos nuevos.
+    @Column(name = "refund_delay_notified", nullable = false)
+    private boolean refundDelayNotified;
+
     @Column(name = "payment_link", columnDefinition = "TEXT")
     private String paymentLink;
 

@@ -51,6 +51,12 @@ const styles = StyleSheet.create({
   qtyText: { fontSize: 10, fontFamily: 'Helvetica-Bold' },
   itemText: { fontSize: 10 },
 
+  // Filas de importes previas al total (subtotal y descuento, US-19-04)
+  amountRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 1 },
+  amountLabel: { fontSize: 10, color: MUTED },
+  amountValue: { fontSize: 10 },
+  discountText: { fontFamily: 'Helvetica-Bold', color: '#000' },
+
   // Total (elemento más destacado del documento: la fuente más grande)
   totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
   totalLabel: { fontSize: 21, fontFamily: 'Helvetica-Bold', letterSpacing: 1 },
@@ -110,6 +116,26 @@ export default function TicketDocument({ order, branch }) {
           ))}
 
           <View style={base.sep} />
+
+          {/* Descuento (US-19-04): subtotal previo y monto restado, para que el TOTAL
+              impreso se explique solo frente al detalle de ítems. */}
+          {!!model.discount && (
+            <>
+              <View style={styles.amountRow}>
+                <Text style={styles.amountLabel}>Subtotal</Text>
+                <Text style={styles.amountValue}>{model.discount.originalTotal}</Text>
+              </View>
+              <View style={styles.amountRow}>
+                <Text style={[styles.amountLabel, styles.discountText]}>
+                  Descuento ({model.discount.percentage})
+                </Text>
+                <Text style={[styles.amountValue, styles.discountText]}>
+                  -{model.discount.amount}
+                </Text>
+              </View>
+              <View style={base.sep} />
+            </>
+          )}
 
           {/* Total: el elemento más destacado del comprobante */}
           <View style={styles.totalRow}>

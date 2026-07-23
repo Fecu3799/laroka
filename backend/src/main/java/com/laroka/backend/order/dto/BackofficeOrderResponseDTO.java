@@ -31,6 +31,10 @@ public class BackofficeOrderResponseDTO {
     private BigDecimal deliveryFee;
     private BigDecimal serviceFee;
     private BigDecimal totalAmount;
+    // US-19-04: descuento vigente, para que el ticket impreso desde la lista pueda
+    // explicar el TOTAL. null = sin descuento. appliedByName no viene resuelto acá
+    // (ver OrderMapper); el detalle de US-19-03 sí lo expone.
+    private OrderDiscountDTO discount;
     private PaymentStatus paymentStatus;
     private PaymentMethod paymentMethod;
     private OrderType orderType;

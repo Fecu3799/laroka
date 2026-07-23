@@ -981,6 +981,96 @@
   cursor: not-allowed;
 }
 
+/* Línea de descuento entre los fees y el Total (US-19-03). En acento porque es la
+   única línea que resta, y sin ella el Total no cerraría con la suma de arriba. */
+.detail-discount-row {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.detail-discount-pct {
+  margin-left: 6px;
+  opacity: 0.75;
+  font-weight: 500;
+}
+
+/* Traza: quién aplicó el descuento, cuándo y por qué (US-19-03). */
+.detail-discount-trace {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 14px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+.detail-discount-trace-reason {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.detail-discount-trace-meta {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.detail-discount-trace-note {
+  font-size: 12px;
+  font-style: italic;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+/* Descuento manual (US-19-02). Vive dentro del bloque de productos, debajo del
+   Total, porque es la acción que modifica ese número. Discreto y en acento: es
+   una acción deliberada del encargado, no la principal de la pantalla. */
+.detail-action-discount {
+  margin: 10px 14px 14px;
+  width: calc(100% - 28px);
+  padding: 9px 12px;
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  color: var(--accent);
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.detail-action-discount:hover {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+/* US-19-06: con un descuento vigente conviven "Modificar" (acento) y "Borrar"
+   (danger). Comparten fila; al vivir dentro del layout, cada botón anula el
+   margen lateral propio para que el contenedor controle el ancho. */
+.detail-discount-actions {
+  display: flex;
+  gap: 8px;
+  margin: 10px 14px 14px;
+}
+
+.detail-discount-actions .detail-action-discount,
+.detail-discount-actions .detail-action-discount-remove {
+  flex: 1;
+  margin: 0;
+  width: auto;
+}
+
+.detail-action-discount-remove {
+  padding: 9px 12px;
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--color-danger) 40%, transparent);
+  color: var(--color-danger);
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.detail-action-discount-remove:hover {
+  border-color: var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger) 10%, transparent);
+}
+
 /* ── Productos block ─────────────────────────────────────────── */
 
 .detail-products-block {

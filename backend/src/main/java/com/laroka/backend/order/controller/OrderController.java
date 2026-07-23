@@ -94,7 +94,7 @@ public class OrderController {
             notificationService.sendCancellationRequestEvent(branchId, row.order().getId());
         } else if (row.order().getStatus() == OrderStatus.CANCELLED) {
             notificationService.sendOrderUpdatedEvent(branchId,
-                    orderMapper.toBackofficeResponseDTO(row.order(), row.payment()), "CLIENT");
+                    orderMapper.toBackofficeResponseDTO(row.order(), row.payment(), row.discount()), "CLIENT");
         }
         return ResponseEntity.noContent().build();
     }

@@ -19,11 +19,13 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.laroka.backend.order.dto.ApplyDiscountRequestDTO;
 import com.laroka.backend.order.dto.BackofficeOrderDetailDTO;
 import com.laroka.backend.order.dto.BackofficeOrderPageDTO;
 import com.laroka.backend.order.dto.BackofficeOrderResponseDTO;
 import com.laroka.backend.order.dto.CancelRequestActionDTO;
 import com.laroka.backend.order.dto.OrderFilterParams;
+import com.laroka.backend.order.dto.RevertDiscountRequestDTO;
 import com.laroka.backend.order.dto.UpdateOrderStatusRequestDTO;
 import com.laroka.backend.order.entity.OrderStatus;
 import com.laroka.backend.order.mapper.OrderMapper;
@@ -74,7 +76,7 @@ public class BackofficeOrderController {
         OrderFilterParams params = new OrderFilterParams(status, dateFrom, dateTo, orderBy);
         List<BackofficeOrderRow> rows = orderService.findActiveOrdersByBranch(branchId, shiftId, params);
         List<BackofficeOrderResponseDTO> response = rows.stream()
-                .map(row -> orderMapper.toBackofficeResponseDTO(row.order(), row.payment()))
+                .map(row -> orderMapper.toBackofficeResponseDTO(row.order(), row.payment(), row.discount()))
                 .toList();
         return ResponseEntity.ok(response);
     }
@@ -98,7 +100,7 @@ public class BackofficeOrderController {
                 branchId, status, dateFrom, dateTo, page, size);
 
         List<BackofficeOrderResponseDTO> content = orderPage.getContent().stream()
-                .map(row -> orderMapper.toBackofficeResponseDTO(row.order(), row.payment()))
+                .map(row -> orderMapper.toBackofficeResponseDTO(row.order(), row.payment(), row.discount()))
                 .toList();
 
         return ResponseEntity.ok(BackofficeOrderPageDTO.builder()
@@ -137,7 +139,7 @@ public class BackofficeOrderController {
                 branchId, principal.getUserId());
         BackofficeOrderRow updatedRow = orderService.findOrderRowById(id);
         notificationService.sendOrderUpdatedEvent(branchId,
-                orderMapper.toBackofficeResponseDTO(updatedRow.order(), updatedRow.payment()), "BACKOFFICE");
+                orderMapper.toBackofficeResponseDTO(updatedRow.order(), updatedRow.payment(), updatedRow.discount()), "BACKOFFICE");
         return ResponseEntity.noContent().build();
     }
 
@@ -154,7 +156,7 @@ public class BackofficeOrderController {
         orderService.transitionToPreviousStatusForBackoffice(id, branchId, principal.getUserId());
         BackofficeOrderRow updatedRow = orderService.findOrderRowById(id);
         notificationService.sendOrderUpdatedEvent(branchId,
-                orderMapper.toBackofficeResponseDTO(updatedRow.order(), updatedRow.payment()), "BACKOFFICE");
+                orderMapper.toBackofficeResponseDTO(updatedRow.order(), updatedRow.payment(), updatedRow.discount()), "BACKOFFICE");
         return ResponseEntity.noContent().build();
     }
 
@@ -172,7 +174,7 @@ public class BackofficeOrderController {
         orderService.resolveCancellationRequest(id, dto.getAction(), branchId, principal.getUserId());
         BackofficeOrderRow updatedRow = orderService.findOrderRowById(id);
         notificationService.sendOrderUpdatedEvent(branchId,
-                orderMapper.toBackofficeResponseDTO(updatedRow.order(), updatedRow.payment()), "BACKOFFICE");
+                orderMapper.toBackofficeResponseDTO(updatedRow.order(), updatedRow.payment(), updatedRow.discount()), "BACKOFFICE");
         return ResponseEntity.noContent().build();
     }
 
@@ -194,7 +196,7 @@ public class BackofficeOrderController {
         Payment payment = paymentService.confirmCashPayment(id, branchId);
         BackofficeOrderRow updatedRow = orderService.findOrderRowById(id);
         notificationService.sendOrderUpdatedEvent(branchId,
-                orderMapper.toBackofficeResponseDTO(updatedRow.order(), payment), "BACKOFFICE");
+                orderMapper.toBackofficeResponseDTO(updatedRow.order(), payment, updatedRow.discount()), "BACKOFFICE");
         return ResponseEntity.ok(PaymentStatusResponseDTO.builder()
                 .status(payment.getStatus())
                 .method(payment.getMethod())
@@ -218,7 +220,55 @@ public class BackofficeOrderController {
         orderService.retryRefund(id, branchId);
         BackofficeOrderRow updatedRow = orderService.findOrderRowById(id);
         notificationService.sendOrderUpdatedEvent(branchId,
-                orderMapper.toBackofficeResponseDTO(updatedRow.order(), updatedRow.payment()), "BACKOFFICE");
+                orderMapper.toBackofficeResponseDTO(updatedRow.order(), updatedRow.payment(), updatedRow.discount()), "BACKOFFICE");
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{id}/discount")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    @Operation(summary = "Apply a manual percentage discount (ADMIN/MANAGER only)",
+            description = "Applies a percentage discount over the order subtotal and overwrites totalAmount. " +
+                    "Only while the order is active (RECEIVED, IN_PREPARATION, ON_THE_WAY, READY_FOR_PICKUP) and " +
+                    "charged outside the gateway: returns 422 outside that window — the payment is still pending, " +
+                    "the order was already delivered (its total is billed in the shift summary) or cancelled — " +
+                    "and 422 if it has a MERCADOPAGO/QR_CODE payment in PENDING or APPROVED. " +
+                    "Every application is recorded as a new order_discount row (append-only audit trail). " +
+                    "Returns 403 if wrong branch or not ADMIN/MANAGER.")
+    public ResponseEntity<Void> applyDiscount(
+            @PathVariable UUID id,
+            @Valid @RequestBody ApplyDiscountRequestDTO dto,
+            @AuthenticationPrincipal CustomUserDetails principal,
+            HttpServletRequest request) {
+
+        Integer branchId = securityUtils.resolveBranchId(principal, request);
+        orderService.applyDiscount(id, branchId, dto.getPercentage(), dto.getReason(),
+                dto.getNote(), principal.getUserId());
+        BackofficeOrderRow updatedRow = orderService.findOrderRowById(id);
+        notificationService.sendOrderUpdatedEvent(branchId,
+                orderMapper.toBackofficeResponseDTO(updatedRow.order(), updatedRow.payment(), updatedRow.discount()), "BACKOFFICE");
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{id}/discount/revert")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    @Operation(summary = "Revert the current discount (ADMIN/MANAGER only)",
+            description = "Reverts the order's current discount, restoring totalAmount to the full " +
+                    "subtotal+fees. Append-only: inserts a REVERTED row (percentage 0, discount 0) with a " +
+                    "required reason and optional note — the applied->reverted trail stays in the table. " +
+                    "Same guards as applying: 422 outside the active window or with a MERCADOPAGO/QR_CODE " +
+                    "payment in PENDING/APPROVED, and 422 if the order has no current discount to revert. " +
+                    "Returns 403 if wrong branch or not ADMIN/MANAGER.")
+    public ResponseEntity<Void> revertDiscount(
+            @PathVariable UUID id,
+            @Valid @RequestBody RevertDiscountRequestDTO dto,
+            @AuthenticationPrincipal CustomUserDetails principal,
+            HttpServletRequest request) {
+
+        Integer branchId = securityUtils.resolveBranchId(principal, request);
+        orderService.revertDiscount(id, branchId, dto.getReason(), dto.getNote(), principal.getUserId());
+        BackofficeOrderRow updatedRow = orderService.findOrderRowById(id);
+        notificationService.sendOrderUpdatedEvent(branchId,
+                orderMapper.toBackofficeResponseDTO(updatedRow.order(), updatedRow.payment(), updatedRow.discount()), "BACKOFFICE");
         return ResponseEntity.noContent().build();
     }
 }
