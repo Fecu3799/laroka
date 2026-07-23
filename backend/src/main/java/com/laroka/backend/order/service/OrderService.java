@@ -402,7 +402,12 @@ public class OrderService {
             throw new AccessDeniedException("El pedido no pertenece a la sucursal del usuario");
         }
 
-        Payment payment = paymentRepository.findByOrderId(orderId).orElse(null);
+        // Lock pesimista (SELECT ... FOR UPDATE) + re-chequeo del estado bajo el lock:
+        // si el operador hace doble click, la segunda transacción bloquea acá hasta que
+        // la primera commitea (Payment ya en REFUNDED) y entonces el guard la rechaza,
+        // evitando disparar dos refunds concurrentes a MercadoPago. El guard ya existía,
+        // pero sin el lock ambas transacciones podían leer REFUND_FAILED y pasar.
+        Payment payment = paymentRepository.findByOrderIdForUpdate(orderId).orElse(null);
         if (payment == null || payment.getStatus() != PaymentStatus.REFUND_FAILED) {
             throw new BusinessException("El pedido no tiene un reembolso fallido pendiente de reintento");
         }

@@ -2203,7 +2203,7 @@ class OrderServiceTest {
         Payment payment = refundFailedPayment(order, new BigDecimal("1700.00"));
 
         when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
-        when(paymentRepository.findByOrderId(orderId)).thenReturn(Optional.of(payment));
+        when(paymentRepository.findByOrderIdForUpdate(orderId)).thenReturn(Optional.of(payment));
 
         service.retryRefund(orderId, 1);
 
@@ -2222,7 +2222,7 @@ class OrderServiceTest {
         Payment payment = refundFailedPayment(order, new BigDecimal("1700.00"));
 
         when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
-        when(paymentRepository.findByOrderId(orderId)).thenReturn(Optional.of(payment));
+        when(paymentRepository.findByOrderIdForUpdate(orderId)).thenReturn(Optional.of(payment));
         doThrow(new RuntimeException("MP gateway caído"))
                 .when(paymentGateway).refundPayment("mp-payment-17-05", new BigDecimal("1700.00"));
 
@@ -2243,7 +2243,7 @@ class OrderServiceTest {
         Payment payment = mercadoPagoPayment(order, PaymentStatus.APPROVED);
 
         when(orderRepository.findByIdWithBranch(orderId)).thenReturn(Optional.of(order));
-        when(paymentRepository.findByOrderId(orderId)).thenReturn(Optional.of(payment));
+        when(paymentRepository.findByOrderIdForUpdate(orderId)).thenReturn(Optional.of(payment));
 
         assertThatThrownBy(() -> service.retryRefund(orderId, 1))
                 .isInstanceOf(BusinessException.class)
