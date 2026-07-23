@@ -1707,16 +1707,18 @@ function OrderDetail({
             </div>
           )}
 
-          {/* US-19-02: descuento manual. Solo MANAGER/ADMIN y solo si el pedido
+          {/* US-19-02/05: descuento manual. Solo MANAGER/ADMIN y solo si el pedido
               no está tomado por un pago de gateway — canApplyDiscount espeja los
-              guards del backend. */}
+              guards del backend. Con un descuento vigente el botón pasa a "Modificar"
+              y abre el mismo modal precargado (US-19-05); el botón "Borrar descuento"
+              es alcance de US-19-06 (necesita el endpoint /revert). */}
           {canApplyDiscount(order, role) && (
             <button
               className="detail-action-btn detail-action-discount"
               type="button"
               onClick={() => setDiscountOpen(true)}
             >
-              Aplicar descuento
+              {order.discount ? "Modificar descuento" : "Aplicar descuento"}
             </button>
           )}
         </div>
@@ -1742,6 +1744,7 @@ function OrderDetail({
             order={order}
             token={token}
             branchId={branchId}
+            mode={order.discount ? "edit" : "create"}
             onClose={() => setDiscountOpen(false)}
             onApplied={() => {
               // Refresca detalle y lista: el total del pedido cambió. El backend

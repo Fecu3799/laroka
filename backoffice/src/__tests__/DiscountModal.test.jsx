@@ -21,7 +21,7 @@ const ORDER = {
   totalAmount: 1700,
 }
 
-function renderModal(order = ORDER) {
+function renderModal(order = ORDER, mode = 'create') {
   const onClose = vi.fn()
   const onApplied = vi.fn()
   render(
@@ -29,11 +29,27 @@ function renderModal(order = ORDER) {
       order={order}
       token="test-token"
       branchId={1}
+      mode={mode}
       onClose={onClose}
       onApplied={onApplied}
     />,
   )
   return { onClose, onApplied }
+}
+
+// Pedido con descuento vigente, para el modo edición (US-19-05). percentage llega
+// como "10.00" (NUMERIC(5,2)) a propósito, para verificar la normalización del input.
+const ORDER_WITH_DISCOUNT = {
+  ...ORDER,
+  totalAmount: 1600,
+  discount: {
+    percentage: '10.00',
+    reason: 'TRANSFER_ADJUSTMENT',
+    note: 'ajuste original',
+    discountAmount: 100,
+    originalTotalAmount: 1700,
+    finalTotalAmount: 1600,
+  },
 }
 
 const percentageInput = () => screen.getByLabelText('Porcentaje')
@@ -141,6 +157,70 @@ describe('envío del descuento', () => {
 
     await waitFor(() => expect(applyDiscount).toHaveBeenCalled())
     expect(applyDiscount.mock.calls[0][1].reason).toBe('TRANSFER_ADJUSTMENT')
+  })
+})
+
+// ── Modo edición: modificar un descuento vigente (US-19-05) ───
+
+describe('modo edición', () => {
+  test('precarga porcentaje, motivo y nota del descuento vigente', () => {
+    renderModal(ORDER_WITH_DISCOUNT, 'edit')
+
+    // "10.00" se normaliza a "10" en el input numérico.
+    expect(percentageInput().value).toBe('10')
+    expect(screen.getByLabelText('Nota (opcional)').value).toBe('ajuste original')
+    // El dropdown muestra la etiqueta del motivo vigente, no el default.
+    expect(screen.getByText('Ajuste por transferencia')).toBeInTheDocument()
+    // El preview arranca ya calculado con el descuento precargado.
+    expect(discountAmount()).toContain('100')
+    expect(finalTotal()).toContain('1.600')
+  })
+
+  test('el título y el botón cambian a "Modificar" / "Guardar cambios"', () => {
+    renderModal(ORDER_WITH_DISCOUNT, 'edit')
+
+    expect(screen.getByRole('heading', { name: 'Modificar descuento' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeInTheDocument()
+    // Ya no aparece el texto del modo creación.
+    expect(screen.queryByRole('button', { name: /Aplicar descuento/ })).toBeNull()
+  })
+
+  test('guardar reaplica sobre el mismo endpoint con los valores editados', async () => {
+    const { onApplied, onClose } = renderModal(ORDER_WITH_DISCOUNT, 'edit')
+
+    fireEvent.change(percentageInput(), { target: { value: '25' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+
+    await waitFor(() => expect(applyDiscount).toHaveBeenCalled())
+    // Modificar = aplicar de nuevo: mismo servicio, con el nuevo porcentaje y el
+    // motivo/nota precargados que no se tocaron.
+    expect(applyDiscount).toHaveBeenCalledWith(
+      ORDER.id,
+      { percentage: 25, reason: 'TRANSFER_ADJUSTMENT', note: 'ajuste original' },
+      'test-token',
+      1,
+    )
+    await waitFor(() => expect(onApplied).toHaveBeenCalled())
+    expect(onClose).toHaveBeenCalled()
+  })
+
+  test('avisa "Descuento modificado" al guardar', async () => {
+    const events = []
+    const handler = e => events.push(e.detail.message)
+    window.addEventListener('laroka:toast', handler)
+
+    renderModal(ORDER_WITH_DISCOUNT, 'edit')
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+
+    await waitFor(() => expect(events).toContain('Descuento modificado'))
+    window.removeEventListener('laroka:toast', handler)
+  })
+
+  test('crear (sin descuento) mantiene los textos originales', () => {
+    renderModal()
+    expect(screen.getByRole('heading', { name: 'Aplicar descuento' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Aplicar descuento' })).toBeInTheDocument()
+    expect(percentageInput().value).toBe('')
   })
 })
 

@@ -190,3 +190,27 @@ describe('trazabilidad del descuento (US-19-03)', () => {
     expect(panel.querySelector('.detail-discount-row').textContent).toContain('−$100')
   })
 })
+
+describe('botón de descuento según haya uno vigente (US-19-05)', () => {
+  const btn = panel => panel.querySelector('.detail-action-discount')
+
+  test('sin descuento, el botón dice "Aplicar descuento"', () => {
+    const panel = openDetail({ ...ORDER, totalAmount: 1700, discount: null })
+    expect(btn(panel).textContent).toBe('Aplicar descuento')
+  })
+
+  test('con descuento vigente, el botón pasa a "Modificar descuento"', () => {
+    const panel = openDetail({ ...ORDER, discount: DISCOUNT })
+    expect(btn(panel).textContent).toBe('Modificar descuento')
+  })
+
+  test('al modificar, el modal abre precargado con el descuento vigente', () => {
+    const panel = openDetail({ ...ORDER, discount: DISCOUNT })
+    fireEvent.click(btn(panel))
+
+    // El modal se monta en un portal a document.body, fuera del panel.
+    const body = within(document.body)
+    expect(body.getByRole('heading', { name: 'Modificar descuento' })).toBeInTheDocument()
+    expect(body.getByLabelText('Porcentaje').value).toBe('10')
+  })
+})
