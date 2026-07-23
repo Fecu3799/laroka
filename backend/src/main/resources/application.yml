@@ -87,6 +87,11 @@ bug-report:
 order:
   expiration-minutes: ${ORDER_EXPIRATION_MINUTES:30}
 
+# US-17-08: horas que un reembolso puede quedar sin resolver (REFUND_FAILED) antes
+# de avisarle al cliente de la demora. El aviso se envía una sola vez por pedido.
+refund:
+  delay-notice-hours: ${REFUND_DELAY_NOTICE_HOURS:24}
+
 debug:
   skip-webhook-signature-validation: ${APP_DEV_SKIP_WEBHOOK_VALIDATION:${APP_DEV_MODE:false}}
 

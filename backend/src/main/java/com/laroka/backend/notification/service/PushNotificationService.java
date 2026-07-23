@@ -46,6 +46,11 @@ public class PushNotificationService {
             case ON_THE_WAY -> "Tu pedido está en camino 🛵";
             case READY_FOR_PICKUP -> "Tu pedido está listo para retirar ✅";
             case DELIVERED -> "Tu pedido fue entregado ¡Buen provecho! 🎉";
+            // Mensaje neutro: no revela el resultado interno del reembolso (éxito/fallo)
+            // y la redacción condicional es correcta tanto para pagos online como en
+            // efectivo. Se muestra siempre que un pedido pasa a CANCELLED (US-17-08).
+            case CANCELLED -> "Tu pedido fue cancelado. Si tu pago ya se había procesado, "
+                    + "el reembolso puede demorar unos minutos en reflejarse.";
             default -> null;
         };
     }
@@ -56,12 +61,32 @@ public class PushNotificationService {
      */
     @Async
     public void sendNotification(Order order, OrderStatus newStatus) {
-        if (order.getPushSubscriptionId() == null) {
-            return;
-        }
-
         String body = bodyFor(newStatus);
         if (body == null) {
+            return;
+        }
+        deliver(order, buildPayload(order, newStatus, body));
+    }
+
+    /**
+     * Aviso al cliente de que el reembolso de su pedido cancelado está demorando
+     * más de lo habitual (US-17-08), con un contacto de soporte. Mismo canal push
+     * fire-and-forget que las notificaciones de estado.
+     */
+    @Async
+    public void sendRefundDelayNotice(Order order, String supportContact) {
+        String body = "El reembolso de tu pedido está demorando más de lo esperado. "
+                + "Si necesitás ayuda, escribinos a " + supportContact + ".";
+        deliver(order, buildCustomPayload(order, body));
+    }
+
+    /**
+     * Resuelve la suscripción del pedido y entrega el payload al Push Service.
+     * Fire-and-forget: nunca propaga excepciones. Compartido por las notificaciones
+     * de estado y los avisos custom.
+     */
+    private void deliver(Order order, String payload) {
+        if (order.getPushSubscriptionId() == null) {
             return;
         }
 
@@ -77,7 +102,6 @@ public class PushNotificationService {
         String endpoint = subscription.getEndpoint();
 
         try {
-            String payload = buildPayload(order, newStatus, body);
             Notification notification = buildNotification(subscription, payload.getBytes(StandardCharsets.UTF_8));
 
             HttpResponse response = pushService.send(notification);
@@ -85,7 +109,7 @@ public class PushNotificationService {
             handleStatusCode(statusCode, order, endpoint);
         } catch (Exception e) {
             // Cualquier fallo (red, criptografía, serialización…) se loguea y se
-            // traga: nunca debe propagarse al flujo de transición de estado.
+            // traga: nunca debe propagarse al flujo que dispara la notificación.
             log.warn("Push notification failed | orderId={} endpoint={}", order.getId(), endpoint, e);
         }
     }
@@ -110,6 +134,16 @@ public class PushNotificationService {
                 + "\"body\":\"" + escape(body) + "\","
                 + "\"orderId\":\"" + order.getId() + "\","
                 + "\"status\":\"" + status.name() + "\""
+                + "}";
+    }
+
+    // Payload sin campo status: el aviso de demora de reembolso no es una transición
+    // de estado. El SW del cliente solo usa title/body/orderId para renderizar.
+    private String buildCustomPayload(Order order, String body) {
+        return "{"
+                + "\"title\":\"" + escape(TITLE) + "\","
+                + "\"body\":\"" + escape(body) + "\","
+                + "\"orderId\":\"" + order.getId() + "\""
                 + "}";
     }
 

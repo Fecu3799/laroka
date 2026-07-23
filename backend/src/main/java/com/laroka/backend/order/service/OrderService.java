@@ -328,8 +328,11 @@ public class OrderService {
         } catch (Exception e) {
             // US-17-04: persistir el fallo de forma explícita (REFUND_FAILED + monto
             // pendiente) en lugar de solo loguear, para visibilidad y reintento.
+            // US-17-08: sellar el momento del fallo para que el job de avisos detecte
+            // reembolsos sin resolver hace más de N horas.
             payment.setStatus(PaymentStatus.REFUND_FAILED);
             payment.setRefundedAmount(refundedAmount);
+            payment.setRefundFailedAt(LocalDateTime.now());
             paymentRepository.save(payment);
             log.error("Refund FAILED — marked REFUND_FAILED for manual retry | orderId={} mpPaymentId={} partial={} amount={} error={}",
                     order.getId(), payment.getMercadopagoPaymentId(), partial, refundedAmount, e.getMessage());

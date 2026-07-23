@@ -174,6 +174,10 @@ class RefundFlowIntegrationTest {
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.REFUND_FAILED);
         // El monto pendiente queda persistido para el reintento manual.
         assertThat(payment.getRefundedAmount()).isEqualByComparingTo(totalAmount);
+        // US-17-08: se sella el momento del fallo para el job de avisos de demora, y
+        // el aviso arranca sin enviar.
+        assertThat(payment.getRefundFailedAt()).isNotNull();
+        assertThat(payment.isRefundDelayNotified()).isFalse();
     }
 
     // ── retry-refund como ADMIN → REFUNDED en éxito ───────────────────────────────

@@ -1,5 +1,6 @@
 package com.laroka.backend.notification.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -11,6 +12,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -21,6 +23,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -102,6 +105,58 @@ class PushNotificationServiceTest {
 
         verify(pushService, times(1)).send(any(Notification.class));
         verify(pushSubscriptionService, never()).delete(any());
+    }
+
+    @Test
+    void cancelledTransition_sendsNeutralRefundMessage() throws Exception {
+        UUID subId = UUID.randomUUID();
+        Order order = orderWithSubscription(subId);
+        when(pushSubscriptionRepository.findById(subId)).thenReturn(Optional.of(subscription(subId)));
+        ArgumentCaptor<byte[]> payloadCaptor = ArgumentCaptor.forClass(byte[].class);
+        doReturn(mock(Notification.class)).when(service).buildNotification(any(), payloadCaptor.capture());
+        HttpResponse response = mock(HttpResponse.class);
+        StatusLine statusLine = mock(StatusLine.class);
+        when(statusLine.getStatusCode()).thenReturn(201);
+        when(response.getStatusLine()).thenReturn(statusLine);
+        when(pushService.send(any(Notification.class))).thenReturn(response);
+
+        service.sendNotification(order, OrderStatus.CANCELLED);
+
+        verify(pushService, times(1)).send(any(Notification.class));
+        String payload = new String(payloadCaptor.getValue(), StandardCharsets.UTF_8);
+        // Neutro: menciona el reembolso pero no el resultado interno (éxito/fallo).
+        assertThat(payload).contains("reembolso").contains("cancelado");
+        assertThat(payload.toLowerCase()).doesNotContain("error").doesNotContain("falló");
+    }
+
+    @Test
+    void sendRefundDelayNotice_sendsPushWithSupportContact() throws Exception {
+        UUID subId = UUID.randomUUID();
+        Order order = orderWithSubscription(subId);
+        when(pushSubscriptionRepository.findById(subId)).thenReturn(Optional.of(subscription(subId)));
+        ArgumentCaptor<byte[]> payloadCaptor = ArgumentCaptor.forClass(byte[].class);
+        doReturn(mock(Notification.class)).when(service).buildNotification(any(), payloadCaptor.capture());
+        HttpResponse response = mock(HttpResponse.class);
+        StatusLine statusLine = mock(StatusLine.class);
+        when(statusLine.getStatusCode()).thenReturn(201);
+        when(response.getStatusLine()).thenReturn(statusLine);
+        when(pushService.send(any(Notification.class))).thenReturn(response);
+
+        service.sendRefundDelayNotice(order, "+542804555000");
+
+        verify(pushService, times(1)).send(any(Notification.class));
+        String payload = new String(payloadCaptor.getValue(), StandardCharsets.UTF_8);
+        assertThat(payload).contains("+542804555000").contains("reembolso");
+    }
+
+    @Test
+    void sendRefundDelayNotice_noSubscription_doesNotSend() throws Exception {
+        Order order = orderWithSubscription(null);
+
+        service.sendRefundDelayNotice(order, "+542804555000");
+
+        verify(pushSubscriptionRepository, never()).findById(any());
+        verify(pushService, never()).send(any(Notification.class));
     }
 
     @Test
