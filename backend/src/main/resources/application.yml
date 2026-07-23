@@ -45,6 +45,15 @@ management:
   endpoint:
     health:
       show-details: never
+  # Export de métricas Micrometer a New Relic. client-provider-type=insights-agent
+  # reutiliza el agente Java ya cargado por -javaagent (Dockerfile) para enviar los
+  # datos, por lo que NO requiere api-key ni account-id propios. Spring Boot expone
+  # automáticamente las métricas hikaricp.* del datasource activo.
+  newrelic:
+    metrics:
+      export:
+        client-provider-type: insights-agent
+        step: 30s
 
 jwt:
   secret: ${JWT_SECRET}
