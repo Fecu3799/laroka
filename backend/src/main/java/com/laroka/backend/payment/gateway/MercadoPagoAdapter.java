@@ -1,12 +1,15 @@
 package com.laroka.backend.payment.gateway;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.client.ClientHttpRequestFactory;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
@@ -24,6 +27,13 @@ public class MercadoPagoAdapter implements PaymentGateway {
     private static final String MP_PREFERENCES_URL = "https://api.mercadopago.com/checkout/preferences";
     private static final String MP_PAYMENTS_URL = "https://api.mercadopago.com/v1/payments/";
 
+    // Timeouts de red conservadores para TODAS las llamadas a MercadoPago. Sin esto el
+    // RestClient hereda timeout infinito: una conexión colgada retiene el thread (y, en
+    // los flujos donde la llamada MP ocurre dentro de una @Transactional, la conexión
+    // Hikari) indefinidamente. connect = handshake TCP/TLS; read = espera de respuesta.
+    private static final Duration MP_CONNECT_TIMEOUT = Duration.ofSeconds(5);
+    private static final Duration MP_READ_TIMEOUT = Duration.ofSeconds(15);
+
     // Solo para logging de diagnóstico: parsea el cuerpo crudo de MP a un record
     // enriquecido sin romper si aparecen campos nuevos. No participa de la lógica
     // de negocio (el valor de retorno sigue saliendo de status + external_reference).
@@ -39,7 +49,17 @@ public class MercadoPagoAdapter implements PaymentGateway {
         @Value("${mercadopago.key:}") String accessToken,
         @Value("${mercadopago.notifications-url:}") String notificationUrl
         ) {
-        this(accessToken, notificationUrl, RestClient.builder());
+        this(accessToken, notificationUrl, RestClient.builder().requestFactory(timeoutRequestFactory()));
+    }
+
+    // Factory con timeouts explícitos. Solo se aplica en el path de producción; el
+    // constructor de test recibe un builder ligado a MockRestServiceServer y no pasa
+    // por acá, así que los tests siguen sin salir a la red.
+    private static ClientHttpRequestFactory timeoutRequestFactory() {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(MP_CONNECT_TIMEOUT);
+        factory.setReadTimeout(MP_READ_TIMEOUT);
+        return factory;
     }
 
     // Constructor de test: permite inyectar un RestClient.Builder ligado a un
@@ -231,16 +251,27 @@ public class MercadoPagoAdapter implements PaymentGateway {
         // monto = reembolso parcial. (POST /v1/payments/{id}/refunds)
         Map<String, Object> body = partial ? Map.of("amount", amount) : Map.of();
 
+        // MercadoPago EXIGE X-Idempotency-Key en reembolsos parciales (y lo acepta en
+        // los totales), sin él responde 400 "Header X-Idempotency-Key can't be null".
+        // Generamos una key nueva por cada intento de llamada (no determinística por
+        // paymentId+amount): la idempotencia real de negocio la garantiza el estado del
+        // Payment (REFUNDED / REFUND_FAILED) en OrderService, no esta key. Una key
+        // determinística haría que MP devolviera cacheado el resultado de un intento
+        // previo fallido, impidiendo el reintento manual (US-17-05).
+        String idempotencyKey = UUID.randomUUID().toString();
+
         String url = MP_PAYMENTS_URL + paymentId + "/refunds";
         try {
             restClient.post()
                     .uri(url)
                     .header("Authorization", "Bearer " + accessToken)
                     .header("Content-Type", "application/json")
+                    .header("X-Idempotency-Key", idempotencyKey)
                     .body(body)
                     .retrieve()
                     .toBodilessEntity();
-            log.info("refundPayment: refund accepted by MercadoPago — paymentId={}, partial={}", paymentId, partial);
+            log.info("refundPayment: refund accepted by MercadoPago — paymentId={}, partial={}, idempotencyKey={}",
+                    paymentId, partial, idempotencyKey);
         } catch (Exception e) {
             log.error("refundPayment: error calling MercadoPago refund API — paymentId={}, error={}", paymentId, e.getMessage());
             throw new BusinessException("Error al solicitar el reembolso en MercadoPago: " + e.getMessage());
