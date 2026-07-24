@@ -1,3 +1,5 @@
+name: pedisur
+
 services:
   postgres:
     image: postgres:16
@@ -26,7 +28,11 @@ services:
     tmpfs:
       - /var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-pedisur_test}"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-pedisur_test}",
+        ]
       interval: 5s
       timeout: 5s
       retries: 10
