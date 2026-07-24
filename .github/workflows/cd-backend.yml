@@ -78,6 +78,9 @@ jobs:
           echo "- Tag legible: \`docker.io/${DOCKER_USER}/pedisur-backend:latest\`" >> "$GITHUB_STEP_SUMMARY"
           echo "- Deploy inmutable (por digest): \`${IMAGE_REF}\`" >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Debug — verificar step output
+        run: echo "step output = ${{ steps.image-ref.outputs.image_ref }}"
+
   deploy:
     name: Deploy to Render
     runs-on: ubuntu-latest
