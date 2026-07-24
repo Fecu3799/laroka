@@ -15,7 +15,7 @@ jobs:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_DB: laroka_test
+          POSTGRES_DB: pedisur_test
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
         ports:
@@ -48,7 +48,7 @@ jobs:
         run: ./mvnw test --no-transfer-progress
         working-directory: backend
         env:
-          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/laroka_test
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/pedisur_test
           SPRING_DATASOURCE_USERNAME: postgres
           SPRING_DATASOURCE_PASSWORD: postgres
           JWT_SECRET: test-secret-minimum-32-chars-for-hmac256-ok

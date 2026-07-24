@@ -25,7 +25,7 @@ RUN find /app/newrelic -name "newrelic.jar" 2>/dev/null
 
 ENTRYPOINT ["java", \
   "-javaagent:/app/newrelic/newrelic/newrelic.jar", \
-  "-Dnewrelic.config.app_name=laroka-backend", \
+  "-Dnewrelic.config.app_name=pedisur-backend", \
   "-Dnewrelic.config.log_file_name=STDOUT", \
   "-Dnewrelic.config.transaction_tracer.enabled=true", \
   "-Dnewrelic.config.transaction_tracer.record_sql=obfuscated", \

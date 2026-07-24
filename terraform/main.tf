@@ -7,10 +7,10 @@ terraform {
   }
 
   cloud {
-    organization = "laroka"
+    organization = "pedisur"
 
     workspaces {
-      name = "laroka-infra"
+      name = "pedisur-infra"
     }
   }
 }
@@ -21,13 +21,13 @@ provider "render" {
 }
 
 resource "render_web_service" "backend" {
-  name    = "laroka-backend"
+  name    = "pedisur-backend"
   plan    = "starter"
   region  = "oregon"
 
   runtime_source = {
     image = {
-        image_url = "docker.io/fecu3799/laroka-backend"
+        image_url = "docker.io/fecu3799/pedisur-backend"
         tag       = "latest"
     }
 }
@@ -39,7 +39,7 @@ resource "render_web_service" "backend" {
     JWT_SECRET                 = { value = var.jwt_secret, sensitive = true }
     JWT_EXPIRATION             = { value = var.jwt_expiration }
     NEW_RELIC_LICENSE_KEY      = { value = var.new_relic_license_key, sensitive = true }
-    NEW_RELIC_APP_NAME         = { value = "laroka-backend" }
+    NEW_RELIC_APP_NAME         = { value = "pedisur-backend" }
     MERCADOPAGO_ACCESS_TOKEN    = { value = var.mercadopago_access_token }
     MERCADOPAGO_WEBHOOK_SECRET = { value = var.mercadopago_webhook_secret }
     R2_ACCESS_KEY              = { value = var.r2_access_key }

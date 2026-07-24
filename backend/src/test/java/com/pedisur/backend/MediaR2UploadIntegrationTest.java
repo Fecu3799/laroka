@@ -48,7 +48,7 @@ import software.amazon.awssdk.services.s3.model.S3Object;
  * el perfil {@code local}); en CI llegan por variables de entorno
  * {@code R2_TEST_*} desde GitHub Secrets. {@link TestPropertySource} apunta los
  * beans productivos {@code r2.*} (que consume {@link R2Config}) al bucket de test,
- * de modo que el endpoint real escribe/lee en {@code laroka-test} y nunca en dev.
+ * de modo que el endpoint real escribe/lee en {@code pedisur-test} y nunca en dev.
  *
  * <p>Aislamiento y limpieza: cada corrida usa un {@code tenantId} aleatorio, así
  * dos ejecuciones concurrentes que compartan el bucket no se pisan. El
@@ -73,7 +73,7 @@ import software.amazon.awssdk.services.s3.model.S3Object;
 @TestPropertySource(properties = {
     "r2.access-key=${r2.test.access-key:}",
     "r2.secret-key=${r2.test.secret-key:}",
-    "r2.bucket-name=${r2.test.bucket-name:laroka-test}",
+    "r2.bucket-name=${r2.test.bucket-name:pedisur-test}",
     "r2.endpoint=${r2.test.endpoint:}",
     "r2.public-url=${r2.test.public-url:}"
 })
