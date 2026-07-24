@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { readActiveOrders, addActiveOrder, removeActiveOrder } from '../utils/activeOrders'
 
-const KEY = 'laroka_active_orders'
+const KEY = 'pedisur_active_orders'
 
 describe('readActiveOrders', () => {
   it('returns [] when storage is empty', () => {
@@ -30,12 +30,12 @@ describe('addActiveOrder', () => {
     expect(readActiveOrders()).toEqual([{ orderId: 'order-1', branchId: 2 }])
   })
 
-  it('dispatches laroka_orders_updated event', () => {
+  it('dispatches pedisur_orders_updated event', () => {
     const listener = vi.fn()
-    window.addEventListener('laroka_orders_updated', listener)
+    window.addEventListener('pedisur_orders_updated', listener)
     addActiveOrder('order-2', 1)
     expect(listener).toHaveBeenCalledOnce()
-    window.removeEventListener('laroka_orders_updated', listener)
+    window.removeEventListener('pedisur_orders_updated', listener)
   })
 
   it('does not duplicate an existing orderId', () => {
@@ -55,12 +55,12 @@ describe('removeActiveOrder', () => {
     expect(readActiveOrders()).toEqual([{ orderId: 'b', branchId: 2 }])
   })
 
-  it('dispatches laroka_orders_updated event', () => {
+  it('dispatches pedisur_orders_updated event', () => {
     localStorage.setItem(KEY, JSON.stringify([{ orderId: 'x', branchId: 1 }]))
     const listener = vi.fn()
-    window.addEventListener('laroka_orders_updated', listener)
+    window.addEventListener('pedisur_orders_updated', listener)
     removeActiveOrder('x')
     expect(listener).toHaveBeenCalledOnce()
-    window.removeEventListener('laroka_orders_updated', listener)
+    window.removeEventListener('pedisur_orders_updated', listener)
   })
 })

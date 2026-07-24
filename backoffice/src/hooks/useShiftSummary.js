@@ -97,8 +97,8 @@ export default function useShiftSummary(activeShiftKey) {
   // Silenciosa: la pantalla muestra los datos previos sin spinner mientras tanto.
   useEffect(() => {
     function handle() { load({ silent: true }) }
-    window.addEventListener('laroka:shift-summary-stale', handle)
-    return () => window.removeEventListener('laroka:shift-summary-stale', handle)
+    window.addEventListener('pedisur:shift-summary-stale', handle)
+    return () => window.removeEventListener('pedisur:shift-summary-stale', handle)
   }, [load])
 
   return { state, loading, error, refresh: load }

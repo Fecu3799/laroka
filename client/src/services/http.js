@@ -1,6 +1,6 @@
 export function showToast(message) {
   window.dispatchEvent(
-    new CustomEvent("laroka:toast", { detail: { message } }),
+    new CustomEvent("pedisur:toast", { detail: { message } }),
   );
 }
 

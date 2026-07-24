@@ -38,7 +38,7 @@ export default function RevertDiscountModal({ order, token, branchId, onClose, o
     try {
       await revertDiscount(order.id, { reason, note }, token, branchId)
       window.dispatchEvent(
-        new CustomEvent('laroka:toast', { detail: { message: 'Descuento eliminado' } }),
+        new CustomEvent('pedisur:toast', { detail: { message: 'Descuento eliminado' } }),
       )
       onReverted()
       onClose()

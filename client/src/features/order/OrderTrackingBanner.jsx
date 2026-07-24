@@ -641,10 +641,10 @@ export function OrderTrackingBanner({ branchId }) {
   }, [])
 
   useEffect(() => {
-    window.addEventListener('laroka_orders_updated', reloadOrders)
+    window.addEventListener('pedisur_orders_updated', reloadOrders)
     window.addEventListener('storage', reloadOrders)
     return () => {
-      window.removeEventListener('laroka_orders_updated', reloadOrders)
+      window.removeEventListener('pedisur_orders_updated', reloadOrders)
       window.removeEventListener('storage', reloadOrders)
     }
   }, [reloadOrders])
@@ -666,7 +666,7 @@ export function OrderTrackingBanner({ branchId }) {
           if (!active) return
 
           // US-15-CF-02: DELIVERED ya no se remueve automáticamente — se trata como
-          // CANCELLED: persiste en laroka_active_orders con su estado y espera el
+          // CANCELLED: persiste en pedisur_active_orders con su estado y espera el
           // descarte manual del usuario. El polling sigue corriendo mientras el
           // pedido esté en localStorage, sin importar el estado.
           let cancellationReason = null

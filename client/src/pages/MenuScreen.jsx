@@ -11,7 +11,7 @@ import { getTenantProfile } from '../services/tenantService'
 import { buildHalfAndHalfItem, buildSizedItem } from '../utils/halfAndHalf'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080'
-const INTRO_SEEN_KEY = 'laroka_intro_seen'
+const INTRO_SEEN_KEY = 'pedisur_intro_seen'
 
 function formatPrice(price) {
   return `$${Number(price).toLocaleString('es-AR')}`
@@ -291,7 +291,7 @@ export function MenuScreen({ branchId, branchName, onChangeBranch, paymentFailur
   // Perfil del negocio (US-13-F-02): se carga al montar la pantalla del menú.
   // Si no hay perfil (404), no se muestra el modal ni el ícono del header.
   // El modal de bienvenida aparece sobre el menú la primera vez (mientras no
-  // exista la key laroka_intro_seen en localStorage).
+  // exista la key pedisur_intro_seen en localStorage).
   useEffect(() => {
     let cancelled = false
     getTenantProfile()

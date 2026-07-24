@@ -1,4 +1,4 @@
-const STORAGE_KEY = "laroka_active_orders";
+const STORAGE_KEY = "pedisur_active_orders";
 
 export function readActiveOrders() {
   try {
@@ -24,7 +24,7 @@ export function addActiveOrder(orderId, branchId) {
         STORAGE_KEY,
         JSON.stringify([...current, { orderId, branchId }]),
       );
-      window.dispatchEvent(new Event("laroka_orders_updated"));
+      window.dispatchEvent(new Event("pedisur_orders_updated"));
     }
   } catch {
     /* storage unavailable */
@@ -38,7 +38,7 @@ export function removeActiveOrder(orderId) {
       STORAGE_KEY,
       JSON.stringify(current.filter((e) => e.orderId !== orderId)),
     );
-    window.dispatchEvent(new Event("laroka_orders_updated"));
+    window.dispatchEvent(new Event("pedisur_orders_updated"));
   } catch {
     /* storage unavailable */
   }

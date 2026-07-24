@@ -50,8 +50,8 @@ export default function useCurrentShift() {
 
   useEffect(() => {
     function handle() { setShiftAutoClosed(true) }
-    window.addEventListener('laroka:shift-auto-closed', handle)
-    return () => window.removeEventListener('laroka:shift-auto-closed', handle)
+    window.addEventListener('pedisur:shift-auto-closed', handle)
+    return () => window.removeEventListener('pedisur:shift-auto-closed', handle)
   }, [])
 
   const confirmShiftAutoClosed = useCallback(async () => {

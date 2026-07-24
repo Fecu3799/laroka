@@ -15,7 +15,7 @@ export function PaymentResultScreen({ branchId, onComplete }) {
   const { status, orderId } = parseResult()
 
   const [recovery] = useState(() => {
-    const raw = sessionStorage.getItem('laroka_checkout_recovery')
+    const raw = sessionStorage.getItem('pedisur_checkout_recovery')
     try { return raw ? JSON.parse(raw) : null } catch { return null }
   })
 
@@ -30,17 +30,17 @@ export function PaymentResultScreen({ branchId, onComplete }) {
       return
     }
     if (status === 'approved') {
-      sessionStorage.removeItem('laroka_checkout_recovery')
-      window.dispatchEvent(new Event('laroka_orders_updated'))
+      sessionStorage.removeItem('pedisur_checkout_recovery')
+      window.dispatchEvent(new Event('pedisur_orders_updated'))
       return
     }
     if (status === 'pending') {
-      sessionStorage.removeItem('laroka_checkout_recovery')
+      sessionStorage.removeItem('pedisur_checkout_recovery')
       onComplete({ type: 'pending' })
       return
     }
     if (status === 'failure') {
-      sessionStorage.removeItem('laroka_checkout_recovery')
+      sessionStorage.removeItem('pedisur_checkout_recovery')
       onComplete({ type: 'failure', recovery })
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps

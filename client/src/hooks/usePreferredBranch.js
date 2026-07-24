@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react'
 
-const STORAGE_KEY = 'laroka_preferred_branch'
+const STORAGE_KEY = 'pedisur_preferred_branch'
 
 function readStorage() {
   try {

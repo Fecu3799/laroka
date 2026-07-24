@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 
-const THEME_KEY = 'laroka_theme'
+const THEME_KEY = 'pedisur_theme'
 const THEMES = ['dark', 'light']
 const DEFAULT_THEME = 'dark'
 

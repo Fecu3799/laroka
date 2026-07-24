@@ -769,7 +769,7 @@ export default function Orders() {
         <button
           className="orders-refresh-btn"
           type="button"
-          onClick={() => { pendingOrderIds.forEach((_, orderId) => flashOrder(orderId)); refresh(); resetCounts(); if (selectedId) refetchDetail(); window.dispatchEvent(new CustomEvent('laroka:clear-feed')); }}
+          onClick={() => { pendingOrderIds.forEach((_, orderId) => flashOrder(orderId)); refresh(); resetCounts(); if (selectedId) refetchDetail(); window.dispatchEvent(new CustomEvent('pedisur:clear-feed')); }}
         >
           <RefreshIcon />
           Actualizar lista
@@ -1248,7 +1248,7 @@ function OrderDetail({
     try {
       await retryRefund(order.id, token, branchId);
       window.dispatchEvent(
-        new CustomEvent("laroka:toast", {
+        new CustomEvent("pedisur:toast", {
           detail: { message: "Reembolso procesado correctamente" },
         }),
       );

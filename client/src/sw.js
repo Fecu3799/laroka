@@ -27,7 +27,7 @@ precacheAndRoute(self.__WB_MANIFEST)
 registerRoute(
   ({ request }) => request.destination === 'image',
   new CacheFirst({
-    cacheName: 'laroka-images',
+    cacheName: 'pedisur-images',
     plugins: [
       new ExpirationPlugin({ maxEntries: 150, maxAgeSeconds: 7 * 24 * 60 * 60 }),
     ],
@@ -39,7 +39,7 @@ const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080'
 registerRoute(
   ({ url }) => url.href.startsWith(API_BASE),
   new NetworkFirst({
-    cacheName: 'laroka-api',
+    cacheName: 'pedisur-api',
     networkTimeoutSeconds: 10,
     plugins: [
       new ExpirationPlugin({ maxEntries: 50, maxAgeSeconds: 5 * 60 }),

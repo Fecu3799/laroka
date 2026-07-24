@@ -12,8 +12,8 @@ export function useToast() {
         setToasts(prev => prev.filter(t => t.id !== id))
       }, 3500)
     }
-    window.addEventListener('laroka:toast', handler)
-    return () => window.removeEventListener('laroka:toast', handler)
+    window.addEventListener('pedisur:toast', handler)
+    return () => window.removeEventListener('pedisur:toast', handler)
   }, [])
 
   return toasts

@@ -63,21 +63,21 @@ export default function SubHeader() {
       }, ...prev])
     }
 
-    window.addEventListener('laroka:order-updated', handle)
-    return () => window.removeEventListener('laroka:order-updated', handle)
+    window.addEventListener('pedisur:order-updated', handle)
+    return () => window.removeEventListener('pedisur:order-updated', handle)
   }, [])
 
   // ── Clear feed on full refresh ───────────────────────────────
   useEffect(() => {
     function handle() { setFeedItems([]) }
-    window.addEventListener('laroka:clear-feed', handle)
-    return () => window.removeEventListener('laroka:clear-feed', handle)
+    window.addEventListener('pedisur:clear-feed', handle)
+    return () => window.removeEventListener('pedisur:clear-feed', handle)
   }, [])
 
   // ── Notify Orders of pending orderIds whenever feed changes ──
   useEffect(() => {
     const orderColorMap = new Map(feedItems.map(item => [item.orderId, item.color]))
-    window.dispatchEvent(new CustomEvent('laroka:feed-updated', { detail: { orderColorMap } }))
+    window.dispatchEvent(new CustomEvent('pedisur:feed-updated', { detail: { orderColorMap } }))
   }, [feedItems])
 
   // ── Click outside closes panel ───────────────────────────────
@@ -97,7 +97,7 @@ export default function SubHeader() {
       try { order = await fetchOrderDetail(item.orderId, token, activeBranchId) } catch { /* noop */ }
     }
     if (order) {
-      window.dispatchEvent(new CustomEvent('laroka:order-insert', { detail: { order } }))
+      window.dispatchEvent(new CustomEvent('pedisur:order-insert', { detail: { order } }))
     }
     setFeedItems(prev => prev.filter(i => i.id !== item.id))
   }

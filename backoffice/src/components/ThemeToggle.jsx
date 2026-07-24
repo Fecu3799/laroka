@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-const STORAGE_KEY = 'laroka_backoffice_theme'
+const STORAGE_KEY = 'pedisur_backoffice_theme'
 
 // El tema vigente lo fija el <script> inline de index.html antes del render, así que
 // se lee del atributo data-theme del <html> (fuente de verdad sincrónica).

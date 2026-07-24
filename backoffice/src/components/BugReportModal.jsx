@@ -36,7 +36,7 @@ export default function BugReportModal({ onClose }) {
         token,
         branchId,
       )
-      window.dispatchEvent(new CustomEvent('laroka:toast', { detail: { message: 'Reporte enviado' } }))
+      window.dispatchEvent(new CustomEvent('pedisur:toast', { detail: { message: 'Reporte enviado' } }))
       onClose()
     } catch {
       setError('No se pudo enviar, intentá de nuevo.')

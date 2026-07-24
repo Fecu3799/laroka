@@ -74,7 +74,7 @@ test('dismissedIds acumula múltiples ids y todos persisten tras refresh()', asy
 })
 
 test('dismissedIds se inicializa desde localStorage', async () => {
-  localStorage.setItem('laroka_dismissed_ids', JSON.stringify(['stored-order']))
+  localStorage.setItem('pedisur_dismissed_ids', JSON.stringify(['stored-order']))
 
   const { result } = renderHook(() => useOrders('test-token'))
   await waitFor(() => expect(result.current.loading).toBe(false))

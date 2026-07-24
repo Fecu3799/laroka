@@ -9,7 +9,7 @@ export async function login(email, password) {
 }
 
 export function logout(token) {
-  const refreshToken = localStorage.getItem('laroka_refresh_token')
+  const refreshToken = localStorage.getItem('pedisur_refresh_token')
   if (token) {
     fetch(`${API_URL}/auth/logout`, {
       method: 'POST',
@@ -20,9 +20,9 @@ export function logout(token) {
       body: JSON.stringify({ refreshToken }),
     }).catch(() => {})
   }
-  localStorage.removeItem('laroka_token')
-  localStorage.removeItem('laroka_refresh_token')
-  localStorage.removeItem('laroka_dismissed_ids')
+  localStorage.removeItem('pedisur_token')
+  localStorage.removeItem('pedisur_refresh_token')
+  localStorage.removeItem('pedisur_dismissed_ids')
   // Notifica a useAuth en esta misma pestaña (el evento "storage" no dispara aquí).
-  window.dispatchEvent(new Event('laroka:token-changed'))
+  window.dispatchEvent(new Event('pedisur:token-changed'))
 }

@@ -207,7 +207,7 @@ export function CartScreen({ items, extras = [], onBack, onRemove, onUpdateQty, 
       if (data.status === 'PENDING_PAYMENT') {
         setMpReturnOrderId(orderId)
       } else if (data.status && data.status !== 'CANCELLED') {
-        sessionStorage.removeItem('laroka_checkout_recovery')
+        sessionStorage.removeItem('pedisur_checkout_recovery')
         onClear()
         setConfirmedOrderId(orderId)
       }
@@ -302,7 +302,7 @@ export function CartScreen({ items, extras = [], onBack, onRemove, onUpdateQty, 
 
     if (formData.paymentMethod === 'MERCADOPAGO') {
       addActiveOrder(data.orderId, preferredBranchId)
-      sessionStorage.setItem('laroka_checkout_recovery', JSON.stringify({
+      sessionStorage.setItem('pedisur_checkout_recovery', JSON.stringify({
         orderId: data.orderId,
         items: items.map(i => ({
           id: i.id, name: i.name, price: i.price, qty: i.qty,

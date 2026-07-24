@@ -1,8 +1,8 @@
 import { useCallback, useRef, useState } from 'react'
 import { upsertPushSubscription } from '../services/pushService'
 
-const OPTIN_KEY = 'laroka_push_optin_shown'
-const INSTALL_KEY = 'laroka_push_install_shown'
+const OPTIN_KEY = 'pedisur_push_optin_shown'
+const INSTALL_KEY = 'pedisur_push_install_shown'
 
 /**
  * Convierte una clave VAPID pública en Base64 URL-safe (sin padding) al

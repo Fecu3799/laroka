@@ -24,14 +24,14 @@ describe('PaymentResultScreen', () => {
   })
 
   it('status=approved: renderiza ConfirmationScreen y no llama onComplete de inmediato', async () => {
-    sessionStorage.setItem('laroka_checkout_recovery', JSON.stringify({ orderId: 'x' }))
+    sessionStorage.setItem('pedisur_checkout_recovery', JSON.stringify({ orderId: 'x' }))
     setSearch('?status=approved&orderId=order-99')
 
     render(<PaymentResultScreen branchId={1} onComplete={onComplete} />)
 
     expect(screen.getByText('Confirmación order-99')).toBeInTheDocument()
     await waitFor(() => {
-      expect(sessionStorage.getItem('laroka_checkout_recovery')).toBeNull()
+      expect(sessionStorage.getItem('pedisur_checkout_recovery')).toBeNull()
     })
     expect(onComplete).not.toHaveBeenCalled()
   })
@@ -42,7 +42,7 @@ describe('PaymentResultScreen', () => {
       items: [{ id: 1, name: 'Muzarella', price: 2000, qty: 1 }],
       formData: { orderType: 'takeaway', nombre: 'Juan', telefono: '11' },
     }
-    sessionStorage.setItem('laroka_checkout_recovery', JSON.stringify(recovery))
+    sessionStorage.setItem('pedisur_checkout_recovery', JSON.stringify(recovery))
     setSearch('?status=failure&orderId=order-42')
 
     const { container } = render(<PaymentResultScreen branchId={1} onComplete={onComplete} />)
@@ -56,7 +56,7 @@ describe('PaymentResultScreen', () => {
         })
       )
     })
-    expect(sessionStorage.getItem('laroka_checkout_recovery')).toBeNull()
+    expect(sessionStorage.getItem('pedisur_checkout_recovery')).toBeNull()
   })
 
   it('status=failure: llama onComplete con recovery=null si no hay dato en sessionStorage', async () => {

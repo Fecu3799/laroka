@@ -7,7 +7,7 @@ export default function useOrders(token, branchId = null, shiftId = null, shiftR
   const [error, setError]             = useState(null)
   const [dismissedIds, setDismissedIds] = useState(() => {
     try {
-      const stored = localStorage.getItem('laroka_dismissed_ids')
+      const stored = localStorage.getItem('pedisur_dismissed_ids')
       return stored ? new Set(JSON.parse(stored)) : new Set()
     } catch { return new Set() }
   })
@@ -37,7 +37,7 @@ export default function useOrders(token, branchId = null, shiftId = null, shiftR
 
   useEffect(() => {
     try {
-      localStorage.setItem('laroka_dismissed_ids', JSON.stringify([...dismissedIds]))
+      localStorage.setItem('pedisur_dismissed_ids', JSON.stringify([...dismissedIds]))
     } catch { /* noop */ }
   }, [dismissedIds])
 
