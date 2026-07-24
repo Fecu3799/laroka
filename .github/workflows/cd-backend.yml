@@ -36,6 +36,11 @@ jobs:
     runs-on: ubuntu-latest
     needs: validate-secrets
 
+    # Expone la referencia de imagen fijada por digest (no por tag) para que el
+    # job de deploy dispare un build inmutable y trazable, en vez de :latest.
+    outputs:
+      image_ref: ${{ steps.image-ref.outputs.image_ref }}
+
     steps:
       - uses: actions/checkout@v4
 
@@ -46,28 +51,32 @@ jobs:
           password: ${{ secrets.DOCKER_PASS }}
 
       - name: Build and push
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: ./backend
           push: true
           tags: |
-            ${{ secrets.DOCKER_USER }}/laroka-backend:${{ github.sha }}
-            ${{ secrets.DOCKER_USER }}/laroka-backend:latest
+            ${{ secrets.DOCKER_USER }}/pedisur-backend:${{ github.sha }}
+            ${{ secrets.DOCKER_USER }}/pedisur-backend:latest
 
-      - name: Record image digest
+      - name: Record and export pinned image reference
+        id: image-ref
+        env:
+          DOCKER_USER: ${{ secrets.DOCKER_USER }}
+          # Digest sha256 del manifest recién pusheado, provisto directamente por
+          # build-push-action (no es el tag). Ya incluye el prefijo "sha256:".
+          DIGEST: ${{ steps.build.outputs.digest }}
         run: |
-          IMAGE="${{ secrets.DOCKER_USER }}/laroka-backend:${{ github.sha }}"
-          if ! docker pull "$IMAGE" > /dev/null 2>&1; then
-            echo "ERROR: no se pudo descargar la imagen $IMAGE para obtener su digest"
-            exit 1
-          fi
-          DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' "$IMAGE" 2>/dev/null) || true
           if [ -z "$DIGEST" ]; then
-            echo "ERROR: no se pudo obtener el digest SHA256 de la imagen $IMAGE"
+            echo "ERROR: build-push-action no devolvió el digest del manifest"
             exit 1
           fi
-          echo "### Docker Image Digest" >> $GITHUB_STEP_SUMMARY
-          echo "$DIGEST" >> $GITHUB_STEP_SUMMARY
+          IMAGE_REF="docker.io/${DOCKER_USER}/pedisur-backend@${DIGEST}"
+          echo "image_ref=${IMAGE_REF}" >> "$GITHUB_OUTPUT"
+          echo "### Docker Image" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Tag legible: \`docker.io/${DOCKER_USER}/pedisur-backend:latest\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Deploy inmutable (por digest): \`${IMAGE_REF}\`" >> "$GITHUB_STEP_SUMMARY"
 
   deploy:
     name: Deploy to Render
@@ -75,7 +84,17 @@ jobs:
     needs: [validate-secrets, docker]
 
     steps:
-      - name: Trigger deploy
+      - name: Trigger deploy pinned to image digest
         env:
           deploy_url: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
-        run: curl -X POST "$deploy_url"
+          image_ref: ${{ needs.docker.outputs.image_ref }}
+        run: |
+          if [ -z "$image_ref" ]; then
+            echo "ERROR: el job docker no expuso la referencia de imagen por digest"
+            exit 1
+          fi
+          # imgURL contiene '/', '@' y ':' → se URL-encodea para pasarlo como
+          # query param del deploy hook sin romper la URL.
+          encoded=$(jq -rn --arg v "$image_ref" '$v|@uri')
+          echo "Disparando deploy en Render fijado a: $image_ref"
+          curl -fsS -X POST "${deploy_url}&imgURL=${encoded}"

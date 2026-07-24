@@ -1,0 +1,33 @@
+package com.pedisur.backend.branch.dto;
+
+import java.time.LocalTime;
+
+import com.fasterxml.jackson.annotation.JsonFormat;
+import com.pedisur.backend.branch.entity.WeekDay;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class BranchScheduleDayResponseDTO {
+
+	private WeekDay dayOfWeek;
+	private boolean active;
+
+	@JsonFormat(pattern = "HH:mm")
+	private LocalTime openTime;
+
+	@JsonFormat(pattern = "HH:mm")
+	private LocalTime closeTime;
+
+	@JsonFormat(pattern = "HH:mm")
+	private LocalTime openTime2;
+
+	@JsonFormat(pattern = "HH:mm")
+	private LocalTime closeTime2;
+}

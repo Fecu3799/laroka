@@ -11,7 +11,7 @@ vi.mock('../hooks/usePreferredBranch', () => ({
   }),
 }))
 
-const KEY = 'laroka_active_orders'
+const KEY = 'pedisur_active_orders'
 
 function seedOrder(orderId, branchId = 1) {
   localStorage.setItem(KEY, JSON.stringify([{ orderId, branchId }]))
@@ -80,7 +80,7 @@ describe('OrderTrackingBanner', () => {
       expect(screen.getByText('ENTREGADO')).toBeInTheDocument()
       expect(screen.getByRole('button', { name: /listo/i })).toBeInTheDocument()
     })
-    // No se removió automáticamente de laroka_active_orders.
+    // No se removió automáticamente de pedisur_active_orders.
     expect(JSON.parse(localStorage.getItem(KEY))).toHaveLength(1)
   })
 
@@ -263,7 +263,7 @@ describe('OrderTrackingBanner', () => {
     expect(document.querySelector('[aria-busy="true"]')).toBeTruthy()
   })
 
-  it('adds a new order when laroka_orders_updated event fires', async () => {
+  it('adds a new order when pedisur_orders_updated event fires', async () => {
     vi.stubGlobal('fetch', vi.fn(url => {
       if (url.includes('/status')) {
         return Promise.resolve({
@@ -284,7 +284,7 @@ describe('OrderTrackingBanner', () => {
 
     act(() => {
       localStorage.setItem(KEY, JSON.stringify([{ orderId: 'order-new', branchId: 1 }]))
-      window.dispatchEvent(new Event('laroka_orders_updated'))
+      window.dispatchEvent(new Event('pedisur_orders_updated'))
     })
 
     await waitFor(() => {

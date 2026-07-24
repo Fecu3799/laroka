@@ -146,7 +146,7 @@ export default function Layout() {
                   const json = JSON.parse(line.slice(5).trim())
                   const orderId = json.orderId ?? json.order?.id
                   if (orderId) {
-                    window.dispatchEvent(new CustomEvent('laroka:order-updated', {
+                    window.dispatchEvent(new CustomEvent('pedisur:order-updated', {
                       detail: { orderId, type: json.type, order: json.order ?? null, origin: json.origin ?? null, actionOrigin: json.actionOrigin ?? null },
                     }))
                     if (orderId !== openOrderIdRef.current && window.location.pathname !== '/orders') {
@@ -155,14 +155,14 @@ export default function Layout() {
                     }
                   }
                   if (json.type === 'SHIFT_AUTO_CLOSED') {
-                    window.dispatchEvent(new CustomEvent('laroka:shift-auto-closed'))
+                    window.dispatchEvent(new CustomEvent('pedisur:shift-auto-closed'))
                   }
                   // Entrega/cancelación de un pedido: son los únicos eventos que
                   // alteran las métricas del turno. Avisamos al resumen (vive en
                   // ShiftProvider) para que recargue en silencio.
                   if (json.type === 'ORDER_UPDATED' &&
                       (json.order?.status === 'DELIVERED' || json.order?.status === 'CANCELLED')) {
-                    window.dispatchEvent(new CustomEvent('laroka:shift-summary-stale'))
+                    window.dispatchEvent(new CustomEvent('pedisur:shift-summary-stale'))
                   }
                 } catch { /* noop */ }
               }

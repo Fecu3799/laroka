@@ -65,7 +65,7 @@ test.describe('US-08 · validaciones de cierre de turno', () => {
     await page.addInitScript((token) => {
       localStorage.clear()
       sessionStorage.clear()
-      localStorage.setItem('laroka_token', token)
+      localStorage.setItem('pedisur_token', token)
     }, DEMO_TOKEN)
 
     await page.route('**/actuator/health', route =>

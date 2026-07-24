@@ -113,7 +113,7 @@ describe('CartScreen — paymentFailure recovery', () => {
     expect(screen.getByText('Tenés un pago pendiente')).toBeInTheDocument()
   })
 
-  it('persiste laroka_checkout_recovery en sessionStorage al confirmar con MercadoPago', async () => {
+  it('persiste pedisur_checkout_recovery en sessionStorage al confirmar con MercadoPago', async () => {
     const user = userEvent.setup()
     // 1) verificación de acceptingOrders del branch, 2) creación del pedido
     vi.mocked(fetch)
@@ -132,7 +132,7 @@ describe('CartScreen — paymentFailure recovery', () => {
     await user.click(screen.getByRole('button', { name: /ir a pagar/i }))
 
     await waitFor(() => {
-      const raw = sessionStorage.getItem('laroka_checkout_recovery')
+      const raw = sessionStorage.getItem('pedisur_checkout_recovery')
       expect(raw).not.toBeNull()
       const recovery = JSON.parse(raw)
       expect(recovery.orderId).toBe('order-99')
@@ -232,7 +232,7 @@ describe('CartScreen — producto no disponible al confirmar (US-15-CF-05)', () 
 // las instrucciones de instalación SIN llamar a requestPermission(), y no debe
 // reabrirlas si ya se mostraron en la misma sesión.
 describe('CartScreen — iOS Safari no instalado (US-09-F-04)', () => {
-  const INSTALL_KEY = 'laroka_push_install_shown'
+  const INSTALL_KEY = 'pedisur_push_install_shown'
   const IOS_UA =
     'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 ' +
     '(KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'

@@ -1,6 +1,6 @@
 spring:
   application:
-    name: laroka-backend
+    name: pedisur-backend
   servlet:
     multipart:
       # Límite de la capa de parsing multipart. Se alinea con MAX_UPLOAD_SIZE_MB
@@ -98,7 +98,7 @@ debug:
 r2:
   access-key: ${R2_ACCESS_KEY:}
   secret-key: ${R2_SECRET_KEY:}
-  bucket-name: ${R2_BUCKET_NAME:laroka-dev}
+  bucket-name: ${R2_BUCKET_NAME:pedisur-dev}
   endpoint: ${R2_ENDPOINT:}
   # Base de la URL pública del bucket (ej: https://<hash>.r2.dev o dominio
   # custom). Es distinta del endpoint S3 de escritura. La URL retornada por el
@@ -108,7 +108,7 @@ r2:
   test:
     access-key: ${R2_TEST_ACCESS_KEY:}
     secret-key: ${R2_TEST_SECRET_KEY:}
-    bucket-name: ${R2_TEST_BUCKET_NAME:laroka-test}
+    bucket-name: ${R2_TEST_BUCKET_NAME:pedisur-test}
     endpoint: ${R2_TEST_ENDPOINT:}
     public-url: ${R2_TEST_PUBLIC_URL:}
 

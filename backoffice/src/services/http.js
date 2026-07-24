@@ -1,11 +1,11 @@
 const API_URL = import.meta.env.VITE_API_URL ?? ''
 
 function dispatchToast(message) {
-  window.dispatchEvent(new CustomEvent('laroka:toast', { detail: { message } }))
+  window.dispatchEvent(new CustomEvent('pedisur:toast', { detail: { message } }))
 }
 
 async function tryRefresh() {
-  const refreshToken = localStorage.getItem('laroka_refresh_token')
+  const refreshToken = localStorage.getItem('pedisur_refresh_token')
   if (!refreshToken) return null
   try {
     const res = await fetch(`${API_URL}/auth/refresh`, {
@@ -15,8 +15,8 @@ async function tryRefresh() {
     })
     if (!res.ok) return null
     const data = await res.json()
-    localStorage.setItem('laroka_token', data.token)
-    if (data.refreshToken) localStorage.setItem('laroka_refresh_token', data.refreshToken)
+    localStorage.setItem('pedisur_token', data.token)
+    if (data.refreshToken) localStorage.setItem('pedisur_refresh_token', data.refreshToken)
     return data.token
   } catch {
     return null
@@ -58,8 +58,8 @@ export async function apiFetch(url, options = {}, { silentErrors = false } = {})
         throw new Error('network_error')
       }
     }
-    localStorage.removeItem('laroka_token')
-    localStorage.removeItem('laroka_refresh_token')
+    localStorage.removeItem('pedisur_token')
+    localStorage.removeItem('pedisur_refresh_token')
     window.location.href = '/login?reason=expired'
     throw new Error('session_expired')
   }

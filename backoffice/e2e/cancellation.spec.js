@@ -51,7 +51,7 @@ test.describe('US-06-F-05 · resolución de solicitud de cancelación', () => {
     await page.addInitScript((token) => {
       localStorage.clear()
       sessionStorage.clear()
-      localStorage.setItem('laroka_token', token)
+      localStorage.setItem('pedisur_token', token)
     }, DEMO_TOKEN)
 
     await page.route('**/actuator/health', route =>
@@ -191,7 +191,7 @@ test.describe('US-06-F-05 · cancelación directa del operador con motivo', () =
     await page.addInitScript((token) => {
       localStorage.clear()
       sessionStorage.clear()
-      localStorage.setItem('laroka_token', token)
+      localStorage.setItem('pedisur_token', token)
     }, DEMO_TOKEN)
 
     await page.route('**/actuator/health', route =>

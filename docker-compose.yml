@@ -1,24 +1,26 @@
+name: pedisur
+
 services:
   postgres:
     image: postgres:16
-    container_name: laroka-postgres
+    container_name: pedisur-postgres
     environment:
-      POSTGRES_DB: laroka
+      POSTGRES_DB: pedisur
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
       - "5432:5432"
     volumes:
-      - laroka-postgres-data:/var/lib/postgresql/data
+      - pedisur-postgres-data:/var/lib/postgresql/data
 
   # Base de datos efímera para la suite de tests (perfil "test" del backend).
   # Aislada del postgres de desarrollo: otro puerto, otra DB y datos en tmpfs
   # (se descartan al detener el contenedor, evitando estado sucio entre corridas).
   postgres-test:
     image: postgres:16
-    container_name: laroka-postgres-test
+    container_name: pedisur-postgres-test
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-laroka_test}
+      POSTGRES_DB: ${POSTGRES_DB:-pedisur_test}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     ports:
@@ -26,10 +28,14 @@ services:
     tmpfs:
       - /var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-laroka_test}"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-pedisur_test}",
+        ]
       interval: 5s
       timeout: 5s
       retries: 10
 
 volumes:
-  laroka-postgres-data:
+  pedisur-postgres-data:

@@ -13,7 +13,7 @@
  */
 (function () {
   try {
-    var t = localStorage.getItem('laroka_backoffice_theme');
+    var t = localStorage.getItem('pedisur_backoffice_theme');
     document.documentElement.setAttribute('data-theme', t === 'light' ? 'light' : 'dark');
   } catch {
     document.documentElement.setAttribute('data-theme', 'dark');

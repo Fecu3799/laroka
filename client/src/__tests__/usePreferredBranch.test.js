@@ -15,7 +15,7 @@ describe('usePreferredBranch', () => {
   })
 
   it('reads saved branch from localStorage on init', () => {
-    localStorage.setItem('laroka_preferred_branch', JSON.stringify(BRANCH))
+    localStorage.setItem('pedisur_preferred_branch', JSON.stringify(BRANCH))
     const { result } = renderHook(() => usePreferredBranch())
     expect(result.current.preferredBranchId).toBe(3)
     expect(result.current.preferredBranchName).toBe('Centro')
@@ -27,26 +27,26 @@ describe('usePreferredBranch', () => {
     const { result } = renderHook(() => usePreferredBranch())
     act(() => result.current.saveBranch(BRANCH))
     expect(result.current.preferredBranchId).toBe(3)
-    const stored = JSON.parse(localStorage.getItem('laroka_preferred_branch'))
+    const stored = JSON.parse(localStorage.getItem('pedisur_preferred_branch'))
     expect(stored.id).toBe(3)
   })
 
   it('clearBranch resets state and removes localStorage entry', () => {
-    localStorage.setItem('laroka_preferred_branch', JSON.stringify(BRANCH))
+    localStorage.setItem('pedisur_preferred_branch', JSON.stringify(BRANCH))
     const { result } = renderHook(() => usePreferredBranch())
     act(() => result.current.clearBranch())
     expect(result.current.preferredBranchId).toBeNull()
-    expect(localStorage.getItem('laroka_preferred_branch')).toBeNull()
+    expect(localStorage.getItem('pedisur_preferred_branch')).toBeNull()
   })
 
   it('handles legacy plain numeric string in storage', () => {
-    localStorage.setItem('laroka_preferred_branch', '5')
+    localStorage.setItem('pedisur_preferred_branch', '5')
     const { result } = renderHook(() => usePreferredBranch())
     expect(result.current.preferredBranchId).toBe(5)
   })
 
   it('handles corrupt JSON gracefully', () => {
-    localStorage.setItem('laroka_preferred_branch', '{bad json}')
+    localStorage.setItem('pedisur_preferred_branch', '{bad json}')
     const { result } = renderHook(() => usePreferredBranch())
     expect(result.current.preferredBranchId).toBeNull()
   })

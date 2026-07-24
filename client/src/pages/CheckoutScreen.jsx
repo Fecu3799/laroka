@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import styles from './CheckoutScreen.module.css'
 import { usePreferredBranch } from '../hooks/usePreferredBranch'
 
-const _DEBUG_COUNT_KEY = 'laroka_debug_fill_count'
+const _DEBUG_COUNT_KEY = 'pedisur_debug_fill_count'
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080'
 
 function formatPrice(amount) {
@@ -116,7 +116,7 @@ export function CheckoutScreen({ onBack, onConfirm, items = [], initialData = nu
       if (document.visibilityState !== 'visible') return
       let orderId = null
       try {
-        const raw = sessionStorage.getItem('laroka_checkout_recovery')
+        const raw = sessionStorage.getItem('pedisur_checkout_recovery')
         orderId = raw ? JSON.parse(raw)?.orderId ?? null : null
       } catch { /* sessionStorage no disponible */ }
       if (!orderId) return

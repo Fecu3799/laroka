@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import useAuth from '../hooks/useAuth'
 import { BranchContext } from '../hooks/useBranch'
 
-const SESSION_KEY = 'laroka_active_branch'
+const SESSION_KEY = 'pedisur_active_branch'
 
 function readSession() {
   try {

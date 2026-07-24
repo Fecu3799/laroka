@@ -67,7 +67,7 @@ export default function DiscountModal({ order, token, branchId, mode = 'create',
     try {
       await applyDiscount(order.id, { percentage: parsed, reason, note }, token, branchId)
       window.dispatchEvent(
-        new CustomEvent('laroka:toast', {
+        new CustomEvent('pedisur:toast', {
           detail: { message: isEdit ? 'Descuento modificado' : 'Descuento aplicado' },
         }),
       )

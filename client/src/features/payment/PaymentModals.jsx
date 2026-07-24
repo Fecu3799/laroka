@@ -29,7 +29,7 @@ export function FailureModal({ orderId, formData, cartItems, onClose }) {
   const handleRetry = async () => {
     // Re-persist recovery so a second failure also restores state
     if (orderId && formData) {
-      sessionStorage.setItem('laroka_checkout_recovery', JSON.stringify({
+      sessionStorage.setItem('pedisur_checkout_recovery', JSON.stringify({
         orderId,
         items: (cartItems || []).map(i => ({
           id: i.id, name: i.name, price: i.price, qty: i.qty,
@@ -44,7 +44,7 @@ export function FailureModal({ orderId, formData, cartItems, onClose }) {
       const paymentLink = await initiatePayment(orderId)
       window.location.href = paymentLink
     } catch {
-      sessionStorage.removeItem('laroka_checkout_recovery')
+      sessionStorage.removeItem('pedisur_checkout_recovery')
       setRetryError('No se pudo iniciar el pago. Intentá nuevamente.')
       setRetrying(false)
     }
@@ -99,7 +99,7 @@ export function PendingPaymentModal({ orderId, onCancel }) {
     try {
       await cancelOrder(orderId, null)
       removeActiveOrder(orderId)
-      sessionStorage.removeItem('laroka_checkout_recovery')
+      sessionStorage.removeItem('pedisur_checkout_recovery')
       onCancel()
     } catch {
       setError('No se pudo cancelar el pedido. Intentá nuevamente.')

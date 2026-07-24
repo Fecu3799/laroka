@@ -37,11 +37,11 @@ function App() {
   useEffect(() => () => clearTimeout(exitTimerRef.current), [])
 
   const handleSplashComplete = useCallback(async () => {
-    const raw = sessionStorage.getItem('laroka_checkout_recovery')
+    const raw = sessionStorage.getItem('pedisur_checkout_recovery')
     if (raw && preferredBranchId) {
       let recovery
       try { recovery = JSON.parse(raw) } catch {
-        sessionStorage.removeItem('laroka_checkout_recovery')
+        sessionStorage.removeItem('pedisur_checkout_recovery')
       }
       if (recovery) {
         try {
@@ -50,10 +50,10 @@ function App() {
           if (data?.status === 'PENDING_PAYMENT') {
             setPendingPaymentData(recovery)
           } else {
-            sessionStorage.removeItem('laroka_checkout_recovery')
+            sessionStorage.removeItem('pedisur_checkout_recovery')
           }
         } catch {
-          sessionStorage.removeItem('laroka_checkout_recovery')
+          sessionStorage.removeItem('pedisur_checkout_recovery')
         }
       }
     }

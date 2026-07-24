@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
 
-const CART_KEY = 'laroka_cart'
+const CART_KEY = 'pedisur_cart'
 
 function loadInitialItems(initialItems) {
   if (initialItems.length > 0) return initialItems

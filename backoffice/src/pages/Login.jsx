@@ -41,10 +41,10 @@ export default function Login() {
       }
 
       const data = await res.json()
-      localStorage.setItem('laroka_token', data.token)
-      if (data.refreshToken) localStorage.setItem('laroka_refresh_token', data.refreshToken)
+      localStorage.setItem('pedisur_token', data.token)
+      if (data.refreshToken) localStorage.setItem('pedisur_refresh_token', data.refreshToken)
       // Notifica a useAuth en esta misma pestaña (el evento "storage" no dispara aquí).
-      window.dispatchEvent(new Event('laroka:token-changed'))
+      window.dispatchEvent(new Event('pedisur:token-changed'))
       try {
         const payload = JSON.parse(atob(data.token.split('.')[1]))
         if (payload.role === 'ADMIN') {

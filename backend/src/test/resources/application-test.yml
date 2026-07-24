@@ -3,7 +3,7 @@
 # Activado por @ActiveProfiles("test") en los tests de integración (@SpringBootTest).
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5433/laroka_test
+    url: jdbc:postgresql://localhost:5433/pedisur_test
     username: postgres
     password: postgres
   jpa:

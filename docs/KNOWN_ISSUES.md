@@ -36,3 +36,13 @@
 2. El ADMIN edita cada categoría existente desde el backoffice y le asigna el tipo correspondiente (US-CAT-03).
 
 No requiere migración de datos ni cambio de código.
+
+## Caches huérfanos del Service Worker al renombrar cache names (rename LaRoka → PediSur)
+
+**Contexto:** El rename de `laroka-images` / `laroka-api` a `pedisur-images` / `pedisur-api` en `client/src/sw.js` se hizo **sin lógica de limpieza** de los caches viejos. Workbox no borra caches cuyo nombre desconoce: al instalarse el SW nuevo, los caches con el nombre anterior quedan en el navegador ocupando espacio hasta que el usuario limpie los datos del sitio a mano.
+
+**Por qué se aceptó:** el cambio se hizo con **cero usuarios instalados**, así que no había ningún navegador con el cache viejo. El costo real fue nulo — no porque el problema no exista, sino porque en ese momento no tenía a quién afectarle.
+
+**Por qué queda anotado:** esa ventana se cierra con el lanzamiento. La próxima vez que se cambien los `cacheName` o se bumpee `SW_VERSION` **ya habiendo usuarios con la PWA instalada**, el mismo cambio sí deja caches huérfanos reales en dispositivos reales (imágenes de producto con `maxEntries: 150` no es despreciable en un teléfono).
+
+**Resolución para entonces:** agregar un handler `activate` en `client/src/sw.js` que enumere `caches.keys()` y borre las que no estén en la allowlist de caches vigentes, antes de `clientsClaim()`. Es la contraparte exacta del rename de storage keys, que también se hizo directo y sin migración aprovechando que no había usuarios: la ventana barata se cierra pronto, y conviene no descubrirlo en sentido inverso.

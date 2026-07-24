@@ -64,8 +64,8 @@ export function OrdersProvider({ setOpenOrderId, children }) {
     function handleOrderCreated() {
       refresh()
     }
-    window.addEventListener('laroka:order-created', handleOrderCreated)
-    return () => window.removeEventListener('laroka:order-created', handleOrderCreated)
+    window.addEventListener('pedisur:order-created', handleOrderCreated)
+    return () => window.removeEventListener('pedisur:order-created', handleOrderCreated)
   }, [refresh])
 
   // ── Feed item pressed in SubHeader → merge + flash ───────────
@@ -77,15 +77,15 @@ export function OrdersProvider({ setOpenOrderId, children }) {
         flashOrder(order.id)
       }
     }
-    window.addEventListener('laroka:order-insert', handleOrderInsert)
-    return () => window.removeEventListener('laroka:order-insert', handleOrderInsert)
+    window.addEventListener('pedisur:order-insert', handleOrderInsert)
+    return () => window.removeEventListener('pedisur:order-insert', handleOrderInsert)
   }, [updateSingleOrder, flashOrder])
 
   // ── Sync pending dot set from SubHeader feed ─────────────────
   useEffect(() => {
     function handle(e) { setPendingOrderIds(e.detail?.orderColorMap ?? new Map()) }
-    window.addEventListener('laroka:feed-updated', handle)
-    return () => window.removeEventListener('laroka:feed-updated', handle)
+    window.addEventListener('pedisur:feed-updated', handle)
+    return () => window.removeEventListener('pedisur:feed-updated', handle)
   }, [])
 
   // ── Remove pending dot when detail panel opens ───────────────
@@ -115,8 +115,8 @@ export function OrdersProvider({ setOpenOrderId, children }) {
         }
       }
     }
-    window.addEventListener('laroka:order-updated', handleOrderUpdated)
-    return () => window.removeEventListener('laroka:order-updated', handleOrderUpdated)
+    window.addEventListener('pedisur:order-updated', handleOrderUpdated)
+    return () => window.removeEventListener('pedisur:order-updated', handleOrderUpdated)
   }, [selectedId, refetchDetail, updateOrderInList, replaceOrderInList])
 
   // ── Clear list and close panel synchronously on branch change ─

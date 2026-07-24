@@ -207,13 +207,13 @@ describe('modo edición', () => {
   test('avisa "Descuento modificado" al guardar', async () => {
     const events = []
     const handler = e => events.push(e.detail.message)
-    window.addEventListener('laroka:toast', handler)
+    window.addEventListener('pedisur:toast', handler)
 
     renderModal(ORDER_WITH_DISCOUNT, 'edit')
     fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
 
     await waitFor(() => expect(events).toContain('Descuento modificado'))
-    window.removeEventListener('laroka:toast', handler)
+    window.removeEventListener('pedisur:toast', handler)
   })
 
   test('crear (sin descuento) mantiene los textos originales', () => {

@@ -256,8 +256,8 @@ export default function NewOrderModal({ open, onClose }) {
 
   const handleDebugFill = import.meta.env.DEV
     ? () => {
-        const next = (parseInt(localStorage.getItem('laroka_debug_fill_count') || '0', 10)) + 1
-        localStorage.setItem('laroka_debug_fill_count', String(next))
+        const next = (parseInt(localStorage.getItem('pedisur_debug_fill_count') || '0', 10)) + 1
+        localStorage.setItem('pedisur_debug_fill_count', String(next))
         const ts = new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
         setCustomerName(`Dev User #${next}`)
         setCustomerPhone('2804000000')
@@ -364,7 +364,7 @@ export default function NewOrderModal({ open, onClose }) {
         })),
         origin: 'BACKOFFICE',
       }, token)
-      window.dispatchEvent(new Event('laroka:order-created'))
+      window.dispatchEvent(new Event('pedisur:order-created'))
       resetState()
       onClose()
     } catch {
