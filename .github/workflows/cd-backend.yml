@@ -41,6 +41,15 @@ jobs:
     outputs:
       image_ref: ${{ steps.image-ref.outputs.image_ref }}
 
+    env:
+      # Namespace público de Docker Hub. Es información pública (visible en
+      # cualquier imagen pusheada), por eso NO se toma de secrets.DOCKER_USER
+      # para armar el output image_ref: GitHub Actions redacta y descarta
+      # cualquier output de job que contenga el valor de un secret como
+      # substring ("Skip output ... since it may contain secret"), y eso vaciaba
+      # needs.docker.outputs.image_ref al propagarlo al job deploy.
+      DOCKER_NAMESPACE: fecu3799
+
     steps:
       - uses: actions/checkout@v4
 
@@ -57,13 +66,12 @@ jobs:
           context: ./backend
           push: true
           tags: |
-            ${{ secrets.DOCKER_USER }}/pedisur-backend:${{ github.sha }}
-            ${{ secrets.DOCKER_USER }}/pedisur-backend:latest
+            ${{ env.DOCKER_NAMESPACE }}/pedisur-backend:${{ github.sha }}
+            ${{ env.DOCKER_NAMESPACE }}/pedisur-backend:latest
 
       - name: Record and export pinned image reference
         id: image-ref
         env:
-          DOCKER_USER: ${{ secrets.DOCKER_USER }}
           # Digest sha256 del manifest recién pusheado, provisto directamente por
           # build-push-action (no es el tag). Ya incluye el prefijo "sha256:".
           DIGEST: ${{ steps.build.outputs.digest }}
@@ -72,10 +80,10 @@ jobs:
             echo "ERROR: build-push-action no devolvió el digest del manifest"
             exit 1
           fi
-          IMAGE_REF="docker.io/${DOCKER_USER}/pedisur-backend@${DIGEST}"
+          IMAGE_REF="docker.io/${DOCKER_NAMESPACE}/pedisur-backend@${DIGEST}"
           echo "image_ref=${IMAGE_REF}" >> "$GITHUB_OUTPUT"
           echo "### Docker Image" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Tag legible: \`docker.io/${DOCKER_USER}/pedisur-backend:latest\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Tag legible: \`docker.io/${DOCKER_NAMESPACE}/pedisur-backend:latest\`" >> "$GITHUB_STEP_SUMMARY"
           echo "- Deploy inmutable (por digest): \`${IMAGE_REF}\`" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Debug — verificar step output
